@@ -1,5 +1,5 @@
 # Author: Bill Doughty
-# Version: 1.0
+# Version: 0.1.1
 
 import socket
 import string
@@ -128,6 +128,16 @@ class StringSpaceClient:
             if self.debug:
                 print(f"Error: {e}")
             return []
+
+    def data_file(self) -> str:
+        try:
+            request_elements = ["data-file"]
+            response = self.request(request_elements)
+            return response
+        except ProtocolError as e:
+            if self.debug:
+                print(f"Error: {e}")
+            return "ERROR"
 
     def insert(self, strings: list[str]):
         try:
