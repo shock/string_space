@@ -88,7 +88,7 @@ def print_strings_test(client):
 
 def similar_test(client):
     try:
-        words = client.similar_search("hello", 2)
+        words = client.similar_search("testi", 0.6)
         print(f"Similar words:")
         for word in words:
             print(f"  {word}")
@@ -97,10 +97,13 @@ def similar_test(client):
 
 def main():
     client = StringSpaceClient('127.0.0.1', 7878)
-    prexix_test(client)
-    substring_test(client)
-    similar_test(client)
-    insert_test(client)
+    # prexix_test(client)
+    # substring_test(client)
+    # similar_test(client)
+    prefix = "testi"
+    print("Prefix search:" + prefix)
+    print("\n".join(client.prefix_search(prefix=prefix)))
+    # insert_test(client)
     # remove_test(client)
     # get_all_strings_test(client)
     # empty_test(client)

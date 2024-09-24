@@ -36,7 +36,7 @@ install: release
 		cp $(RELEASE_DIR)/$(EXECUTABLE) $(TARGET)
 
 benchmark: release
-	RUST_BACKTRACE=full $(CARGO) run --release -- -b test/text.file 100000
+	RUST_BACKTRACE=full $(CARGO) run --release -- test/text.file -b 100000
 
 server: release
 	RUST_BACKTRACE=full $(RELEASE_DIR)/$(EXECUTABLE) test/word_list.txt
