@@ -95,15 +95,23 @@ def similar_test(client):
     except ProtocolError as e:
         print(f"ProtocolError: {e}")
 
+def data_file_test(client):
+    try:
+        data_file = client.data_file()
+        print(f"Data file: {data_file}")
+    except ProtocolError as e:
+        print(f"ProtocolError: {e}")
+
 def main():
     client = StringSpaceClient('127.0.0.1', 7878)
-    # prexix_test(client)
-    # substring_test(client)
-    # similar_test(client)
+    prexix_test(client)
+    substring_test(client)
+    similar_test(client)
     prefix = "testi"
     print("Prefix search:" + prefix)
     print("\n".join(client.prefix_search(prefix=prefix)))
-    # insert_test(client)
+    insert_test(client)
+    data_file_test(client)
     # remove_test(client)
     # get_all_strings_test(client)
     # empty_test(client)

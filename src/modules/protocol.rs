@@ -2,6 +2,7 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
 use crate::modules::string_space::StringSpace;
+use crate::modules::utils;
 use regex;
 
 pub trait Protocol {
@@ -20,7 +21,8 @@ pub struct StringSpaceProtocol {
 impl StringSpaceProtocol {
     pub fn new(file_path: String) -> Self {
         let mut space = StringSpace::new();
-        let result: io::Result<()> = space.read_from_file(&file_path);
+        let expanded_path = utils::expand_path(&file_path);
+        let result: io::Result<()> = space.read_from_file(&expanded_path);
         match result {
             Ok(_) => {
                 println!("File read successfully");
@@ -31,7 +33,7 @@ impl StringSpaceProtocol {
         }
         Self {
             space: space,
-            file_path: file_path,
+            file_path: expanded_path,
         }
 
     }
@@ -117,7 +119,12 @@ impl StringSpaceProtocol {
                 response.extend_from_slice("\n".as_bytes());
             }
             return response;
-        } else if "insert"  == operation {
+        }
+        else if "data-file"  == operation {
+            response.extend_from_slice(self.file_path.as_bytes());
+            return response;
+        }
+        else if "insert"  == operation {
             if params.len() < 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());

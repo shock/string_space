@@ -39,3 +39,24 @@ where
     let duration = start.elapsed(); // Calculate the elapsed time
     duration // Return the duration in milliseconds
 }
+
+use std::path::PathBuf;
+use dirs;
+
+#[allow(unused)]
+pub fn expand_path(path: &str) -> String {
+    let path_buf = if path.starts_with("~") {
+        dirs::home_dir()
+            .map(|mut home| {
+                home.push(&path[2..]);
+                home
+            })
+            .unwrap_or_else(|| PathBuf::from(path))
+    } else {
+        PathBuf::from(path)
+    };
+
+    path_buf.canonicalize()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_string())
+}
