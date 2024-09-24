@@ -1,0 +1,15 @@
+[package]
+name = "string_space"
+authors = ["Bill Doughty"]
+version = "0.1.0"
+about = "github.com/shock/string_space"
+edition = "2021"
+
+[dependencies]
+byteorder = "1.5.0"
+clap = { version = "4.5.18", features = ["derive"] }
+fuzzy-matcher = "0.3.7"
+jaro_winkler = "0.1.0"
+rand = "0.8.5"
+regex = "1.10.6"
+strsim = "0.11.1"

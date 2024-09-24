@@ -1,0 +1,7 @@
+*.code-workspace
+.DS_Store
+.aider*
+target/
+__pycache__/
+test/
+!.gitkeep

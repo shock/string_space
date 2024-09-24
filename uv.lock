@@ -1,0 +1,21 @@
+version = 1
+requires-python = ">=3.12"
+
+[[package]]
+name = "jaro-winkler"
+version = "2.0.3"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/fb/f62082539f2e62ecb70e1f8fefcea051f3e8f993731b3aa83dd1db5814f3/jaro_winkler-2.0.3-py3-none-any.whl", hash = "sha256:9ad42a94eb110351e72dd5b9e0a0f1053b0760761d676f9be35da19ea80d511b", size = 33663 },
+]
+
+[[package]]
+name = "struct-test"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "jaro-winkler" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jaro-winkler", specifier = ">=2.0.3" }]
