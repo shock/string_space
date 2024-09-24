@@ -65,13 +65,14 @@ impl StringSpace {
     }
 
     #[allow(unused)]
-    pub fn get_similar_words(&self, word: &str, threshold: usize) -> Vec<StringRef> {
+    pub fn get_similar_words(&self, word: &str, cutoff: Option<f64>) -> Vec<StringRef> {
+        let cutoff = cutoff.unwrap_or(0.6);
         if word.len() < 2 {
             return Vec::new();
         }
         let possibilities = self.inner.find_by_prefix(word[0..1].to_string().as_str());
         // let matches = get_close_matches_levenshtein(word, &possibilities, threshold);
-        let matches = get_close_matches(word, &possibilities, 5, 0.2);
+        let matches = get_close_matches(word, &possibilities, 5, cutoff);
         matches
     }
 
@@ -290,11 +291,18 @@ impl StringSpaceInner {
             return results;
         }
 
-        let start_index = self.binary_search(search_bytes, |a, b| {
-            let prefix_len = std::cmp::min(a.len(), b.len());
-            a[..prefix_len].cmp(&b[..prefix_len])
+        // find the index of the string that is or preceeds the first string matching the prefix
+        let start_index = self.binary_search(search_bytes, |string, prefix| {
+            let prefix_len = std::cmp::min(string.len(), prefix.len());
+            let compare = string[..prefix_len].cmp(&prefix[..prefix_len]);
+            if compare == std::cmp::Ordering::Equal {
+                // if the comparison is equal, check if the string is longer than the prefix
+                if string.len() > prefix.len() { return std::cmp::Ordering::Greater; }
+            }
+            compare
         });
 
+        let mut matched_once = false;
         for index in start_index..self.string_refs.len() {
             let ref_info = &self.string_refs[index];
             let string_bytes = unsafe {
@@ -304,8 +312,13 @@ impl StringSpaceInner {
                 )
             };
 
-            let prefix_len = std::cmp::min(search_len, ref_info.length);
-            if &string_bytes[..prefix_len] == &search_bytes[..prefix_len] {
+            // if the string is shorter than the prefix, skip it
+            if string_bytes.len() < search_len {
+                continue;
+            }
+
+            if &string_bytes[..search_len] == &search_bytes[..search_len] {
+                matched_once = true;
                 if let Ok(string) = std::str::from_utf8(string_bytes) {
                     results.push(StringRef {
                         string: string.to_string(),
@@ -315,8 +328,10 @@ impl StringSpaceInner {
                     println!("Invalid UTF-8 string at pointer {}", ref_info.pointer);
                 }
             } else {
-                // No longer matching, break out of the loop
-                break;
+                if matched_once {
+                    // No longer matching, break out of the loop
+                    break;
+                }
             }
         }
         // reverse sort the results by frequency
@@ -535,9 +550,10 @@ fn get_close_matches(word: &str, possibilities: &[StringRef], n: usize, cutoff: 
 
     for string_ref in possibilities {
         let possibility = string_ref.string.as_str();
+        // let score = similar(word, possibility) * 2.0;
         let score = jaro_winkler(word, possibility);
-        println!("word: {}, possibility: {}, score: {}", word, possibility, score);
         if score > cutoff {
+            // println!("word: {}, possibility: {}, score: {}", word, possibility, score);
             matches.push((possibility.to_string(), (score*4294967296.0) as u32, string_ref.meta.frequency, string_ref.meta.age_days));
         }
     }
@@ -605,39 +621,6 @@ mod tests {
         assert!(ss.insert_string("a".repeat(51).as_str(), 1).is_err());  // Too long
         assert!(ss.insert_string("abc", 1).is_ok());  // Just right
         assert!(ss.insert_string("a".repeat(50).as_str(), 1).is_ok());  // Maximum length
-    }
-
-    #[test]
-    fn test_find_by_prefix() {
-        let mut ss = StringSpace::new();
-        ss.insert_string("apple", 1).unwrap();
-        ss.insert_string("hello", 1).unwrap();
-        ss.insert_string("help", 2).unwrap();
-        ss.insert_string("helicopter", 1).unwrap();
-        ss.insert_string("world", 1).unwrap();
-
-        let results = ss.find_by_prefix("hel");
-        for r in &results {
-            println!("found string: {}", r.string);
-        }
-        assert_eq!(results.len(), 3);
-        // results are sorted by reverse frequency primary, then alphanumeric order secondary
-        assert!(results[0].string == "help");  // highest frequency
-        assert!(results[1].string == "helicopter");  // lower same frequency alphabetically first
-        assert!(results[2].string == "hello");  // lowest same frequency alphabetically last
-    }
-
-    #[test]  // test find_by_prefix with empty prefix
-    fn test_find_by_prefix_empty_prefix() {
-        let mut ss = StringSpace::new();
-        ss.insert_string("apple", 1).unwrap();
-        ss.insert_string("hello", 1).unwrap();
-        ss.insert_string("help", 2).unwrap();
-        ss.insert_string("helicopter", 1).unwrap();
-        ss.insert_string("world", 1).unwrap();
-
-        let results = ss.find_by_prefix("");
-        assert_eq!(results.len(), 0);
     }
 
     #[test]
@@ -746,6 +729,22 @@ mod tests {
             assert!(results[2].string == "hello");  // lowest same frequency alphabetically last
         }
 
+        #[test]
+        fn prefix_excludes() {
+            // this is to verify a bug-fix where the prefix search was returning strings that
+            // were a prefix of the prefix being searched for! ;)
+            let mut ss = StringSpace::new();
+            ss.insert_string("test", 1).unwrap();
+            ss.insert_string("testing", 1).unwrap();
+
+            let results = ss.find_by_prefix("testi");
+            for r in &results {
+                println!("found string: {}", r.string);
+            }
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "testing");
+        }
+
         #[test]  // test find_by_prefix with empty prefix
         fn test_find_by_prefix_empty_prefix() {
             let mut ss = StringSpace::new();
@@ -777,7 +776,7 @@ mod tests {
             let ss = StringSpace {
                 inner: ssi,
             };
-            let results = ss.get_similar_words("hell", 2);
+            let results = ss.get_similar_words("hell", Some(0.6));
             for r in &results {
                 println!("found string: {}", r.string);
             }
@@ -785,7 +784,8 @@ mod tests {
             assert!(results[0].string == "hello3");  // highest frequency
             assert!(results[1].string == "hello2");  // highest age
             assert!(results[2].string == "hello1");  // same frequency and age
-            assert!(results[3].string == "help");  // lowest distance
+            assert!(results[3].string == "help");  // lower score
+            assert!(results[4].string == "helicopter");  // lowest score
         }
     }
 }

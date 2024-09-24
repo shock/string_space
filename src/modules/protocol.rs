@@ -63,13 +63,23 @@ impl StringSpaceProtocol {
         }
         else if "similar" == operation {
             if params.len() != 2 {
-                let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
+                let response_str = format!("ERROR\nInvalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
                 return response;
             }
             let word = params[0];
-            let threshold = params[1].parse::<usize>().unwrap_or_else(|_| {1});
-            let matches = self.space.get_similar_words(word, threshold);
+            let cutoff_param = params[1].parse::<f64>();
+            let cutoff: f64;
+            match cutoff_param {
+                Ok(t) => { cutoff = t; },
+                Err(_) => {
+                    let response_str = format!("ERROR\nInvalid cutoff parameter '{}'.  expecting floating point string between 0.0 and 1.0", params[1]);
+                    response.extend_from_slice(response_str.as_bytes());
+                    return response;
+                }
+            }
+            println!("cutoff: {}", cutoff);
+            let matches = self.space.get_similar_words(word, Some(cutoff));
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -175,14 +185,12 @@ impl Protocol for StringSpaceProtocol {
             if let Ok(buffer_str) = str_or_err {
                 // Split the buffer into a vector of strings using RS_BYTE as the delimiter
                 let request_elements: Vec<&str> = buffer_str.split(RS_BYTE_STR).collect();
-                println!("Received:\n{}", request_elements.join("\n"));
+                println!("\nRequest:\n{}", request_elements.join("\n"));
 
                 let mut response = self.create_response(request_elements[0], request_elements[1..].to_vec());
-
-                // // Ensure the response ends with a newline and the EOT character
-                // if !response.ends_with(&RS_BYTE_ARRAY) {
-                //     response.extend_from_slice("\n".as_bytes());
-                // }
+                // convert the response byte vector to a string
+                let response_str = String::from_utf8(response.clone()).unwrap();
+                println!("Response:\n{:?}", response_str);
                 response.push(EOT_BYTE);
 
                 stream.write_all(&response).expect("Failed to write to stream");
