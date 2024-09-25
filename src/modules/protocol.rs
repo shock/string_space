@@ -214,11 +214,16 @@ impl Protocol for StringSpaceProtocol {
 }
 
 #[allow(unused)]
-pub fn run_server(port: u16, mut protocol: Box<dyn Protocol>) {
-    let host = "127.0.0.1";
+pub fn run_server<F>(host: &str, port: u16, mut protocol: Box<dyn Protocol>, bind_success: Option<F>) -> io::Result<()>
+where F: FnMut()
+{
+    // let host = "127.0.0.1";
     let listener = TcpListener::bind(format!("{}:{}", host, port));
     match listener {
         Ok(listener) => {
+            if let Some(mut bind_success) = bind_success {
+                bind_success();
+            }
             println!("TCP protocol handler listening on {}:{}", host, port);
             for stream in listener.incoming() {
                 match stream {
@@ -230,9 +235,11 @@ pub fn run_server(port: u16, mut protocol: Box<dyn Protocol>) {
                     Err(e) => { eprintln!("Failed: {}", e); },
                 }
             }
+            return Ok(());
         },
         Err(e) => {
             eprintln!("Failed to bind to port {}: {}", port, e);
+            return Err(e);
         }
     }
 }

@@ -19,27 +19,27 @@ all: debug test
 
 # Build the project in debug mode
 debug:
-		$(CARGO) build
+	$(CARGO) build
 
 # Build the project in release mode
 release: test
-		$(CARGO) build --release
+	$(CARGO) build --release
 
 # Clean up build artifacts
 clean:
-		$(CARGO) clean
+	$(CARGO) clean
 
 test:
-	$(CARGO) test
+	tests/run_tests.sh
 
 install: release
-		cp $(RELEASE_DIR)/$(EXECUTABLE) $(TARGET)
+	cp $(RELEASE_DIR)/$(EXECUTABLE) $(TARGET)
 
 benchmark: release
 	RUST_BACKTRACE=full $(CARGO) run --release -- test/text.file -b 100000
 
 server: release
-	RUST_BACKTRACE=full $(RELEASE_DIR)/$(EXECUTABLE) test/word_list.txt
+	RUST_BACKTRACE=full $(RELEASE_DIR)/$(EXECUTABLE) start test/word_list.txt
 
 client:
 	python client.py

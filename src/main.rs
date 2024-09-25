@@ -1,167 +1,287 @@
-use std::fs;
-use std::io::{self};
 mod modules {
     pub mod utils;
     pub mod string_space;
     pub mod protocol;
+    pub mod benchmark;
 }
 
-use modules::utils::generate_random_words;
-use modules::utils::time_execution;
-use modules::string_space::StringSpace;
-use modules::string_space::StringRef;
 use modules::protocol::Protocol;
 use modules::protocol::StringSpaceProtocol;
 use modules::protocol::run_server;
+use modules::benchmark::benchmark;
 
-#[allow(unused)]
-fn benchmark(args: Vec<String>) {
-    if args.len() != 2 {
-        eprintln!("Usage: {} -b <num>", args[0]);
-        std::process::exit(1);
-    }
-
-    let file_path = &args[0];
-    let num_words: usize = args[1].parse().expect("Invalid number of words");
-
-    // TRUNCATE FILE IF IT EXISTS
-    if let Err(e) = fs::remove_file(file_path) {
-        if e.kind() != io::ErrorKind::NotFound {
-            panic!("Error deleting file: {}", e);
-        }
-    }
-    let _ = fs::File::create(file_path);
-
-    let mut space = StringSpace::new();
-
-    // Insert strings
-    space.insert_string("hello", 1).unwrap();
-    space.insert_string("helicopter", 1).unwrap();
-    space.insert_string("helicopter", 1).unwrap();
-    space.insert_string("helicopter", 1).unwrap();
-    space.insert_string("helicopter", 1).unwrap();
-    space.insert_string("help", 1).unwrap();
-    space.insert_string("harmony", 1).unwrap();
-    space.insert_string("hero", 1).unwrap();
-    space.insert_string("rust", 1).unwrap();
-
-    let mut random_words = generate_random_words(num_words, 15, 26);
-    random_words.sort();
-    random_words.reverse();
-
-    let insert_time = time_execution(|| {
-        // Insert strings
-        for word in random_words.iter() {
-            space.insert_string(word, 1).unwrap();
-        }
-    });
-    println!("Inserting {} words took {:?}", num_words, insert_time);
-
-    let insert_time = time_execution(|| {
-        // Insert strings
-        for word in random_words.iter() {
-            space.insert_string(word, 1).unwrap();
-        }
-    });
-    println!("Inserting {} words again took {:?}", num_words, insert_time);
-
-    // Write strings to file
-    let write_time = time_execution(|| {
-        space.write_to_file(file_path).unwrap();
-    });
-    println!("Writing strings to file took {:?}", write_time);
-
-    // Read strings from file
-    space.clear_space();
-    let read_time = time_execution(|| {
-        space.read_from_file(file_path).unwrap();
-    });
-    println!("Reading strings from file took {:?}", read_time);
-
-    // space.print_strings();
-
-    let substring = "he";
-    // Search by prefix
-    let mut found_strings: Vec<StringRef> = Vec::new();
-    let find_time = time_execution(|| {
-        found_strings = space.find_by_prefix(substring);
-        println!("Found {} strings with prefix '{}':", found_strings.len(), substring);
-        let max_len = std::cmp::min(found_strings.len(), 5);
-        for string_ref in found_strings[0..max_len].iter() {
-            println!("  {} {}", string_ref.string, string_ref.meta.frequency);
-        }
-    });
-    found_strings.sort_by(|a, b| a.meta.frequency.cmp(&b.meta.frequency));
-    println!("Finding strings with prefix '{}' took {:?}", substring, find_time);
-
-    // Search by substring
-    let mut found_strings: Vec<StringRef> = Vec::new();
-
-    let find_time = time_execution(|| {
-        found_strings = space.find_with_substring(substring);
-        println!("Found {} strings with substring '{}':", found_strings.len(), substring);
-        let max_len = std::cmp::min(found_strings.len(), 5);
-        for string_ref in found_strings[0..max_len].iter() {
-            println!("  {} {}", string_ref.string, string_ref.meta.frequency);
-        }
-    });
-    found_strings.sort_by(|a, b| a.meta.frequency.cmp(&b.meta.frequency));
-    println!("Finding strings with substring '{}' took {:?}", substring, find_time);
-
-    let insert_time = time_execution(|| {
-        // Insert strings
-        space.insert_string("aaaaaaaaaaaaaaaa", 1).unwrap();
-        space.insert_string("aaaaaaaaaaaaaaa", 1).unwrap();
-        space.insert_string("aaaaaaaaaaaaaa", 1).unwrap();
-        space.insert_string("aaaaaaaaaaaaa", 1).unwrap();
-        space.insert_string("aaaaaaaaaaaa", 1).unwrap();
-    });
-    println!("Inserting first word 5 times for {} word list took {:?}", num_words, insert_time);
-
-    space.write_to_file(file_path).unwrap();
-
-}
-
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use std::fs;
+use libc;
+use std::path::PathBuf;
 
 /// String Space Server
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// path to string database text file (will be created if it doesn't exist)
-    #[arg(value_name = "data-file", index = 1)]
-    data_file: String,
-
-    /// TCP port to listen on
-    #[arg(short, long, default_value_t = 7878)]
-    port: u16,
-
-    /// TCP host to bind on
-    #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
-    host: String,
-
-    /// Run benchmarks with COUNT words - WARNING: data-file will be overwritten!!
-    #[arg(short, long, value_name = "COUNT")]
-    benchmark: Option<u32>,
+    /// Command to execute
+    #[command(subcommand)]
+    command: Command,
 }
 
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Start the server
+    Start {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+
+        /// Run in background as daemon
+        #[arg(short, long, default_value_t = false)]
+        daemon: bool,
+
+        /// TCP port to listen on
+        #[arg(short, long, default_value_t = 7878)]
+        port: u16,
+
+        /// TCP host to bind on
+        #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
+        host: String,
+    },
+    /// Stop the server
+    Stop,
+    /// Check the server status
+    Status,
+    /// Restart the server
+    Restart {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+
+        /// Run in background as daemon
+        #[arg(short, long, default_value_t = false)]
+        daemon: bool,
+
+        /// TCP port to listen on
+        #[arg(short, long, default_value_t = 7878)]
+        port: u16,
+
+        /// TCP host to bind on
+        #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
+        host: String,
+
+    },
+    /// Run benchmarks
+    Benchmark {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+        /// Number of words to benchmark
+        #[arg(short, long)]
+        count: u32,
+    },
+}
 
 fn main() {
     let args = Args::parse();
-    // If benchmark is false, data_file must be provided
-    // if args.benchmark.is_none() && args.data_file.is_none() {
-    //     eprintln!("Error: The data file argument is required unless the benchmark flag is used.");
-    //     eprintln!("\nFor more information, try '--help'.");
-    //     std::process::exit(1);
-    // }
 
-    if args.benchmark.is_some() {
-        let v = vec![args.data_file, args.benchmark.unwrap().to_string()];
-        benchmark(v);
-        std::process::exit(0);
+    match args.command {
+        Command::Start { daemon, port, host, data_file } => {
+            start_server(daemon, host, port, data_file);
+        }
+        Command::Stop => {
+            stop_server();
+        }
+        Command::Status => {
+            check_status();
+        }
+        Command::Restart { daemon, port, host, data_file } => {
+            restart_server(daemon, host.clone(), port, data_file);
+        }
+        Command::Benchmark { data_file, count } => {
+            let v = vec![data_file, count.to_string()];
+            benchmark(v);
+            std::process::exit(0);
+        }
+    }
+}
+
+use modules::utils::create_pid_file;
+use modules::utils::get_pid_file_path;
+
+fn start_server(daemon: bool, host: String, port: u16, data_file: String) {
+    let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(data_file.to_string()));
+
+    // If running as a daemon, check for existing PID file
+    if daemon {
+        let app_name = env!("CARGO_PKG_NAME");
+        let pid_file_path = get_pid_file_path(app_name);
+
+        // Check if the PID file exists
+        if fs::metadata(&pid_file_path).is_ok() {
+            // Read the PID from the file
+            let pid = fs::read_to_string(&pid_file_path)
+                .expect("Unable to read PID file")
+                .trim()
+                .parse::<i32>()
+                .expect("Invalid PID");
+
+            // Check if the process with that PID is running
+            if is_process_running(pid) {
+                eprintln!("Server is already running with PID: {}", pid);
+                std::process::exit(1); // Exit if the server is already running
+            } else {
+                // If the process is not running, we can proceed to start a new one
+                eprintln!("Found stale PID file. Starting a new server instance.");
+            }
+        }
     }
 
-    let file_path = args.data_file;
-    let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(file_path.to_string())); // Use the trait here
-    run_server(7878, ssp);
+    // Fork the process
+    let pid = unsafe { libc::fork() };
+
+    if pid < 0 {
+        eprintln!("Failed to fork process");
+        std::process::exit(1);
+    } else if pid == 0 {
+        // Child process
+        let app_name = env!("CARGO_PKG_NAME");
+        let pid_file_path = get_pid_file_path(app_name);
+
+        let mut bind_success = false;
+        let bind_success_fn = || {
+            // Write the child's PID to the PID file
+            if let Err(e) = create_pid_file(&pid_file_path) {
+                eprintln!("Error creating PID file: {}", e);
+                std::process::exit(1);
+            }
+            // Set up signal handling for graceful shutdown
+            setup_signal_handling();
+            bind_success = true; // Indicate that binding was successful
+        };
+
+        // Now run the server, passing the bind success function
+        let result = run_server(&host, port, ssp, Some(bind_success_fn));
+
+        match result {
+            Ok(_) => {
+                // Cleanup PID file before exiting
+                if bind_success {
+                    remove_pid_file(&pid_file_path);
+                    std::process::exit(0); // Exit gracefully
+                } else {
+                    std::process::exit(1); // Exit gracefully with error code 1
+                }
+            },
+            Err(e) => {
+                eprintln!("Error running server: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        // Parent process
+        std::process::exit(0); // Exit the parent process immediately
+    }
+}
+
+fn setup_signal_handling() {
+    unsafe {
+        let sa_mask: libc::sigset_t = std::mem::zeroed();
+        let sigaction = libc::sigaction {
+            sa_sigaction: signal_handler as usize,
+            sa_mask,
+            sa_flags: libc::SA_SIGINFO | libc::SA_RESTART, // Add SA_RESTART to restart interrupted system calls
+        };
+        if libc::sigaction(libc::SIGTERM, &sigaction, std::ptr::null_mut()) < 0 {
+            eprintln!("Failed to set up signal handler");
+            std::process::exit(1);
+        }
+    }
+}
+
+extern "C" fn signal_handler(_signum: i32) {
+    // Clean up PID file before exiting
+    let app_name = env!("CARGO_PKG_NAME");
+    let pid_file_path = get_pid_file_path(app_name);
+    remove_pid_file(&pid_file_path);
+    std::process::exit(0); // Exit the child process
+}
+
+fn remove_pid_file(pid_file_path: &PathBuf) {
+    if let Err(e) = fs::remove_file(pid_file_path) {
+        eprintln!("Unable to remove PID file: {}", e);
+    }
+}
+
+fn stop_server() {
+    // Read the PID from the file and kill the process
+    let app_name = env!("CARGO_PKG_NAME");
+    let pid_file_path = get_pid_file_path(app_name);
+
+    // Check if the PID file exists
+    if !fs::metadata(&pid_file_path).is_ok() {
+        eprintln!("PID file does not exist. Server may not be running.");
+        return;
+    }
+
+    let pid = fs::read_to_string(&pid_file_path).expect("Unable to read PID file");
+    let pid: i32 = pid.trim().parse().expect("Invalid PID");
+
+    // Verify that the process is running and is our process
+    if is_process_running(pid) {
+        eprintln!("Server is running with PID: {}", pid);
+        eprintln!("Sending SIGTERM to the process...");
+        let _ = unsafe { libc::kill(pid, libc::SIGTERM) }; // Send SIGTERM to the process
+        // wait one second for the process to exit
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        // check if the process is still running
+        if is_process_running(pid) {
+            eprintln!("Server is still running with PID: {}", pid);
+            eprintln!("Sending SIGKILL to the process...");
+            // send SIGKILL to the process
+            let _ = unsafe { libc::kill(pid, libc::SIGKILL) };
+            // wait one second for the process to exit
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            if is_process_running(pid) {
+                eprintln!("Server is still running with PID: {}", pid);
+                std::process::exit(1); // Exit if the server is still running
+            }
+        }
+        eprintln!("Server terminated successfully");
+        // remove the PID file if it exists
+        let pid_file_exists = fs::metadata(&pid_file_path).is_ok();
+        if pid_file_exists {
+            remove_pid_file(&pid_file_path);
+        }
+    } else {
+        eprintln!("No running process found with PID: {}", pid);
+    }
+}
+
+fn check_status() {
+    // Check if the server is running by checking the PID file
+    let app_name = env!("CARGO_PKG_NAME");
+    let pid_file_path = get_pid_file_path(app_name).clone(); // Clone the value to avoid moving
+
+    // Check if the PID file exists
+    if fs::metadata(&pid_file_path).is_ok() {
+        let pid = fs::read_to_string(&pid_file_path).expect("Unable to read PID file");
+        let pid: i32 = pid.trim().parse().expect("Invalid PID");
+
+        // Verify that the process is running and is our process
+        if is_process_running(pid) {
+            println!("Server is running with PID: {}", pid);
+        } else {
+            println!("Server is not running (stale PID).");
+        }
+    } else {
+        println!("Server is not running (PID file does not exist).");
+    }
+}
+
+fn restart_server(daemon: bool, host: String, port: u16, data_file: String) {
+    stop_server();
+    // Add a delay here to ensure the server has stopped
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    start_server(daemon, host, port, data_file);
+}
+
+fn is_process_running(pid: i32) -> bool {
+    // Check if a process with the given PID is running using libc::kill
+    unsafe {
+        libc::kill(pid, 0) == 0 // Returns 0 if the process exists
+    }
 }

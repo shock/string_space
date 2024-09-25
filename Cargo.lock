@@ -185,9 +185,9 @@ checksum = "966903d6b75c207539d45eef272e66e68542640adc142f15e9c9623f76f36b5f"
 
 [[package]]
 name = "libc"
-version = "0.2.158"
+version = "0.2.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
+checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "libredox"
@@ -316,13 +316,14 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 
 [[package]]
 name = "string_space"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "byteorder",
  "clap",
  "dirs",
  "fuzzy-matcher",
  "jaro_winkler",
+ "libc",
  "rand",
  "regex",
  "strsim",

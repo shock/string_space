@@ -60,3 +60,34 @@ pub fn expand_path(path: &str) -> String {
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| path.to_string())
 }
+
+#[allow(unused)]
+use std::env;
+use std::path::Path;
+use std::fs::File;
+use std::io::{self, Write};
+
+#[allow(unused)]
+pub fn get_pid_file_path(app_name: &str) -> PathBuf {
+    // get the value of the SS_PID_FILE environment variable
+    let test = env::var("SS_TEST").unwrap_or_else(|_| String::from("false")) == "true";
+    #[cfg(target_os = "linux")]
+    {
+        Path::new(&format!("/var/tmp/{}{}.pid", app_name, if test { "_test" } else { "" })).to_path_buf()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Path::new(&format!("/var/tmp/{}{}.pid", app_name, if test { "_test" } else { "" })).to_path_buf()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        env::temp_dir().join(format!("{}{}.pid", app_name, if test { "_test" } else { "" }))
+    }
+}
+
+#[allow(unused)]
+pub fn create_pid_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    let pid = std::process::id();
+    let mut file = File::create(path)?;
+    writeln!(file, "{}", pid)
+}
