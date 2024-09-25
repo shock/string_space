@@ -179,8 +179,29 @@ fn stop_server() {
 
     // Verify that the process is running and is our process
     if is_process_running(pid) {
+        eprintln!("Server is running with PID: {}", pid);
+        eprintln!("Sending SIGTERM to the process...");
         let _ = unsafe { libc::kill(pid, libc::SIGTERM) }; // Send SIGTERM to the process
-        remove_pid_file(&pid_file_path);
+        // wait one second for the process to exit
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        // check if the process is still running
+        if is_process_running(pid) {
+            eprintln!("Server is still running with PID: {}", pid);
+            eprintln!("Sending SIGKILL to the process...");
+            // send SIGKILL to the process
+            let _ = unsafe { libc::kill(pid, libc::SIGKILL) };
+            // wait one second for the process to exit
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            if is_process_running(pid) {
+                eprintln!("Server is still running with PID: {}", pid);
+                std::process::exit(1); // Exit if the server is still running
+            }
+        }
+        // remove the PID file if it exists
+        let pid_file_exists = fs::metadata(&pid_file_path).is_ok();
+        if pid_file_exists {
+            remove_pid_file(&pid_file_path);
+        }
     } else {
         eprintln!("No running process found with PID: {}", pid);
     }
