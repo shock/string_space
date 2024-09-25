@@ -102,8 +102,15 @@ def data_file_test(client):
     except ProtocolError as e:
         print(f"ProtocolError: {e}")
 
+import sys
+
 def main():
-    client = StringSpaceClient('127.0.0.1', 7878)
+    # read the first argument as the port number
+    if len(sys.argv) < 2:
+        print("Usage: python client.py <port>")
+        sys.exit(1)
+    port = int(sys.argv[1])
+    client = StringSpaceClient('127.0.0.1', port)
     prexix_test(client)
     substring_test(client)
     similar_test(client)

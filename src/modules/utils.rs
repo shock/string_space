@@ -69,17 +69,19 @@ use std::io::{self, Write};
 
 #[allow(unused)]
 pub fn get_pid_file_path(app_name: &str) -> PathBuf {
+    // get the value of the SS_PID_FILE environment variable
+    let test = env::var("SS_TEST").unwrap_or_else(|_| String::from("false")) == "true";
     #[cfg(target_os = "linux")]
     {
-        Path::new(&format!("/var/tmp/{}.pid", app_name)).to_path_buf()
+        Path::new(&format!("/var/tmp/{}{}.pid", app_name, if test { "_test" } else { "" })).to_path_buf()
     }
     #[cfg(target_os = "macos")]
     {
-        Path::new(&format!("/var/tmp/{}.pid", app_name)).to_path_buf()
+        Path::new(&format!("/var/tmp/{}{}.pid", app_name, if test { "_test" } else { "" })).to_path_buf()
     }
     #[cfg(target_os = "windows")]
     {
-        env::temp_dir().join(format!("{}.pid", app_name))
+        env::temp_dir().join(format!("{}{}.pid", app_name, if test { "_test" } else { "" }))
     }
 }
 

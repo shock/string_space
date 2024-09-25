@@ -1,5 +1,6 @@
 # Author: Bill Doughty
-# Version: 0.1.1
+# Version: 0.1.2
+# Date: 2024-09-24
 
 import socket
 import string
@@ -17,10 +18,6 @@ class StringSpaceClient:
         self.port = port
         self.debug = debug
         self.connected = False
-        try:
-            self.connect()
-        except ConnectionRefusedError as e:
-            pass
 
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a new socket
@@ -35,8 +32,9 @@ class StringSpaceClient:
             raise e
 
     def disconnect(self):
-        self.sock.close()
-        self.connected = False
+        if self.connected:
+            self.sock.close()
+            self.connected = False
 
     def __del__(self):
         self.disconnect()
@@ -86,6 +84,7 @@ class StringSpaceClient:
                 response = self.receive_response()
                 if self.debug:
                     print(f"Response:\n{response}")
+                self.disconnect()
                 return response
             except ConnectionError as e:
                 if self.debug:
@@ -107,7 +106,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return []
+            return f"ERROR: {e}"
 
     def substring_search(self, substring: str) -> list[str]:
         try:
@@ -117,7 +116,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return []
+            return f"ERROR: {e}"
 
     def similar_search(self, word: str, threshold: int) -> list[str]:
         try:
@@ -127,7 +126,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return []
+            return f"ERROR: {e}"
 
     def data_file(self) -> str:
         try:
@@ -137,7 +136,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return "ERROR"
+            return f"ERROR: {e}"
 
     def insert(self, strings: list[str]):
         try:
@@ -147,14 +146,14 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return []
+            return f"ERROR: {e}"
 
     def add_words(self, words):
         try:
-            request_elements = ["add_words", "\n".join(words)]
+            request_elements = ["insert", "\n".join(words)]
             response = self.request(request_elements)
             return response
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return "ERROR"
+            return f"ERROR: {e}"
