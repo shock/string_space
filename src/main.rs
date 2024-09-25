@@ -64,7 +64,7 @@ fn start_server(args: Args) {
 
     // If not running as a daemon, run the server directly
     if !args.daemon {
-        run_server(&args.host, args.port, ssp, Some(|| {}));
+        let _ = run_server(&args.host, args.port, ssp, Some(|| {}));
         std::process::exit(0);
     }
 
@@ -92,14 +92,22 @@ fn start_server(args: Args) {
         };
 
         // Now run the server, passing the bind success function
-        run_server(&args.host, args.port, ssp, Some(bind_success_fn));
+        let result = run_server(&args.host, args.port, ssp, Some(bind_success_fn));
 
-        // Cleanup PID file before exiting
-        if bind_success {
-            remove_pid_file(&pid_file_path);
-            std::process::exit(0); // Exit gracefully
-        } else {
-            std::process::exit(1); // Exit gracefully with error code 1
+        match result {
+            Ok(_) => {
+                // Cleanup PID file before exiting
+                if bind_success {
+                    remove_pid_file(&pid_file_path);
+                    std::process::exit(0); // Exit gracefully
+                } else {
+                    std::process::exit(1); // Exit gracefully with error code 1
+                }
+            },
+            Err(e) => {
+                eprintln!("Error running server: {}", e);
+                std::process::exit(1);
+            }
         }
     } else {
         // Parent process

@@ -214,7 +214,7 @@ impl Protocol for StringSpaceProtocol {
 }
 
 #[allow(unused)]
-pub fn run_server<F>(host: &str, port: u16, mut protocol: Box<dyn Protocol>, bind_success: Option<F>)
+pub fn run_server<F>(host: &str, port: u16, mut protocol: Box<dyn Protocol>, bind_success: Option<F>) -> io::Result<()>
 where F: FnMut()
 {
     // let host = "127.0.0.1";
@@ -235,9 +235,11 @@ where F: FnMut()
                     Err(e) => { eprintln!("Failed: {}", e); },
                 }
             }
+            return Ok(());
         },
         Err(e) => {
-            panic!("Failed to bind to port {}: {}", port, e);
+            eprintln!("Failed to bind to port {}: {}", port, e);
+            return Err(e);
         }
     }
 }
