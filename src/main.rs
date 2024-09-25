@@ -62,10 +62,29 @@ fn start_server(args: Args) {
     let file_path = args.data_file;
     let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(file_path.to_string()));
 
-    // If not running as a daemon, run the server directly
-    if !args.daemon {
-        let _ = run_server(&args.host, args.port, ssp, Some(|| {}));
-        std::process::exit(0);
+    // If running as a daemon, check for existing PID file
+    if args.daemon {
+        let app_name = env!("CARGO_PKG_NAME");
+        let pid_file_path = get_pid_file_path(app_name);
+
+        // Check if the PID file exists
+        if fs::metadata(&pid_file_path).is_ok() {
+            // Read the PID from the file
+            let pid = fs::read_to_string(&pid_file_path)
+                .expect("Unable to read PID file")
+                .trim()
+                .parse::<i32>()
+                .expect("Invalid PID");
+
+            // Check if the process with that PID is running
+            if is_process_running(pid) {
+                eprintln!("Server is already running with PID: {}", pid);
+                std::process::exit(1); // Exit if the server is already running
+            } else {
+                // If the process is not running, we can proceed to start a new one
+                eprintln!("Found stale PID file. Starting a new server instance.");
+            }
+        }
     }
 
     // Fork the process
@@ -148,20 +167,43 @@ fn stop_server() {
     // Read the PID from the file and kill the process
     let app_name = env!("CARGO_PKG_NAME");
     let pid_file_path = get_pid_file_path(app_name);
+
+    // Check if the PID file exists
+    if !fs::metadata(&pid_file_path).is_ok() {
+        eprintln!("PID file does not exist. Server may not be running.");
+        return;
+    }
+
     let pid = fs::read_to_string(&pid_file_path).expect("Unable to read PID file");
     let pid: i32 = pid.trim().parse().expect("Invalid PID");
-    let _ = unsafe { libc::kill(pid, libc::SIGTERM) }; // Send SIGTERM to the process
-    remove_pid_file(&pid_file_path);
+
+    // Verify that the process is running and is our process
+    if is_process_running(pid) {
+        let _ = unsafe { libc::kill(pid, libc::SIGTERM) }; // Send SIGTERM to the process
+        remove_pid_file(&pid_file_path);
+    } else {
+        eprintln!("No running process found with PID: {}", pid);
+    }
 }
 
 fn check_status() {
     // Check if the server is running by checking the PID file
     let app_name = env!("CARGO_PKG_NAME");
-    let pid_file_path = get_pid_file_path(app_name);
-    if fs::metadata(pid_file_path).is_ok() {
-        println!("Server is running.");
+    let pid_file_path = get_pid_file_path(app_name).clone(); // Clone the value to avoid moving
+
+    // Check if the PID file exists
+    if fs::metadata(&pid_file_path).is_ok() {
+        let pid = fs::read_to_string(&pid_file_path).expect("Unable to read PID file");
+        let pid: i32 = pid.trim().parse().expect("Invalid PID");
+
+        // Verify that the process is running and is our process
+        if is_process_running(pid) {
+            println!("Server is running with PID: {}", pid);
+        } else {
+            println!("Server is not running (stale PID).");
+        }
     } else {
-        println!("Server is not running.");
+        println!("Server is not running (PID file does not exist).");
     }
 }
 
@@ -170,4 +212,11 @@ fn restart_server(args: Args) {
     // Add a delay here to ensure the server has stopped
     std::thread::sleep(std::time::Duration::from_secs(1));
     start_server(args); // Pass any necessary arguments here
+}
+
+fn is_process_running(pid: i32) -> bool {
+    // Check if a process with the given PID is running using libc::kill
+    unsafe {
+        libc::kill(pid, 0) == 0 // Returns 0 if the process exists
+    }
 }
