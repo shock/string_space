@@ -10,60 +10,103 @@ use modules::protocol::StringSpaceProtocol;
 use modules::protocol::run_server;
 use modules::benchmark::benchmark;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use std::fs;
+use libc;
+use std::path::PathBuf;
 
 /// String Space Server
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Path to string database text file (will be created if it doesn't exist)
-    #[arg(value_name = "data-file", index = 1)]
-    data_file: String,
-
-    /// Run in background as daemon
-    #[arg(short, long, default_value_t = false)]
-    daemon: bool,
-
-    /// TCP port to listen on
-    #[arg(short, long, default_value_t = 7878)]
-    port: u16,
-
-    /// TCP host to bind on
-    #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
-    host: String,
-
-    /// Run benchmarks with COUNT words - WARNING: data-file will be overwritten!!
-    #[arg(short, long, value_name = "COUNT")]
-    benchmark: Option<u32>,
+    /// Command to execute
+    #[command(subcommand)]
+    command: Command,
 }
 
-use std::fs;
-use libc;
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Start the server
+    Start {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+
+        /// Run in background as daemon
+        #[arg(short, long, default_value_t = false)]
+        daemon: bool,
+
+        /// TCP port to listen on
+        #[arg(short, long, default_value_t = 7878)]
+        port: u16,
+
+        /// TCP host to bind on
+        #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
+        host: String,
+    },
+    /// Stop the server
+    Stop,
+    /// Check the server status
+    Status,
+    /// Restart the server
+    Restart {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+
+        /// Run in background as daemon
+        #[arg(short, long, default_value_t = false)]
+        daemon: bool,
+
+        /// TCP port to listen on
+        #[arg(short, long, default_value_t = 7878)]
+        port: u16,
+
+        /// TCP host to bind on
+        #[arg(short = 'H', long, default_value_t = String::from("127.0.0.1"))]
+        host: String,
+
+    },
+    /// Run benchmarks
+    Benchmark {
+        /// Path to string database text file (will be created if it doesn't exist)
+        data_file: String,
+        /// Number of words to benchmark
+        #[arg(short, long)]
+        count: u32,
+    },
+}
 
 fn main() {
     let args = Args::parse();
 
-    // If benchmark is specified, run the benchmark and exit
-    if args.benchmark.is_some() {
-        let v = vec![args.data_file.clone(), args.benchmark.unwrap().to_string()];
-        benchmark(v);
-        std::process::exit(0);
+    match args.command {
+        Command::Start { daemon, port, host, data_file } => {
+            start_server(daemon, host, port, data_file);
+        }
+        Command::Stop => {
+            stop_server();
+        }
+        Command::Status => {
+            check_status();
+        }
+        Command::Restart { daemon, port, host, data_file } => {
+            restart_server(daemon, host.clone(), port, data_file);
+        }
+        Command::Benchmark { data_file, count } => {
+            let v = vec![data_file, count.to_string()];
+            benchmark(v);
+            std::process::exit(0);
+        }
     }
-
-    // Start the server with the provided arguments
-    start_server(args);
 }
 
 use modules::utils::create_pid_file;
 use modules::utils::get_pid_file_path;
-use std::path::PathBuf;
 
-fn start_server(args: Args) {
-    let file_path = args.data_file;
-    let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(file_path.to_string()));
+fn start_server(daemon: bool, host: String, port: u16, data_file: String) {
+    let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(data_file.to_string()));
 
     // If running as a daemon, check for existing PID file
-    if args.daemon {
+    if daemon {
         let app_name = env!("CARGO_PKG_NAME");
         let pid_file_path = get_pid_file_path(app_name);
 
@@ -111,7 +154,7 @@ fn start_server(args: Args) {
         };
 
         // Now run the server, passing the bind success function
-        let result = run_server(&args.host, args.port, ssp, Some(bind_success_fn));
+        let result = run_server(&host, port, ssp, Some(bind_success_fn));
 
         match result {
             Ok(_) => {
@@ -197,6 +240,7 @@ fn stop_server() {
                 std::process::exit(1); // Exit if the server is still running
             }
         }
+        eprintln!("Server terminated successfully");
         // remove the PID file if it exists
         let pid_file_exists = fs::metadata(&pid_file_path).is_ok();
         if pid_file_exists {
@@ -228,11 +272,11 @@ fn check_status() {
     }
 }
 
-fn restart_server(args: Args) {
+fn restart_server(daemon: bool, host: String, port: u16, data_file: String) {
     stop_server();
     // Add a delay here to ensure the server has stopped
     std::thread::sleep(std::time::Duration::from_secs(1));
-    start_server(args); // Pass any necessary arguments here
+    start_server(daemon, host, port, data_file);
 }
 
 fn is_process_running(pid: i32) -> bool {
