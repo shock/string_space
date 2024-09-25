@@ -16,11 +16,11 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// path to string database text file (will be created if it doesn't exist)
+    /// Path to string database text file (will be created if it doesn't exist)
     #[arg(value_name = "data-file", index = 1)]
     data_file: String,
 
-    /// run in background as daemon
+    /// Run in background as daemon
     #[arg(short, long, default_value_t = false)]
     daemon: bool,
 
@@ -43,12 +43,14 @@ use libc;
 fn main() {
     let args = Args::parse();
 
+    // If benchmark is specified, run the benchmark and exit
     if args.benchmark.is_some() {
-        let v = vec![args.data_file, args.benchmark.unwrap().to_string()];
+        let v = vec![args.data_file.clone(), args.benchmark.unwrap().to_string()];
         benchmark(v);
         std::process::exit(0);
     }
 
+    // Start the server with the provided arguments
     start_server(args);
 }
 
@@ -60,6 +62,7 @@ fn start_server(args: Args) {
     let file_path = args.data_file;
     let ssp: Box<dyn Protocol> = Box::new(StringSpaceProtocol::new(file_path.to_string()));
 
+    // If not running as a daemon, run the server directly
     if !args.daemon {
         run_server(&args.host, args.port, ssp, Some(|| {}));
         std::process::exit(0);
@@ -83,11 +86,12 @@ fn start_server(args: Args) {
                 eprintln!("Error creating PID file: {}", e);
                 std::process::exit(1);
             }
-            // Set up signal handling
+            // Set up signal handling for graceful shutdown
             setup_signal_handling();
-            bind_success = true;
+            bind_success = true; // Indicate that binding was successful
         };
-        // Now run the server
+
+        // Now run the server, passing the bind success function
         run_server(&args.host, args.port, ssp, Some(bind_success_fn));
 
         // Cleanup PID file before exiting
@@ -109,9 +113,12 @@ fn setup_signal_handling() {
         let sigaction = libc::sigaction {
             sa_sigaction: signal_handler as usize,
             sa_mask,
-            sa_flags: libc::SA_SIGINFO,
+            sa_flags: libc::SA_SIGINFO | libc::SA_RESTART, // Add SA_RESTART to restart interrupted system calls
         };
-        libc::sigaction(libc::SIGTERM, &sigaction, std::ptr::null_mut());
+        if libc::sigaction(libc::SIGTERM, &sigaction, std::ptr::null_mut()) < 0 {
+            eprintln!("Failed to set up signal handler");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -152,7 +159,7 @@ fn check_status() {
 
 fn restart_server(args: Args) {
     stop_server();
-    // add a delay here to ensure the server has stopped
+    // Add a delay here to ensure the server has stopped
     std::thread::sleep(std::time::Duration::from_secs(1));
     start_server(args); // Pass any necessary arguments here
 }
