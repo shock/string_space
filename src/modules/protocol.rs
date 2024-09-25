@@ -214,8 +214,8 @@ impl Protocol for StringSpaceProtocol {
 }
 
 #[allow(unused)]
-pub fn run_server(port: u16, mut protocol: Box<dyn Protocol>) {
-    let host = "127.0.0.1";
+pub fn run_server(host: &str, port: u16, mut protocol: Box<dyn Protocol>) {
+    // let host = "127.0.0.1";
     let listener = TcpListener::bind(format!("{}:{}", host, port));
     match listener {
         Ok(listener) => {
