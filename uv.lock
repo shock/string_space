@@ -1,6 +1,12 @@
 version = 1
 requires-python = ">=3.12"
 
+[manifest]
+members = [
+    "python",
+    "string-space",
+]
+
 [[package]]
 name = "jaro-winkler"
 version = "2.0.3"
@@ -10,7 +16,12 @@ wheels = [
 ]
 
 [[package]]
-name = "struct-test"
+name = "python"
+version = "0.1.0"
+source = { virtual = "python" }
+
+[[package]]
+name = "string-space"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
@@ -18,4 +29,4 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "jaro-winkler", specifier = ">=2.0.3" }]
+requires-dist = [{ name = "jaro-winkler" }]
