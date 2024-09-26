@@ -2,7 +2,7 @@
 ## 1. cd /Users/billdoughty/src/wdd/rust/string_space/python
 ## 2. create the pyproject.toml
 ## 3. cd /Users/billdoughty/src/wdd/rust/string_space
-## 4. uv pip install -e cd /Users/billdoughty/src/wdd/rust/string_space/python
+## 4. uv pip install -e /Users/billdoughty/src/wdd/rust/string_space/python
 ##
 ## Then I could run the import.py script using the venv
 ## Unfortunately, VSCode does not seem to be able to find the module, so the warning persists.
