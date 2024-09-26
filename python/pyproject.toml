@@ -1,12 +1,7 @@
 [project]
-name = "string_space"
+name = "python"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "jaro-winkler",
-]
-
-[tool.uv.workspace]
-members = ["python"]
+dependencies = []
