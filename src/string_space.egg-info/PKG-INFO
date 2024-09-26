@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: string_space
+Version: 0.1.0
+Summary: A package for string space operations
+Author-email: Your Name <your.email@example.com>
+Requires-Python: >=3.10
+Requires-Dist: jaro-winkler>=2.0.3
+Requires-Dist: string-space-client

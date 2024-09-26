@@ -1,9 +1,9 @@
 # Author: Bill Doughty
-# Version: 0.1.2
-# Date: 2024-09-24
+# Version: 0.2.0
+# Date: 2024-09-25
 
 import socket
-import string
+import re
 import time
 
 RS_BYTE = 0x1E
@@ -157,3 +157,17 @@ class StringSpaceClient:
             if self.debug:
                 print(f"Error: {e}")
             return f"ERROR: {e}"
+
+    def parse_text(self, text: str) -> list[str]:
+        # split the text into words by regex /s+/
+        words = re.split(r'[^\w_\-s]+', text)
+        # get unique words
+        words = list(set(words))
+        # filter out words that are too short or too long
+        words = [word for word in words if len(word) >= 3]
+        return words
+
+    def add_words_from_text(self, text: str):
+        words = self.parse_text(text)
+        response = self.add_words(words)
+        return response

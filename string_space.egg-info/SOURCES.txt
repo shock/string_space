@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+python/cm_test.py
+python/main.py
+python/string_space/__init__.py
+python/string_space/string_space_client.py
+string_space.egg-info/PKG-INFO
+string_space.egg-info/SOURCES.txt
+string_space.egg-info/dependency_links.txt
+string_space.egg-info/requires.txt
+string_space.egg-info/top_level.txt
+tests/client.py
+tests/import.py

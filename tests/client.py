@@ -1,6 +1,6 @@
 import string
 
-from string_space import ProtocolError, StringSpaceClient
+from string_space_client import ProtocolError, StringSpaceClient
 
 #######
 

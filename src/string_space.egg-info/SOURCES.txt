@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+src/string_space.egg-info/PKG-INFO
+src/string_space.egg-info/SOURCES.txt
+src/string_space.egg-info/dependency_links.txt
+src/string_space.egg-info/requires.txt
+src/string_space.egg-info/top_level.txt

@@ -1,17 +1,17 @@
-## To get this to work, I had to d o the following:
-## 1. cd /Users/billdoughty/src/wdd/rust/string_space/python
-## 2. create the pyproject.toml
+## To get this to work, I had to do the following:
+## 1. cd /Users/billdoughty/src/wdd/rust/string_space/python/string_space_client
+## 2. create the pyproject.toml that's there now
 ## 3. cd /Users/billdoughty/src/wdd/rust/string_space
-## 4. uv pip install -e /Users/billdoughty/src/wdd/rust/string_space/python
+## 4. uv add --editable python/string_space_client
 ##
-## Then I could run the import.py script using the venv
-## Unfortunately, VSCode does not seem to be able to find the module, so the warning persists.
-## I'm not sure how to fix this.
+## Then I could run this import.py script using the venv
 
 import sys
+print(sys.path)
 
-from string_space import ProtocolError, StringSpaceClient
+from string_space_client import ProtocolError, StringSpaceClient
 
 ssc = StringSpaceClient('127.0.0.1', 8080)
 
-print("import successful")
+words = ssc.parse_text("import successful like a long awaited arrival in the dead of night")
+print("\n".join(words))

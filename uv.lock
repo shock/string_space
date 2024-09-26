@@ -1,11 +1,5 @@
 version = 1
-requires-python = ">=3.12"
-
-[manifest]
-members = [
-    "python",
-    "string-space",
-]
+requires-python = ">=3.10"
 
 [[package]]
 name = "jaro-winkler"
@@ -16,17 +10,21 @@ wheels = [
 ]
 
 [[package]]
-name = "python"
-version = "0.1.0"
-source = { virtual = "python" }
-
-[[package]]
 name = "string-space"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "jaro-winkler" },
+    { name = "string-space-client" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "jaro-winkler" }]
+requires-dist = [
+    { name = "jaro-winkler", specifier = ">=2.0.3" },
+    { name = "string-space-client", editable = "python/string_space_client" },
+]
+
+[[package]]
+name = "string-space-client"
+version = "0.1.0"
+source = { editable = "python/string_space_client" }
