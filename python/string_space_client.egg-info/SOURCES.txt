@@ -1,9 +1,0 @@
-pyproject.toml
-../string_space_client/__init__.py
-../string_space_client/string_space_client.py
-../string_space_client.egg-info/PKG-INFO
-../string_space_client.egg-info/SOURCES.txt
-../string_space_client.egg-info/dependency_links.txt
-../string_space_client.egg-info/top_level.txt
-../string_space_client/build/lib/string_space_client/__init__.py
-../string_space_client/build/lib/string_space_client/string_space_client.py

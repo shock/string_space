@@ -1,1 +1,0 @@
-string_space_client
