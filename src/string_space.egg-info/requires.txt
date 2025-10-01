@@ -1,2 +1,0 @@
-jaro-winkler>=2.0.3
-string-space-client
