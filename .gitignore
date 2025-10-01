@@ -5,3 +5,5 @@ target
 __pycache__
 test
 !.gitkeep
+*.egg-info/
+
