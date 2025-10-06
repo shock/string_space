@@ -59,6 +59,7 @@ To run the project, clone the repository, navigate to the project directory, and
   ```bash
   cargo run -- status
   ```
+  *Displays server status, PID, and PID file location*
 
 - **Restart server** (daemon mode only):
   ```bash
