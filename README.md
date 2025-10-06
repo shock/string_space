@@ -24,7 +24,11 @@ The project is organized as follows:
 - `src/modules/`:
   - `protocol.rs`: Defines the TCP protocol for handling client connections and processing commands.
   - `string_space.rs`: Implements the core string storage logic.
-  - `utils.rs`: Utility functions for generating random words and timing code execution.
+  - `benchmark.rs`: Performance testing utilities.
+  - `utils.rs`: Utility functions for generating random words, timing code execution, and PID management.
+  - `word_struct.rs`: Word structure definitions.
+- `python/string_space_client/`: Python client package for easy integration.
+- `tests/`: Integration tests and test runner scripts.
 
 ## Prerequisites
 
@@ -35,30 +39,56 @@ Before running the project, ensure that the following are installed:
 
 ## Usage
 
-To run the project, clone the repository, navigate to the project directory, and run the following command:
+To run the project, clone the repository, navigate to the project directory, and use the following commands:
 
-```bash
-cargo run -- <data-file> --port <port> --host <host> [--benchmark <COUNT>]
-```
+### Server Management Commands
+
+*Note: Stop, status, and restart commands only apply to servers started in daemon mode.*
+
+- **Start server**:
+  ```bash
+  cargo run -- start <data-file> --port <port> --host <host> [--daemon]
+  ```
+
+- **Stop server** (daemon mode only):
+  ```bash
+  cargo run -- stop
+  ```
+
+- **Check server status** (daemon mode only):
+  ```bash
+  cargo run -- status
+  ```
+
+- **Restart server** (daemon mode only):
+  ```bash
+  cargo run -- restart <data-file> --port <port> --host <host>
+  ```
+
+- **Run benchmarks**:
+  ```bash
+  cargo run -- benchmark <data-file> --count <COUNT>
+  ```
 
 ### Command-Line Arguments
 
 - `<data-file>`: The file where the word database will be stored. If the file doesn't exist, it will be created.
 - `--port <port>`: The TCP port to bind to (default: 7878).
 - `--host <host>`: The host address to bind to (default: `127.0.0.1`).
-- `--benchmark <COUNT>`: If provided, runs a benchmark with `COUNT` random words. **Warning:** This will overwrite the data file.
+- `--daemon`: Run server in background as daemon.
+- `--count <COUNT>`: Number of random words for benchmarking. **Warning:** This will overwrite the data file.
 
 Example:
 
 ```bash
-cargo run -- data/words.txt --port 7878 --host 127.0.0.1
+cargo run -- start data/words.txt --port 7878 --host 127.0.0.1
 ```
 
 This starts a TCP server listening on `127.0.0.1:7878` and serving requests from the `words.txt` file.
 
 ## TCP API
 
-The server listens for client connections on the specified host and port. It supports the following commands, each terminated by an End-of-Text (EOT) byte (`0x04`).  Requests are UTF-8 encoded strings, made up of one or more elements separated by by the ASCII RS (Record Separator) character (`0x1E`).  See client.py for an example implementation.
+The server listens for client connections on the specified host and port. It supports the following commands, each terminated by an End-of-Text (EOT) byte (`0x04`).  Requests are UTF-8 encoded strings, made up of one or more elements separated by by the ASCII RS (Record Separator) character (`0x1E`).  See the Python client package in `python/string_space_client/` for an example implementation.
 
 ### Commands
 
@@ -81,6 +111,15 @@ The server listens for client connections on the specified host and port. It sup
    - **Command**: `similar <word> <threshold>`
    - **Description**: Searches for words similar to the provided word, based on a similarity threshold.
    - **Response**: A list of similar words.
+
+5. **Additional Operations**
+   - **Remove Words**: `remove <words...>` - Remove words from storage
+   - **Clear Space**: `clear_space` - Clear all strings
+   - **Get All Strings**: `get_all_strings` - Retrieve all stored strings
+   - **Check Empty**: `empty` - Check if storage is empty
+   - **Get Length**: `len` - Get number of stored strings
+   - **Get Capacity**: `capacity` - Get total allocated memory for string storage (in bytes)
+   - **Get Data File**: `data_file` - Get data file path
 
 ### Response Format
 
