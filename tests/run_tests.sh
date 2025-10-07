@@ -70,6 +70,14 @@ else
     echo "Server stopped successfully"
 fi
 
+# Run the import test
+uv run tests/import.py 9898
+if [ $? -ne 0 ]; then
+    echo "uv run tests/import.py 9898 failed"
+    exit 1
+else
+    echo "Import test ran successfully"
+fi
 echo
 echo "ALL TESTS PASSED !!!"
 echo

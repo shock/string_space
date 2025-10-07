@@ -10,8 +10,17 @@ import sys
 print(sys.path)
 
 from string_space_client import ProtocolError, StringSpaceClient
+from string_space_completer import StringSpaceCompleter
 
 ssc = StringSpaceClient('127.0.0.1', 8080)
 
 words = ssc.parse_text("import successful like a long awaited arrival in the dead of night")
 print("\n".join(words))
+
+try:
+    raise ProtocolError("This is an expected error for testing")
+except ProtocolError as e:
+    print(f"ProtocolError: {e}")
+
+ssc = StringSpaceCompleter()
+print("StringSpaceCompleter initialized successfully")
