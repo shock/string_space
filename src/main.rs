@@ -45,7 +45,7 @@ enum Command {
     },
     /// Stop the server
     Stop,
-    /// Check the server status
+    /// Check the server status and display PID file information
     Status,
     /// Restart the server
     Restart {
@@ -256,8 +256,11 @@ fn check_status() {
     let app_name = env!("CARGO_PKG_NAME");
     let pid_file_path = get_pid_file_path(app_name).clone(); // Clone the value to avoid moving
 
+    println!("PID file location: {}", pid_file_path.display());
+
     // Check if the PID file exists
     if fs::metadata(&pid_file_path).is_ok() {
+        println!("PID file exists: Yes");
         let pid = fs::read_to_string(&pid_file_path).expect("Unable to read PID file");
         let pid: i32 = pid.trim().parse().expect("Invalid PID");
 
@@ -268,6 +271,7 @@ fn check_status() {
             println!("Server is not running (stale PID).");
         }
     } else {
+        println!("PID file exists: No");
         println!("Server is not running (PID file does not exist).");
     }
 }

@@ -5,3 +5,8 @@ target
 __pycache__
 test
 !.gitkeep
+*.egg-info/
+build/
+.claude-trace
+.venv/
+.env
