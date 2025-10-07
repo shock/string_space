@@ -8,3 +8,5 @@ test
 *.egg-info/
 build/
 .claude-trace
+.venv/
+.env

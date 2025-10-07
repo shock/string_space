@@ -106,7 +106,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return f"ERROR: {e}"
+            return [f"ERROR: {e}"]
 
     def substring_search(self, substring: str) -> list[str]:
         try:
@@ -116,9 +116,9 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return f"ERROR: {e}"
+            return [f"ERROR: {e}"]
 
-    def similar_search(self, word: str, threshold: int) -> list[str]:
+    def similar_search(self, word: str, threshold: float) -> list[str]:
         try:
             request_elements = ["similar", word, str(threshold)]
             response = self.request(request_elements)
@@ -126,7 +126,7 @@ class StringSpaceClient:
         except ProtocolError as e:
             if self.debug:
                 print(f"Error: {e}")
-            return f"ERROR: {e}"
+            return [f"ERROR: {e}"]
 
     def data_file(self) -> str:
         try:
