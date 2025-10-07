@@ -24,7 +24,7 @@ wheels = [
 
 [[package]]
 name = "string-space"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "jaro-winkler" },
@@ -43,7 +43,7 @@ requires-dist = [
 
 [[package]]
 name = "string-space-client"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "python/string_space_client" }
 
 [[package]]

@@ -16,12 +16,12 @@ wheels = [
 
 [[package]]
 name = "string-space-client"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "../string_space_client" }
 
 [[package]]
 name = "string-space-completer"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "prompt-toolkit" },

@@ -1,6 +1,6 @@
 # Author: Bill Doughty
-# Version: 0.2.0
-# Date: 2024-09-25
+# Version: 0.3.0
+# Date: 2025-10-07
 
 import socket
 import re
