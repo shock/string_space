@@ -1,7 +1,7 @@
 [package]
 name = "string_space"
 authors = ["Bill Doughty"]
-version = "0.2.0"
+version = "0.3.0"
 about = "github.com/shock/string_space"
 edition = "2021"
 

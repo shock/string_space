@@ -88,8 +88,8 @@ fn main() {
         Command::Status => {
             check_status();
         }
-        Command::Restart { daemon, port, host, data_file } => {
-            restart_server(daemon, host.clone(), port, data_file);
+        Command::Restart { daemon: _, port, host, data_file } => {
+            restart_server(true, host.clone(), port, data_file);
         }
         Command::Benchmark { data_file, count } => {
             let v = vec![data_file, count.to_string()];
@@ -130,8 +130,11 @@ fn start_server(daemon: bool, host: String, port: u16, data_file: String) {
         }
     }
 
-    // Fork the process
-    let pid = unsafe { libc::fork() };
+    let mut pid = 0;
+
+    if daemon {
+        pid = unsafe { libc::fork() };
+    }
 
     if pid < 0 {
         eprintln!("Failed to fork process");
