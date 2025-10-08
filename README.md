@@ -41,6 +41,13 @@ Before running the project, ensure that the following are installed:
 
 To run the project, clone the repository, navigate to the project directory, and use the following commands:
 
+### Daemon vs Foreground Mode
+
+The server can run in two modes:
+
+- **Foreground Mode** (default): Server runs in the current terminal session, displaying logs and output directly. Use this for development and debugging.
+- **Daemon Mode** (with `--daemon` flag): Server runs as a background process with proper UNIX daemon conventions (double-fork, session management, I/O redirection). Use this for production deployment.
+
 ### Server Management Commands
 
 *Note: Stop, status, and restart commands only apply to servers started in daemon mode.*
@@ -76,7 +83,7 @@ To run the project, clone the repository, navigate to the project directory, and
 - `<data-file>`: The file where the word database will be stored. If the file doesn't exist, it will be created.
 - `--port <port>`: The TCP port to bind to (default: 7878).
 - `--host <host>`: The host address to bind to (default: `127.0.0.1`).
-- `--daemon`: Run server in background as daemon.
+- `--daemon`: Run server in background as daemon. When omitted, server runs in foreground.
 - `--count <COUNT>`: Number of random words for benchmarking. **Warning:** This will overwrite the data file.
 
 Example:
