@@ -25,11 +25,10 @@ class StringSpaceClient:
             self.sock.connect((self.host, self.port))
             self.connected = True
         except ConnectionRefusedError as e:
-            print(f"WARNING: StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
-            print(f"Will retry...")
             self.sock.close()
             self.connected = False
-            raise e
+            raise ProtocolError(f"StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
+
 
     def disconnect(self):
         if self.connected:
