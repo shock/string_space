@@ -3,16 +3,25 @@
 
 from prompt_toolkit.completion import Completer, Completion
 import re
-from string_space_client import StringSpaceClient
+from string_space_client import StringSpaceClient, ProtocolError
 
 class StringSpaceCompleter(Completer):
     def __init__(self, **kwargs):
         port = kwargs.get('port', 7878)
         host = kwargs.get('host', '127.0.0.1')
         debug = kwargs.get('debug', False)
+        self.disabled = False
         self.client = StringSpaceClient(host, port, debug)
+        try:
+            self.client.connect()
+        except ProtocolError as e:
+            print(f"WARNING: {e}")
+            print("StringSpaceCompleter is disabled.  Launch StringSpaceServer and restart this app for word completion suggestions.")
+            self.disabled = True
 
     def get_completions(self, document, complete_event):
+        if self.disabled:
+            return
         word_before_cursor = document.get_word_before_cursor(WORD=True).lower()
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
