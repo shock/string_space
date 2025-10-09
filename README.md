@@ -29,11 +29,14 @@ This Rust project implements a word-list database that allows efficient insertio
   - run the `llm_chat_cli` program (see https://github.com/shock/llm_chat_cli). It should silently connect to the server. You will see a warning message if it cannot connect.
   - execute `string_space stop` to stop the server
 
+### Starting the Server Automatically using crond
 To run the string_space server in in the background automatically when your machine boots, add the following to your crontab (`crontab -e`):
 
 ```crontab
 @reboot /opt/local/bin/string_space start -d ~/.llm_chat_cli/word_list.txt > /dev/null 2>&1
 ```
+
+***NOTE:*** On macOS, you may need to give full-disk access permissions to `cron` in **System Settings > Privacy & Security > Full Disk Access**.  Click the **'+'** icon.  In the Finder window that opens, **SHIFT+CMD+G** to open the search bar, type `/usr/sbin/cron` and enter.  Click **Open** or **OK**.
 
 ## Project Structure
 
