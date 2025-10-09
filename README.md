@@ -16,6 +16,25 @@ This Rust project implements a word-list database that allows efficient insertio
 - **Random Word Generation**: Capable of generating a customizable number of random words for benchmarking and testing.
 - **Benchmarks**: Includes tools for benchmarking the performance of string insertions and lookups.
 
+## Quick Start Guide for use with [llm_chat_cli](https://github.com/shock/llm_chat_cli)
+
+- Ensure you have `rust` [installed on your system](https://rust-lang.org/tools/install/)
+- Clone this repository: `git clone https://github.com/shock/string_space.git`
+- Navigate to the repository directory: `cd string_space`
+- Build and install the executable:
+  - execute `./setup_opt_local_bin.sh`
+  - execute `make install`
+  - execute `mkdir -p ~/.llm_chat_cli/`
+  - execute `string_space start -d ~/.llm_chat_cli/word_list.txt`
+  - run the `llm_chat_cli` program (see https://github.com/shock/llm_chat_cli). It should silently connect to the server. You will see a warning message if it cannot connect.
+  - execute `string_space stop` to stop the server
+
+To run the string_space server in in the background automatically when your machine boots, add the following to your crontab (`crontab -e`):
+
+```crontab
+@reboot /opt/local/bin/string_space start -d ~/.llm_chat_cli/word_list.txt > /dev/null 2>&1
+```
+
 ## Project Structure
 
 The project is organized as follows:
@@ -27,12 +46,13 @@ The project is organized as follows:
   - `benchmark.rs`: Performance testing utilities.
   - `utils.rs`: Utility functions for generating random words, timing code execution, and PID management.
   - `word_struct.rs`: Word structure definitions.
-- `python/string_space_client/`: Python client package for easy integration.
+- `python/string_space_client/`: Python client package for easy integration into python projects.
+- `python/string_space_completer/`: Python [prompt_toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) completer package for word completion in command line tools using `prompt_toolkit`.  Used by [llm_chat_cli](https://github.com/shock/llm_chat_cli).
 - `tests/`: Integration tests and test runner scripts.
 
 ## Prerequisites
 
-Before running the project, ensure that the following are installed:
+Before building the project, ensure that the following are installed:
 
 - [Rust](https://www.rust-lang.org/tools/install)
 - TCP networking enabled on your system.
