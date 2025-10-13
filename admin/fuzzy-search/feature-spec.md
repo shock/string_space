@@ -23,9 +23,9 @@ fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>
 - Must handle UTF-8 strings correctly
 - Should be case-sensitive (matching existing search behavior)
 
-#### 1.2 Scoring Methods
+#### 1.2 Scoring Method
 
-**Option A: Span-Based Scoring** (Default)
+**Span-Based Scoring**
 ```rust
 fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
 ```
@@ -33,34 +33,25 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
 - Span length = last_match_index - first_match_index + 1
 - Lower scores are better (closer matches)
 
-**Option B: Normalized Scoring**
-```rust
-fn score_match_normalized(match_indices: &[usize], candidate: &str, max_len: usize) -> f64
-```
-- Normalized span = span_length / candidate_length
-- Normalized length = candidate_length / max_candidate_length
-- Score = 0.7 * normalized_span + 0.3 * normalized_length
-- Lower scores are better (closer matches)
-
 #### 1.3 Main Search Function
 ```rust
-fn fuzzy_subsequence_search(&self, query: &str, scoring_method: ScoringMethod) -> Vec<StringRef>
+fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 ```
-- `ScoringMethod` enum with variants: `SpanBased`, `Normalized`
 - Returns results sorted by score (ascending), then by frequency (descending), then by age (descending)
 - Should handle empty query by returning empty vector
 - Must respect existing string length constraints (3-50 characters)
+- Limits results to top 10 matches
+- Uses prefix filtering like existing `get_similar_words` for performance
 
 ### 2. StringSpace API Extension
 
 Add to `StringSpace` struct in `src/modules/string_space.rs`:
 ```rust
-pub fn fuzzy_subsequence_search(&self, query: &str, scoring_method: ScoringMethod) -> Vec<StringRef>
+pub fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 
 // Internal helper functions
 fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>
 fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
-fn score_match_normalized(match_indices: &[usize], candidate: &str, max_len: usize) -> f64
 ```
 
 ### 3. Protocol Integration
@@ -69,19 +60,17 @@ fn score_match_normalized(match_indices: &[usize], candidate: &str, max_len: usi
 
 **Request Format:**
 ```
-fuzzy-subsequence<RS>query<RS>[scoring_method]
+fuzzy-subsequence<RS>query
 ```
 
 **Parameters:**
 - `query`: The subsequence to search for (required)
-- `scoring_method`: Optional parameter ("span" or "normalized"), defaults to "span"
 
 **Response Format:**
 Same as existing search commands - newline-separated list of matching strings, optionally with metadata if `SEND_METADATA` is true.
 
 **Error Cases:**
 - Invalid parameter count: "ERROR - invalid parameters (length = X)"
-- Invalid scoring method: "ERROR - invalid scoring method 'X', expected 'span' or 'normalized'"
 
 #### 3.2 Protocol Implementation
 
@@ -96,7 +85,7 @@ else if "fuzzy-subsequence" == operation {
 
 Add to `StringSpaceClient` in `python/string_space_client/`:
 ```python
-def fuzzy_subsequence_search(self, query: str, scoring_method: str = "span") -> List[str]
+def fuzzy_subsequence_search(self, query: str) -> List[str]
 ```
 
 ## Test Plan
@@ -164,9 +153,9 @@ def fuzzy_subsequence_test(client):
         for result in results:
             print(f"  {result}")
 
-        # Test normalized scoring
-        results = client.fuzzy_subsequence_search("ogp5", "normalized")
-        print(f"Fuzzy-subsequence search 'ogp5' (normalized):")
+        # Test with different query
+        results = client.fuzzy_subsequence_search("ogp5")
+        print(f"Fuzzy-subsequence search 'ogp5':")
         for result in results:
             print(f"  {result}")
 
@@ -200,22 +189,17 @@ Add benchmark tests to compare with existing search methods:
 3. Performance benchmarking
 4. Documentation updates
 
-## Open Questions / TBD
+## Open Questions / Resolved
 
-1. **Case Sensitivity**: Should fuzzy-subsequence search be case-sensitive like other searches?
-   - Current analysis suggests yes for consistency
+1. **Case Sensitivity**: ✅ Fuzzy-subsequence search will be case-sensitive like other searches
 
-2. **Scoring Default**: Which scoring method should be the default?
-   - Span-based seems more intuitive for most use cases
+2. **Scoring Method**: ✅ Only span-based scoring will be implemented (removed normalized scoring)
 
-3. **Performance Optimization**: Should we implement any optimizations for large datasets?
-   - Consider prefix filtering like existing `get_similar_words`
+3. **Performance Optimization**: ✅ Will use prefix filtering like existing `get_similar_words`
 
-4. **Result Limit**: Should there be a default limit on results returned?
-   - Current implementation returns all matches, consider adding limit parameter
+4. **Result Limit**: ✅ Will limit results to top 10 matches
 
-5. **Metadata Integration**: How should frequency and age affect ranking?
-   - Current plan: score primary, then frequency, then age
+5. **Metadata Integration**: ✅ Will use same strategy as `get_similar_words` - score primary, then frequency, then age
 
 ## Success Criteria
 
@@ -243,7 +227,7 @@ Add benchmark tests to compare with existing search methods:
 
 1. **Configurable Scoring Weights**: Allow users to customize fuzzy-subsequence scoring formula
 2. **Case Insensitive Option**: Add case-insensitive fuzzy-subsequence matching
-3. **Result Limit Parameter**: Add optional limit to fuzzy-subsequence protocol
+3. **Result Limit Parameter**: Add optional limit parameter to fuzzy-subsequence protocol (currently hardcoded to 10)
 4. **Performance Optimizations**: Add indexing for common fuzzy-subsequence patterns
 
 ---
