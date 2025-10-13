@@ -1,4 +1,4 @@
-I want to add a new feature.  It's a new type of matching search on the StringSpace type.  It will be similar to the get_similar_words function, but it will bee a fuzzy subsequence search algorithm, similar to the python implementations in @admin/fuzzy-search/fuzzy-subsequence-search.py and @admin/fuzzy-search/fuzzy-subsequence-search-normalized.py .  Adding this feature will also involve adding a method to access it to the TCP protocol in @src/modules/protocol.rs.
+I want to add a new feature.  It's a new type of matching search on the StringSpace type.  It will be similar to the get_similar_words function, but it will be a fuzzy subsequence search algorithm, similar to the python implementations in @admin/fuzzy-search/fuzzy-subsequence-search.py and @admin/fuzzy-search/fuzzy-subsequence-search-normalized.py .  Adding this feature will also involve adding a method to access it to the TCP protocol in @src/modules/protocol.rs.
 
 Help me write the first draft of the feature spec doc in @admin/fuzzy-search/feature-spec.md, to capture the requirements for fully implementing this feature along with a test plan that augments the current test suite and strategy.
 
