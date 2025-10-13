@@ -1,11 +1,11 @@
-# Fuzzy Subsequence Search Feature Specification
+# Fuzzy-Subsequence Search Feature Specification
 
 ## Overview
-This document specifies the implementation of a fuzzy subsequence search feature for the StringSpace Rust project. The feature will provide a new type of matching search similar to existing Python implementations, with full TCP protocol integration.
+This document specifies the implementation of a fuzzy-subsequence search feature for the StringSpace Rust project. The feature will provide a new type of matching search similar to existing Python implementations, with full TCP protocol integration.
 
 ## Feature Description
 
-Fuzzy subsequence search allows users to find strings where the query characters appear in order within the candidate string, but not necessarily consecutively. This is particularly useful for:
+Fuzzy-subsequence search allows users to find strings where the query characters appear in order within the candidate string, but not necessarily consecutively. This is particularly useful for:
 - Abbreviation matching (e.g., "g4" matches "openai/gpt-4o-2024-08-06")
 - Partial word matching (e.g., "ogp5" matches "openai/gpt-5")
 - Flexible pattern matching with character order preservation
@@ -65,11 +65,11 @@ fn score_match_normalized(match_indices: &[usize], candidate: &str, max_len: usi
 
 ### 3. Protocol Integration
 
-#### 3.1 New Command: "fuzzy"
+#### 3.1 New Command: "fuzzy-subsequence"
 
 **Request Format:**
 ```
-fuzzy<RS>query<RS>[scoring_method]
+fuzzy-subsequence<RS>query<RS>[scoring_method]
 ```
 
 **Parameters:**
@@ -87,8 +87,8 @@ Same as existing search commands - newline-separated list of matching strings, o
 
 Add to `StringSpaceProtocol::create_response()` in `src/modules/protocol.rs`:
 ```rust
-else if "fuzzy" == operation {
-    // Parameter validation and fuzzy search implementation
+else if "fuzzy-subsequence" == operation {
+    // Parameter validation and fuzzy-subsequence search implementation
 }
 ```
 
@@ -96,7 +96,7 @@ else if "fuzzy" == operation {
 
 Add to `StringSpaceClient` in `python/string_space_client/`:
 ```python
-def fuzzy_search(self, query: str, scoring_method: str = "span") -> List[str]
+def fuzzy_subsequence_search(self, query: str, scoring_method: str = "span") -> List[str]
 ```
 
 ## Test Plan
@@ -156,17 +156,17 @@ fn test_fuzzy_subsequence_search_empty() {
 
 Extend `tests/client.py`:
 ```python
-def fuzzy_test(client):
+def fuzzy_subsequence_test(client):
     try:
-        # Test basic fuzzy search
-        results = client.fuzzy_search("g4")
-        print(f"Fuzzy search 'g4':")
+        # Test basic fuzzy-subsequence search
+        results = client.fuzzy_subsequence_search("g4")
+        print(f"Fuzzy-subsequence search 'g4':")
         for result in results:
             print(f"  {result}")
 
         # Test normalized scoring
-        results = client.fuzzy_search("ogp5", "normalized")
-        print(f"Fuzzy search 'ogp5' (normalized):")
+        results = client.fuzzy_subsequence_search("ogp5", "normalized")
+        print(f"Fuzzy-subsequence search 'ogp5' (normalized):")
         for result in results:
             print(f"  {result}")
 
@@ -190,7 +190,7 @@ Add benchmark tests to compare with existing search methods:
 4. Add comprehensive unit tests
 
 ### Phase 2: Protocol Integration (Week 1)
-1. Add "fuzzy" command to protocol handler
+1. Add "fuzzy-subsequence" command to protocol handler
 2. Implement parameter validation and error handling
 3. Add protocol-level unit tests
 
@@ -202,7 +202,7 @@ Add benchmark tests to compare with existing search methods:
 
 ## Open Questions / TBD
 
-1. **Case Sensitivity**: Should fuzzy search be case-sensitive like other searches?
+1. **Case Sensitivity**: Should fuzzy-subsequence search be case-sensitive like other searches?
    - Current analysis suggests yes for consistency
 
 2. **Scoring Default**: Which scoring method should be the default?
@@ -241,10 +241,10 @@ Add benchmark tests to compare with existing search methods:
 
 ## Future Enhancements
 
-1. **Configurable Scoring Weights**: Allow users to customize scoring formula
-2. **Case Insensitive Option**: Add case-insensitive matching
-3. **Result Limit Parameter**: Add optional limit to protocol
-4. **Performance Optimizations**: Add indexing for common patterns
+1. **Configurable Scoring Weights**: Allow users to customize fuzzy-subsequence scoring formula
+2. **Case Insensitive Option**: Add case-insensitive fuzzy-subsequence matching
+3. **Result Limit Parameter**: Add optional limit to fuzzy-subsequence protocol
+4. **Performance Optimizations**: Add indexing for common fuzzy-subsequence patterns
 
 ---
 
