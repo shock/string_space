@@ -79,7 +79,7 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
 ```rust
 fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 ```
-- Returns results sorted by score (ascending), then by frequency (descending), then by age (descending)
+- Returns results sorted by score (ascending - lower scores are better), then by frequency (descending), then by age (descending)
 - Handles empty query by returning empty vector
 - Respects existing string length constraints (3-50 characters)
 - Limits results to top 10 matches
@@ -459,7 +459,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - `find_by_prefix()` sorts by frequency (descending) only
 - `find_with_substring()` sorts by frequency (descending) only
 - `get_similar_words()` sorts by score (descending), then frequency (descending), then age (descending)
-**Recommendation**: Follow the `get_similar_words()` pattern for consistency: sort by score (descending), then frequency (descending), then age (descending)
+- however, lower scores are better for `score_match_span`
+**Recommendation**: Clarify the sorting strategy in the plan is correct due to the opposite nature of scores in `score_match_span` (lower scores are better) compared to other search methods
 
 2. **Inconsistent Prefix Filtering Approach**
 **Description**: The plan mentions using prefix filtering "like existing `get_similar_words`" but the implementation details don't match
