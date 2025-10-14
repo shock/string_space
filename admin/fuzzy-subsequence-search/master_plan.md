@@ -46,6 +46,8 @@ The TCP protocol currently supports:
 - `similar <word> <threshold>` - Similarity search command
 - **Key Pattern**: Commands follow `operation<RS>parameters` format with EOT termination
 
+**Note on Unimplemented Commands**: The Python client test file contains a `remove_test(client)` function that references a "remove" command, but this command is not currently implemented in the protocol and is considered out of scope for the fuzzy-subsequence search feature implementation.
+
 ### Python Client Integration (python/string_space_client/)
 
 The Python client currently provides:
@@ -90,6 +92,7 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
   - **Prefix filtering implementation**: Uses `query[0..1].to_string().as_str()` to get first character of query (identical to `get_similar_words()` implementation)
   - **Filtering approach**: Only considers candidates that start with first character of query using `find_by_prefix()`
   - **Performance benefit**: Significantly reduces search space by filtering candidates early
+- **String access consistency**: Uses the existing `StringRefInfo.string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure for consistency with other search methods
 
 ### Protocol Integration
 
@@ -164,6 +167,7 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
      - **Prefix filtering implementation**: Use `query[0..1].to_string().as_str()` to get first character of query
      - **Filtering approach**: Only consider candidates that start with first character of query using `find_by_prefix()`
      - **Performance benefit**: Significantly reduces search space by filtering candidates early
+   - **String access consistency**: Use the existing `StringRefInfo.string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure for consistency with other search methods
    - Implement result ranking (score ascending, frequency descending, age descending)
    - **Result limiting timing**: Limit results to top 10 matches **after all sorting is complete** using `matches.truncate(10)`
    - Handle empty query case (return empty results, consistent with existing search method behavior)
@@ -235,6 +239,9 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
     matches.into_iter().map(|(string_ref, _)| string_ref).collect()
 }
 ```
+
+**Note on StringRefInfo.string_ref() Method Usage:**
+The fuzzy-subsequence search implementation will use the existing `StringRefInfo.string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure for consistency with other search methods. This method provides a safe abstraction for converting pointer-based string references to actual string slices, ensuring consistent string access patterns across all search implementations.
 
 ### Phase 2: StringSpace API Extension
 
@@ -442,6 +449,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - Character-by-character matching preserving order using Rust's `chars()` iterator
 - Case-sensitive to match existing search behavior
 - **UTF-8 Character Handling**: Proper Unicode support using `chars()` iterator for multi-byte UTF-8 sequences (emoji, accented characters, etc.)
+  - **Performance Consideration**: Using `chars()` iterator is correct and necessary for proper Unicode support. Any performance impact compared to byte-based iteration is acceptable given the correctness requirements for handling international text.
+  - **Performance Mitigation**: The prefix filtering optimization significantly reduces the search space, mitigating most performance concerns.
 - Early termination when no match possible
 
 **Scoring Strategy:**
@@ -496,7 +505,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Protocol Errors:**
 - Invalid parameter count returns clear error message using format: "ERROR - invalid parameters (length = X)"
 - Follows existing error format pattern used by "prefix", "substring", and "insert" commands
-- **Note**: The "similar" command's error format should be updated to use the dash format for consistency
+- **Note**: The "similar" command's error format will be updated to use the dash format for consistency during this implementation
 - No server crashes on malformed requests
 
 **Algorithm Errors:**
@@ -529,7 +538,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - Follows existing `operation<RS>parameters` pattern
 - Uses same EOT termination as other commands
 - Consistent error handling with existing commands, specifically using the "ERROR - invalid parameters (length = X)" format from the "prefix", "substring", and "insert" commands
-- **Note**: The "similar" command's error format should be updated to use the dash format for consistency
+- **Note**: The "similar" command's error format will be updated to use the dash format for consistency during this implementation
 
 **Response Format:**
 - Newline-separated strings matching existing patterns
@@ -705,7 +714,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Recommendation**:
 - Document that the new command will follow the existing pattern of using the dash format ("ERROR - invalid parameters (length = {})"), AND
 - Add to the plan that the ERROR message format for "similar" command should be updated to be consistent with the rest of the commands
-**Resolution**: Plan updated to use the dash format "ERROR - invalid parameters (length = X)" for the new fuzzy-subsequence command, consistent with the majority of existing commands. Added note that the "similar" command's error format should be updated for consistency during implementation.
+**Resolution**: Plan updated to use the dash format "ERROR - invalid parameters (length = X)" for the new fuzzy-subsequence command, consistent with the majority of existing commands. The "similar" command's error format will be updated to use the consistent dash format during the fuzzy-subsequence search implementation as a simple one-line code change.
 
 8. **Missing Test Infrastructure Details** - **RESOLVED**
 **Description**: The plan mentions comprehensive testing but doesn't specify how to integrate tests with the existing test infrastructure
@@ -742,24 +751,26 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - **Implementation Pattern**: Follow existing `time_execution()` pattern with result display and timing output
 - **Performance Comparison**: Include timing comparison output showing fuzzy-subsequence search performance relative to prefix and substring searches
 
-10. **Missing Protocol Command for "remove" Operation**
+10. **Missing Protocol Command for "remove" Operation** - **RESOLVED**
 **Description**: The plan mentions protocol integration but doesn't address the existing "remove" command that appears in the Python client tests
 **Analysis**: The Python client test file `tests/client.py` contains a `remove_test(client)` function that calls `client.remove()`, but this command is not implemented in the current protocol.rs file
 **Recommendation**: Document that the "remove" command is not currently implemented in the protocol and should be considered out of scope for this feature implementation
 **Impact**: Low - the "remove" command appears to be a planned feature that hasn't been implemented yet, so it doesn't affect the fuzzy-subsequence search implementation
+**Resolution**: Added clarification that the "remove" command is not currently implemented in the protocol and is considered out of scope for the fuzzy-subsequence search feature implementation. The existing test function is commented out in the main test execution, confirming this is a planned but unimplemented feature.
 
-11. **Inconsistent Protocol Error Handling for "similar" Command**
+11. **Inconsistent Protocol Error Handling for "similar" Command** - **RESOLVED**
 **Description**: The plan correctly identifies that the "similar" command uses a different error format ("ERROR\nInvalid parameters") compared to other commands ("ERROR - invalid parameters")
-**Analysis**: The plan recommends updating the "similar" command's error format for consistency, but this should be treated as a separate refactoring task
-**Recommendation**: Add a note that updating the "similar" command's error format should be done as a separate refactoring task after the fuzzy-subsequence search implementation is complete, to avoid scope creep
-**Overruled**: Fixing the error message for the similar command is literally a one-line code change. We will do it in this implementation.  Update the document accordingly.
+**Analysis**: The "similar" command's error format should be updated to use the consistent dash format ("ERROR - invalid parameters") for protocol consistency
+**Resolution**: The "similar" command's error format will be updated to use the consistent dash format ("ERROR - invalid parameters") during the fuzzy-subsequence search implementation. This is a simple one-line code change that improves consistency across all protocol commands and will be included in the Phase 3 protocol integration work.
 
-12. **Missing Documentation for StringRefInfo.string_ref() Method**
+12. **Missing Documentation for StringRefInfo.string_ref() Method** - **RESOLVED**
 **Description**: The plan doesn't mention how the new fuzzy-subsequence search will interact with the existing `StringRefInfo.string_ref()` method
 **Analysis**: The `StringRefInfo.string_ref()` method is used internally to convert pointer-based string references to actual string slices. The fuzzy-subsequence search implementation should use this method for consistency
 **Recommendation**: Add a note that the fuzzy-subsequence search implementation should use the existing `StringRefInfo.string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure for consistency with other search methods
+**Resolution**: Plan updated with explicit documentation that the fuzzy-subsequence search implementation will use the existing `StringRefInfo.string_ref()` method for consistent string access. The implementation details in Phase 1 have been updated to show proper usage of `string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure, ensuring consistency with the existing codebase patterns.
 
-13. **Potential Performance Impact of UTF-8 Character Iteration**
+13. **Potential Performance Impact of UTF-8 Character Iteration** - **RESOLVED**
 **Description**: The plan correctly identifies UTF-8 character handling using `chars()` iterator, but doesn't address potential performance implications
 **Analysis**: Using `chars()` for character-by-character iteration is correct for UTF-8 handling but may be slower than byte-based iteration for ASCII-only strings
 **Recommendation**: Add a note that the UTF-8 character iteration approach is correct and necessary for proper Unicode support, and any performance impact is acceptable given the correctness requirements. The prefix filtering optimization should mitigate most performance concerns
+**Resolution**: Plan updated with explicit clarification that UTF-8 character iteration using `chars()` is correct and necessary for proper Unicode support, and any performance impact is acceptable given the correctness requirements. The prefix filtering optimization significantly mitigates performance concerns by reducing the search space early in the process.
