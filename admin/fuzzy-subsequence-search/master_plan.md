@@ -49,10 +49,10 @@ The TCP protocol currently supports:
 ### Python Client Integration (python/string_space_client/)
 
 The Python client currently provides:
-- `prefix_search(prefix)` - Prefix search method
-- `substring_search(substring)` - Substring search method
-- `similar_search(word, threshold)` - Similarity search method
-- **Key Pattern**: Methods mirror protocol commands with proper error handling
+- `prefix_search(prefix: str) -> list[str]` - Prefix search method
+- `substring_search(substring: str) -> list[str]` - Substring search method
+- `similar_search(word: str, threshold: float) -> list[str]` - Similarity search method
+- **Key Pattern**: Methods mirror protocol commands with proper error handling and type annotations
 
 ## Proposed Architecture
 
@@ -64,7 +64,7 @@ fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>
 ```
 - Returns `Some(Vec<usize>)` containing indices of matched characters
 - Returns `None` if query is not a subsequence of candidate
-- Handles UTF-8 strings correctly
+- **UTF-8 Character Handling**: Uses Rust's `chars()` iterator for proper Unicode character-by-character matching, correctly handling multi-byte UTF-8 sequences
 - Case-sensitive (matching existing search behavior)
 
 **Span-Based Scoring:**
@@ -73,17 +73,23 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
 ```
 - Score = span_length + (candidate_length * 0.1)
 - Span length = last_match_index - first_match_index + 1
-- Lower scores are better (closer matches)
+- **Lower scores are better (closer matches)** - this is intentional and differs from other search methods where higher scores are better
+- The scoring algorithm is designed so that more compact matches (shorter spans) receive lower scores, making them rank higher
 
 **Main Search Function:**
 ```rust
 fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 ```
-- Returns results sorted by score (ascending - lower scores are better), then by frequency (descending), then by age (descending)
-- Handles empty query by returning empty vector
+- Returns results sorted by **score (ascending - lower scores are better)**, then by frequency (descending), then by age (descending)
+- **Sorting rationale**: Lower scores indicate better matches (more compact subsequences), so ascending order puts best matches first
+- **Consistency with scoring design**: This sorting strategy is intentional and consistent with the scoring algorithm where lower scores represent better matches
+- **Empty query handling**: Returns empty vector for empty queries, consistent with existing search method behavior
 - Respects existing string length constraints (3-50 characters)
-- Limits results to top 10 matches
-- Uses prefix filtering like existing `get_similar_words` for performance
+- **Result limiting**: Limits results to top 10 matches **after all sorting is complete**, ensuring the best matches are selected based on the full sorting criteria
+- Uses prefix filtering like existing `get_similar_words` for performance optimization
+  - **Prefix filtering implementation**: Uses `query[0..1].to_string().as_str()` to get first character of query
+  - **Filtering approach**: Only considers candidates that start with first character of query using `find_by_prefix()`
+  - **Performance benefit**: Significantly reduces search space by filtering candidates early
 
 ### Protocol Integration
 
@@ -91,7 +97,7 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 - **Request Format**: `fuzzy-subsequence<RS>query`
 - **Parameters**: `query` (required) - The subsequence to search for
 - **Response Format**: Newline-separated list of matching strings
-- **Error Cases**: Invalid parameter count returns "ERROR - invalid parameters (length = X)"
+- **Error Cases**: Invalid parameter count returns "ERROR\nInvalid parameters (length = X)" (consistent with existing "similar" command format)
 
 ### Python Client Integration
 
@@ -116,6 +122,7 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 **Testing Framework:**
 - **Unit Tests**: Individual component testing with mocked dependencies
 - **Integration Tests**: Testing component interactions and protocol integration
+  - **Protocol Integration Tests**: Specific test cases for command validation, error handling, and response format verification (see Protocol Integration Testing Strategy section)
 - **Regression Tests**: Ensuring existing functionality remains unchanged
 - **Manual QA**: Real-world testing with live server and client
 
@@ -150,9 +157,12 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 3. **Implement Main Search Method**
    - Add `fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>` to `StringSpace`
    - Use prefix filtering for performance optimization
+     - **Prefix filtering implementation**: Use `query[0..1].to_string().as_str()` to get first character of query
+     - **Filtering approach**: Only consider candidates that start with first character of query using `find_by_prefix()`
+     - **Performance benefit**: Significantly reduces search space by filtering candidates early
    - Implement result ranking (score ascending, frequency descending, age descending)
-   - Limit results to top 10 matches
-   - Handle empty query case
+   - **Result limiting timing**: Limit results to top 10 matches **after all sorting is complete** using `matches.truncate(10)`
+   - Handle empty query case (return empty results, consistent with existing search method behavior)
    - Add comprehensive unit tests
 
 **Implementation Details:**
@@ -163,6 +173,8 @@ fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>> {
     let mut current_char = query_chars.next();
     let mut match_indices = Vec::new();
 
+    // UTF-8 Character Handling: Use chars() iterator for proper Unicode character-by-character matching
+    // This correctly handles multi-byte UTF-8 sequences like emoji, accented characters, etc.
     for (i, c) in candidate.chars().enumerate() {
         if current_char == Some(c) {
             match_indices.push(i);
@@ -184,6 +196,40 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
     let candidate_length = candidate.len() as f64;
     span_length + (candidate_length * 0.1)
 }
+
+// In StringSpace implementation
+fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
+    // Empty query handling: return empty vector for empty queries
+    // This is consistent with existing search method behavior
+    if query.is_empty() {
+        return Vec::new();
+    }
+
+    // Use prefix filtering like get_similar_words for performance
+    let possibilities = self.inner.find_by_prefix(query[0..1].to_string().as_str());
+
+    let mut matches: Vec<(StringRef, f64)> = Vec::new();
+
+    for candidate in possibilities {
+        if let Some(match_indices) = Self::is_subsequence(query, &candidate.string) {
+            let score = Self::score_match_span(&match_indices, &candidate.string);
+            matches.push((candidate, score));
+        }
+    }
+
+    // Sort by score (ascending - lower scores are better), then frequency (descending), then age (descending)
+    matches.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1).unwrap()
+            .then(b.0.meta.frequency.cmp(&a.0.meta.frequency))
+            .then(b.0.meta.age_days.cmp(&a.0.meta.age_days))
+    });
+
+    // Limit to top 10 results AFTER all sorting is complete
+    // This ensures the best 10 matches are selected based on the full sorting criteria
+    matches.truncate(10);
+
+    matches.into_iter().map(|(string_ref, _)| string_ref).collect()
+}
 ```
 
 ### Phase 2: StringSpace API Extension
@@ -201,9 +247,9 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
 **Test Scenarios:**
 - Basic subsequence matching
 - Non-matching sequences
-- Empty query handling
+- **Empty query handling**: Verify empty queries return empty results, consistent with existing search method behavior
 - Exact matches
-- UTF-8 character handling
+- **UTF-8 Character Handling**: Test with multi-byte UTF-8 sequences (emoji, accented characters, etc.) to verify proper `chars()` iterator usage
 - Result ranking verification
 - Performance with large datasets
 
@@ -219,7 +265,7 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
 ```rust
 else if "fuzzy-subsequence" == operation {
     if params.len() != 1 {
-        let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
+        let response_str = format!("ERROR\nInvalid parameters (length = {})", params.len());
         response.extend_from_slice(response_str.as_bytes());
         return response;
     }
@@ -244,16 +290,71 @@ else if "fuzzy-subsequence" == operation {
    - Test error cases and parameter validation
    - Verify response format consistency
 
+### Protocol Integration Testing Strategy
+
+**Comprehensive Test Coverage for Protocol Command:**
+
+**Test Case 1: Valid Command Execution**
+- **Scenario**: Send "fuzzy-subsequence<RS>query" with valid query
+- **Validation**: Verify response contains newline-separated matching strings
+- **Expected Behavior**: Returns up to 10 matching strings in correct order (score ascending, frequency descending, age descending)
+- **Success Criteria**: Response format matches existing search commands, no metadata unless SEND_METADATA flag is set
+
+**Test Case 2: Parameter Validation**
+- **Scenario**: Send "fuzzy-subsequence" with incorrect parameter count (0 or >1 parameters)
+- **Validation**: Verify error response format "ERROR\nInvalid parameters (length = X)"
+- **Expected Behavior**: Returns standardized error message consistent with "similar" command
+- **Success Criteria**: Error message format exactly matches existing protocol error patterns
+
+**Test Case 3: Empty Query Handling**
+- **Scenario**: Send "fuzzy-subsequence<RS>" with empty query string
+- **Validation**: Verify empty response (no matches)
+- **Expected Behavior**: Returns empty results consistent with existing search method behavior
+- **Success Criteria**: No error, empty response, consistent with prefix/substring search behavior
+
+**Test Case 4: Response Format Verification**
+- **Scenario**: Send multiple valid queries with known matches
+- **Validation**: Verify response format consistency across different result sets
+- **Expected Behavior**: Newline-separated strings, optional metadata following SEND_METADATA flag
+- **Success Criteria**: Response format identical to existing search commands, proper UTF-8 encoding
+
+**Test Case 5: Protocol Command Isolation**
+- **Scenario**: Verify new command doesn't interfere with existing commands
+- **Validation**: Test all existing protocol commands before and after implementation
+- **Expected Behavior**: All existing commands continue working without changes
+- **Success Criteria**: No regression in existing protocol functionality
+
+**Test Case 6: Error Resilience**
+- **Scenario**: Send malformed requests (missing separators, invalid encodings)
+- **Validation**: Verify graceful error handling without server crashes
+- **Expected Behavior**: Server handles malformed requests without crashing
+- **Success Criteria**: Server remains responsive after protocol errors
+
+**Test Case 7: Performance Under Load**
+- **Scenario**: Send multiple concurrent fuzzy-subsequence requests
+- **Validation**: Verify response times and memory usage remain within acceptable limits
+- **Expected Behavior**: Concurrent requests handled without significant performance degradation
+- **Success Criteria**: Performance meets established benchmark criteria under load
+
 ### Phase 4: Python Client Integration
 
 1. **Add Client Method**
-   - Add `fuzzy_subsequence_search(query: str) -> List[str]` to `StringSpaceClient`
-   - Follow existing client method patterns
-   - Implement proper error handling
+   - Add `fuzzy_subsequence_search(query: str) -> list[str]` to `StringSpaceClient`
+   - Follow existing client method patterns with proper type annotations
+   - Implement proper error handling consistent with existing search methods
 
 **Implementation Details:**
 ```python
 def fuzzy_subsequence_search(self, query: str) -> list[str]:
+    """
+    Perform fuzzy-subsequence search for strings where query characters appear in order.
+
+    Args:
+        query: The subsequence pattern to search for
+
+    Returns:
+        list[str]: List of matching strings, or error message in list format
+    """
     try:
         request_elements = ["fuzzy-subsequence", query]
         response = self.request(request_elements)
@@ -273,13 +374,25 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 
 1. **Comprehensive Integration Tests**
    - Test end-to-end functionality from client to server
-   - Verify protocol command handling
+   - Verify protocol command handling using the specific test cases outlined in Protocol Integration Testing Strategy
    - Test with various data sets and query patterns
 
 2. **Performance Benchmarking**
-   - Compare performance with existing search methods
-   - Test with various query lengths and dataset sizes
-   - Measure memory usage impact
+   - **Benchmark Integration**: Add fuzzy-subsequence search to existing benchmark suite in `src/modules/benchmark.rs`
+   - **Performance Criteria**:
+     - Fuzzy-subsequence search should complete within 2x the time of prefix search for equivalent dataset sizes
+     - Should handle 100,000-word datasets with queries of 1-10 characters in under 100ms
+     - Memory usage should not exceed 10% increase over existing search methods
+   - **Benchmark Strategy**:
+     - Use existing `time_execution()` utility for timing measurements
+     - Test with standardized dataset sizes (10K, 50K, 100K words)
+     - Compare against existing search methods (prefix, substring, similarity)
+     - Measure performance with various query patterns (short, medium, long queries)
+     - Include edge cases (**empty queries** return empty results efficiently, single character queries, no matches)
+   - **Acceptable Performance**:
+     - Should not degrade existing search method performance
+     - Should scale linearly with dataset size up to 100K words
+     - Should be faster than substring search for equivalent queries
 
 3. **Manual Testing and Validation**
    - Test with live server and client
@@ -303,41 +416,61 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 ### Subsequence Detection Strategy
 
 **Matching Strategy:**
-- Character-by-character matching preserving order
+- Character-by-character matching preserving order using Rust's `chars()` iterator
 - Case-sensitive to match existing search behavior
-- UTF-8 aware for international character support
+- **UTF-8 Character Handling**: Proper Unicode support using `chars()` iterator for multi-byte UTF-8 sequences (emoji, accented characters, etc.)
 - Early termination when no match possible
 
 **Scoring Strategy:**
 - Span-based scoring prioritizes compact matches
-- Lower scores indicate better matches
+- **Lower scores indicate better matches** - this is intentional and differs from other search methods
+- **Sorting strategy justification**: Results are sorted by score (ascending) because lower scores represent more compact and better matches
 - Candidate length penalty prevents overly long matches from ranking too high
 - No normalized scoring (simplified implementation)
+
+### Result Sorting Strategy
+
+**Sorting Design Rationale:**
+- **Score (ascending)**: Lower scores indicate better matches (more compact subsequences), so ascending order puts best matches first
+- **Frequency (descending)**: Higher frequency words are more relevant, consistent with existing search methods
+- **Age (descending)**: Newer words are more relevant, consistent with existing search methods
+
+**Consistency with Scoring Algorithm:**
+- The sorting strategy is intentional and consistent with the scoring design where lower scores represent better matches
+- This differs from other search methods (like `get_similar_words`) where higher scores are better
+- The design choice is justified by the nature of span-based scoring where compactness is the primary quality metric
 
 ### Performance Optimization
 
 **Filtering Strategy:**
 - Use prefix filtering like existing `get_similar_words`
-- Only consider candidates that start with first character of query
+  - **Implementation**: Use `query[0..1].to_string().as_str()` to get first character of query
+  - **Filtering**: Only consider candidates that start with first character of query using `find_by_prefix()`
+  - **Performance benefit**: Significantly reduces search space by filtering candidates early
 - Reduces search space significantly
 - Maintains performance with large datasets
+- **Benchmark Validation**: Performance will be validated against established criteria (within 2x prefix search time, under 100ms for 100K words)
 
 **Result Limiting:**
 - Hard limit of 10 results for consistency
+- **Implementation timing**: Result limiting occurs **after all sorting is complete**, using `matches.truncate(10)`
+- **Sorting order**: Results are first sorted by score (ascending), then frequency (descending), then age (descending), then limited to top 10
+- **Consistency with existing patterns**: Follows the same approach as `get_similar_words()` where truncation happens after full sorting
 - Prevents excessive memory usage
 - Matches existing result limiting patterns
+- **Performance Impact**: Limiting results ensures predictable performance characteristics
 
 ### Error Handling
 
 **Comprehensive Error Handling Strategy:**
 
 **Protocol Errors:**
-- Invalid parameter count returns clear error message
-- Follows existing error format patterns
+- Invalid parameter count returns clear error message using format: "ERROR\nInvalid parameters (length = X)"
+- Follows existing error format pattern used by "similar" command
 - No server crashes on malformed requests
 
 **Algorithm Errors:**
-- Empty queries return empty results
+- **Empty queries return empty results**: Consistent with existing search method behavior where empty queries yield no matches
 - UTF-8 decoding errors handled gracefully
 - Memory allocation failures handled through existing mechanisms
 
@@ -365,7 +498,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Command Format:**
 - Follows existing `operation<RS>parameters` pattern
 - Uses same EOT termination as other commands
-- Consistent error handling with existing commands
+- Consistent error handling with existing commands, specifically using the "ERROR\nInvalid parameters (length = X)" format from the "similar" command
 
 **Response Format:**
 - Newline-separated strings matching existing patterns
@@ -375,9 +508,11 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 ### Python Client Integration
 
 **Method Pattern:**
-- Follows existing client method signatures
-- Consistent error handling with `ProtocolError`
-- Same request/response pattern as other search methods
+- Follows existing client method signatures with proper type annotations: `fuzzy_subsequence_search(query: str) -> list[str]`
+- Consistent error handling with `ProtocolError` returning error message in list format
+- Same request/response pattern as other search methods using `request_elements` list
+- Includes docstring following existing documentation patterns
+- Returns list of strings or error message in list format consistent with existing search methods
 
 ## Benefits of New Feature
 
@@ -419,14 +554,20 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 
 **Mitigation Strategies:**
 - Comprehensive testing at each phase
-- Performance benchmarking throughout implementation
+- **Performance benchmarking against established criteria** throughout implementation
 - Careful protocol integration testing
+- **Performance validation** using existing benchmark infrastructure
 
 ## Success Criteria
 
 - [ ] All unit tests pass
 - [ ] Integration tests demonstrate working TCP protocol
-- [ ] Performance is acceptable for typical use cases
+- [ ] **Performance benchmarks meet established criteria**:
+  - [ ] Fuzzy-subsequence search completes within 2x prefix search time
+  - [ ] Handles 100,000-word datasets with queries of 1-10 characters in under 100ms
+  - [ ] Memory usage does not exceed 10% increase over existing search methods
+  - [ ] Scales linearly with dataset size up to 100K words
+  - [ ] Faster than substring search for equivalent queries
 - [ ] Backward compatibility maintained
 - [ ] Documentation updated
 - [ ] Python client integration complete
@@ -473,18 +614,25 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Description**: The plan shows "ERROR - invalid parameters (length = X)" but existing protocol uses "ERROR\nInvalid parameters (length = X)" for similar command
 **Analysis**: Different error message formats exist across commands
 **Recommendation**: Standardize on the existing format used by the "similar" command: "ERROR\nInvalid parameters (length = X)"
+**Resolution**: Plan updated to use standardized error format "ERROR\nInvalid parameters (length = X)" consistent with "similar" command
 
 ### Missing Critical Details:
 
-1. **UTF-8 Character Handling Implementation**
+1. **UTF-8 Character Handling Implementation** - **RESOLVED**
 **Description**: The plan mentions UTF-8 handling but doesn't specify how character-by-character matching works with multi-byte UTF-8 sequences
 **Analysis**: The current implementation uses `chars()` for iteration which handles UTF-8 correctly, but the plan should explicitly document this
 **Recommendation**: Clarify that subsequence detection uses `chars()` iterator for proper UTF-8 character handling
+**Resolution**: Plan updated with explicit documentation of UTF-8 character handling using Rust's `chars()` iterator in multiple sections including core algorithm, implementation details, matching strategy, and test scenarios
 
-2. **Performance Benchmarking Criteria**
+2. **Performance Benchmarking Criteria** - **RESOLVED**
 **Description**: No specific performance criteria or benchmarks are defined
 **Analysis**: The plan mentions performance benchmarking but doesn't specify what constitutes acceptable performance
 **Recommendation**: Look at the existing benchmark flag That runs benchmarks for certain operations and Propose a strategy to test performance of this new feature as part of the existing benchmark suite.
+**Resolution**: Plan updated with comprehensive performance benchmarking criteria and strategy:
+- **Specific performance criteria** defined: within 2x prefix search time, under 100ms for 100K words, <10% memory increase
+- **Benchmark integration strategy**: Use existing `time_execution()` utility, standardized dataset sizes, comparison with existing search methods
+- **Acceptable performance standards**: Linear scaling, faster than substring search, no degradation of existing functionality
+- **Success criteria updated** with measurable performance benchmarks
 
 3. **Empty Query Handling**
 **Description**: The plan mentions handling empty queries but doesn't specify the exact behavior
@@ -496,12 +644,14 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Analysis**: The `get_similar_words()` method uses `matches.truncate(n)` after initial sorting
 **Recommendation**: Specify that result limiting happens after all sorting is complete, similar to `get_similar_words()`
 
-5. **Protocol Integration Testing**
+5. **Protocol Integration Testing** - **RESOLVED**
 **Description**: No specific test cases for protocol integration are outlined
 **Analysis**: The plan mentions integration testing but doesn't specify test scenarios for the new protocol command
 **Recommendation**: Add specific test cases for protocol command validation, error handling, and response format verification
+**Resolution**: Plan updated with comprehensive Protocol Integration Testing Strategy section containing 7 specific test cases with clear scenarios, validation criteria, expected behaviors, and success criteria
 
-6. **Python Client Method Documentation**
+6. **Python Client Method Documentation** - **RESOLVED**
 **Description**: The Python client integration plan doesn't specify the exact method signature and return type
 **Analysis**: Existing client methods follow consistent patterns with proper type annotations
 **Recommendation**: Ensure the new method follows the exact pattern of existing search methods with proper type hints
+**Resolution**: Plan updated with exact method signature `fuzzy_subsequence_search(query: str) -> list[str]` including proper type annotations, implementation details with docstring, and error handling patterns consistent with existing search methods
