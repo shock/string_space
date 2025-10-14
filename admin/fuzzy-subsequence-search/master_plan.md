@@ -741,3 +741,25 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - **Test Queries**: Use standardized queries "he", "lo", "wor" to match existing search patterns
 - **Implementation Pattern**: Follow existing `time_execution()` pattern with result display and timing output
 - **Performance Comparison**: Include timing comparison output showing fuzzy-subsequence search performance relative to prefix and substring searches
+
+10. **Missing Protocol Command for "remove" Operation**
+**Description**: The plan mentions protocol integration but doesn't address the existing "remove" command that appears in the Python client tests
+**Analysis**: The Python client test file `tests/client.py` contains a `remove_test(client)` function that calls `client.remove()`, but this command is not implemented in the current protocol.rs file
+**Recommendation**: Document that the "remove" command is not currently implemented in the protocol and should be considered out of scope for this feature implementation
+**Impact**: Low - the "remove" command appears to be a planned feature that hasn't been implemented yet, so it doesn't affect the fuzzy-subsequence search implementation
+
+11. **Inconsistent Protocol Error Handling for "similar" Command**
+**Description**: The plan correctly identifies that the "similar" command uses a different error format ("ERROR\nInvalid parameters") compared to other commands ("ERROR - invalid parameters")
+**Analysis**: The plan recommends updating the "similar" command's error format for consistency, but this should be treated as a separate refactoring task
+**Recommendation**: Add a note that updating the "similar" command's error format should be done as a separate refactoring task after the fuzzy-subsequence search implementation is complete, to avoid scope creep
+**Overruled**: Fixing the error message for the similar command is literally a one-line code change. We will do it in this implementation.  Update the document accordingly.
+
+12. **Missing Documentation for StringRefInfo.string_ref() Method**
+**Description**: The plan doesn't mention how the new fuzzy-subsequence search will interact with the existing `StringRefInfo.string_ref()` method
+**Analysis**: The `StringRefInfo.string_ref()` method is used internally to convert pointer-based string references to actual string slices. The fuzzy-subsequence search implementation should use this method for consistency
+**Recommendation**: Add a note that the fuzzy-subsequence search implementation should use the existing `StringRefInfo.string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure for consistency with other search methods
+
+13. **Potential Performance Impact of UTF-8 Character Iteration**
+**Description**: The plan correctly identifies UTF-8 character handling using `chars()` iterator, but doesn't address potential performance implications
+**Analysis**: Using `chars()` for character-by-character iteration is correct for UTF-8 handling but may be slower than byte-based iteration for ASCII-only strings
+**Recommendation**: Add a note that the UTF-8 character iteration approach is correct and necessary for proper Unicode support, and any performance impact is acceptable given the correctness requirements. The prefix filtering optimization should mitigate most performance concerns
