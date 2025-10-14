@@ -97,7 +97,7 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 - **Request Format**: `fuzzy-subsequence<RS>query`
 - **Parameters**: `query` (required) - The subsequence to search for
 - **Response Format**: Newline-separated list of matching strings
-- **Error Cases**: Invalid parameter count returns "ERROR\nInvalid parameters (length = X)" (consistent with existing "similar" command format)
+- **Error Cases**: Invalid parameter count returns "ERROR - invalid parameters (length = X)" (consistent with existing "prefix", "substring", and "insert" command formats)
 
 ### Python Client Integration
 
@@ -120,9 +120,13 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 3. **Post-implementation**: Comprehensive regression testing and manual validation
 
 **Testing Framework:**
-- **Unit Tests**: Individual component testing with mocked dependencies
+- **Unit Tests**: Individual component testing following existing test infrastructure patterns
+  - **Placement**: Add tests within the existing `#[cfg(test)] mod tests` section in `string_space.rs`
+  - **Organization**: Create a new `mod fuzzy_subsequence_search` module following the same nested module pattern as `mod find_by_prefix` and `mod get_similar_words`
+  - **Patterns**: Use existing test naming conventions (`test_` prefix), assertion patterns, and setup approaches
 - **Integration Tests**: Testing component interactions and protocol integration
   - **Protocol Integration Tests**: Specific test cases for command validation, error handling, and response format verification (see Protocol Integration Testing Strategy section)
+  - **Client Integration Tests**: Follow existing patterns from `tests/client.py`, adding a new `fuzzy_subsequence_test(client)` function that mirrors the structure of existing test functions like `similar_test(client)`
 - **Regression Tests**: Ensuring existing functionality remains unchanged
 - **Manual QA**: Real-world testing with live server and client
 
@@ -241,7 +245,8 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
 
 2. **Update StringSpace Tests**
    - Extend existing test module in `string_space.rs`
-   - Add comprehensive unit tests for fuzzy-subsequence search
+   - Add comprehensive unit tests for fuzzy-subsequence search within a new `mod fuzzy_subsequence_search` module
+   - Follow existing test patterns and organization (same as `mod find_by_prefix` and `mod get_similar_words`)
    - Test edge cases and boundary conditions
 
 **Test Scenarios:**
@@ -265,7 +270,7 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
 ```rust
 else if "fuzzy-subsequence" == operation {
     if params.len() != 1 {
-        let response_str = format!("ERROR\nInvalid parameters (length = {})", params.len());
+        let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
         response.extend_from_slice(response_str.as_bytes());
         return response;
     }
@@ -302,9 +307,9 @@ else if "fuzzy-subsequence" == operation {
 
 **Test Case 2: Parameter Validation**
 - **Scenario**: Send "fuzzy-subsequence" with incorrect parameter count (0 or >1 parameters)
-- **Validation**: Verify error response format "ERROR\nInvalid parameters (length = X)"
-- **Expected Behavior**: Returns standardized error message consistent with "similar" command
-- **Success Criteria**: Error message format exactly matches existing protocol error patterns
+- **Validation**: Verify error response format "ERROR - invalid parameters (length = X)"
+- **Expected Behavior**: Returns standardized error message consistent with "prefix", "substring", and "insert" commands
+- **Success Criteria**: Error message format exactly matches existing protocol error patterns using dash format
 
 **Test Case 3: Empty Query Handling**
 - **Scenario**: Send "fuzzy-subsequence<RS>" with empty query string
@@ -366,8 +371,9 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 ```
 
 2. **Update Client Tests**
-   - Extend existing client test suite
-   - Add integration tests for new method
+   - Extend existing client test suite in `tests/client.py`
+   - Add integration tests for new method following existing patterns
+   - Add a new `fuzzy_subsequence_test(client)` function that mirrors the structure of existing test functions like `similar_test(client)`
    - Verify error handling and response parsing
 
 ### Phase 5: Integration Testing and Validation
@@ -379,6 +385,23 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 
 2. **Performance Benchmarking**
    - **Benchmark Integration**: Add fuzzy-subsequence search to existing benchmark suite in `src/modules/benchmark.rs`
+   - **Implementation Location**: Add benchmark immediately after existing prefix and substring search benchmarks (lines 74-100)
+   - **Standardized Test Queries**: Use "he", "lo", "wor" to match existing search patterns and enable direct comparison
+   - **Benchmark Implementation Pattern**:
+     ```rust
+     // Search by fuzzy-subsequence
+     let mut found_strings: Vec<StringRef> = Vec::new();
+     let find_time = time_execution(|| {
+         found_strings = space.fuzzy_subsequence_search(substring);
+         println!("Found {} strings with fuzzy-subsequence '{}':", found_strings.len(), substring);
+         let max_len = std::cmp::min(found_strings.len(), 5);
+         for string_ref in found_strings[0..max_len].iter() {
+             println!("  {} {}", string_ref.string, string_ref.meta.frequency);
+         }
+     });
+     println!("Finding strings with fuzzy-subsequence '{}' took {:?}", substring, find_time);
+     ```
+   - **Performance Comparison**: Include timing comparison output showing fuzzy-subsequence search performance relative to prefix and substring searches
    - **Performance Criteria**:
      - Fuzzy-subsequence search should complete within 2x the time of prefix search for equivalent dataset sizes
      - Should handle 100,000-word datasets with queries of 1-10 characters in under 100ms
@@ -471,8 +494,9 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Comprehensive Error Handling Strategy:**
 
 **Protocol Errors:**
-- Invalid parameter count returns clear error message using format: "ERROR\nInvalid parameters (length = X)"
-- Follows existing error format pattern used by "similar" command
+- Invalid parameter count returns clear error message using format: "ERROR - invalid parameters (length = X)"
+- Follows existing error format pattern used by "prefix", "substring", and "insert" commands
+- **Note**: The "similar" command's error format should be updated to use the dash format for consistency
 - No server crashes on malformed requests
 
 **Algorithm Errors:**
@@ -504,7 +528,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Command Format:**
 - Follows existing `operation<RS>parameters` pattern
 - Uses same EOT termination as other commands
-- Consistent error handling with existing commands, specifically using the "ERROR\nInvalid parameters (length = X)" format from the "similar" command
+- Consistent error handling with existing commands, specifically using the "ERROR - invalid parameters (length = X)" format from the "prefix", "substring", and "insert" commands
+- **Note**: The "similar" command's error format should be updated to use the dash format for consistency
 
 **Response Format:**
 - Newline-separated strings matching existing patterns
@@ -670,7 +695,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Recommendation**: Ensure the new method follows the exact pattern of existing search methods with proper type hints
 **Resolution**: Plan updated with exact method signature `fuzzy_subsequence_search(query: str) -> list[str]` including proper type annotations, implementation details with docstring, and error handling patterns consistent with existing search methods
 
-7. **Protocol Error Message Format Consistency**
+7. **Protocol Error Message Format Consistency** - **RESOLVED**
 **Description**: The plan specifies using "ERROR\nInvalid parameters (length = X)" format, but analysis of the protocol.rs file reveals inconsistent error message formats across different commands
 **Analysis**:
 - "prefix" command uses: "ERROR - invalid parameters (length = {})"
@@ -680,9 +705,9 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 **Recommendation**:
 - Document that the new command will follow the existing pattern of using the dash format ("ERROR - invalid parameters (length = {})"), AND
 - Add to the plan that the ERROR message format for "similar" command should be updated to be consistent with the rest of the commands
-**Impact**: This is a minor inconsistency but should be addressed for protocol consistency
+**Resolution**: Plan updated to use the dash format "ERROR - invalid parameters (length = X)" for the new fuzzy-subsequence command, consistent with the majority of existing commands. Added note that the "similar" command's error format should be updated for consistency during implementation.
 
-8. **Missing Test Infrastructure Details**
+8. **Missing Test Infrastructure Details** - **RESOLVED**
 **Description**: The plan mentions comprehensive testing but doesn't specify how to integrate tests with the existing test infrastructure
 **Analysis**: The codebase has unit tests embedded directly in the string_space.rs file (lines 584-791) following Rust's standard testing conventions. The plan should specify:
 - Where new unit tests should be placed (within the existing test module)
@@ -693,8 +718,14 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - Follow existing test patterns (e.g., `mod find_by_prefix`, `mod get_similar_words`)
 - Use the same test organization and naming conventions
 - Integration tests should follow the existing protocol testing patterns, namely look at tests/client.py
+**Resolution**: Plan updated with specific test infrastructure integration guidance:
+- **Unit Test Placement**: Add fuzzy-subsequence search tests within the existing `#[cfg(test)] mod tests` section in `string_space.rs`, following the same nested module pattern as `mod find_by_prefix` and `mod get_similar_words`
+- **Test Organization**: Create a new `mod fuzzy_subsequence_search` module within the existing test module, following the same structure as existing search method test modules
+- **Test Patterns**: Use the same test naming conventions (`test_` prefix), assertion patterns, and test setup approaches as existing tests
+- **Integration Tests**: Follow the existing protocol testing patterns from `tests/client.py`, adding a new `fuzzy_subsequence_test(client)` function that mirrors the structure of existing test functions like `similar_test(client)`
+- **Test Coverage**: Include comprehensive test scenarios covering basic matching, edge cases, empty queries, UTF-8 handling, and result ranking verification
 
-9. **Benchmark Integration Details**
+9. **Benchmark Integration Details** - **RESOLVED**
 **Description**: The plan mentions adding fuzzy-subsequence search to the existing benchmark suite but doesn't specify the exact implementation approach
 **Analysis**: The existing benchmark.rs file uses `time_execution()` utility and follows specific patterns for measuring different operations. The plan should specify:
 - Where in the benchmark function to add the new search benchmark
@@ -705,3 +736,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - Use standardized test queries (e.g., "he", "lo", "wor")
 - Include performance comparison output in the benchmark results
 - Follow the existing benchmark pattern of using `time_execution()` and printing results
+**Resolution**: Plan updated with specific benchmark integration implementation details:
+- **Location**: Add fuzzy-subsequence search benchmark immediately after existing prefix and substring search benchmarks (lines 74-100 in benchmark.rs)
+- **Test Queries**: Use standardized queries "he", "lo", "wor" to match existing search patterns
+- **Implementation Pattern**: Follow existing `time_execution()` pattern with result display and timing output
+- **Performance Comparison**: Include timing comparison output showing fuzzy-subsequence search performance relative to prefix and substring searches
