@@ -83,11 +83,11 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>
 - Returns results sorted by **score (ascending - lower scores are better)**, then by frequency (descending), then by age (descending)
 - **Sorting rationale**: Lower scores indicate better matches (more compact subsequences), so ascending order puts best matches first
 - **Consistency with scoring design**: This sorting strategy is intentional and consistent with the scoring algorithm where lower scores represent better matches
-- **Empty query handling**: Returns empty vector for empty queries, consistent with existing search method behavior
+- **Empty query handling**: Returns empty vector for empty queries, consistent with existing search method behavior where empty queries yield no matches
 - Respects existing string length constraints (3-50 characters)
 - **Result limiting**: Limits results to top 10 matches **after all sorting is complete**, ensuring the best matches are selected based on the full sorting criteria
 - Uses prefix filtering like existing `get_similar_words` for performance optimization
-  - **Prefix filtering implementation**: Uses `query[0..1].to_string().as_str()` to get first character of query
+  - **Prefix filtering implementation**: Uses `query[0..1].to_string().as_str()` to get first character of query (identical to `get_similar_words()` implementation)
   - **Filtering approach**: Only considers candidates that start with first character of query using `find_by_prefix()`
   - **Performance benefit**: Significantly reduces search space by filtering candidates early
 
@@ -156,7 +156,7 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 
 3. **Implement Main Search Method**
    - Add `fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef>` to `StringSpace`
-   - Use prefix filtering for performance optimization
+   - Use prefix filtering for performance optimization (identical to `get_similar_words()` approach)
      - **Prefix filtering implementation**: Use `query[0..1].to_string().as_str()` to get first character of query
      - **Filtering approach**: Only consider candidates that start with first character of query using `find_by_prefix()`
      - **Performance benefit**: Significantly reduces search space by filtering candidates early
@@ -200,7 +200,7 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
 // In StringSpace implementation
 fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
     // Empty query handling: return empty vector for empty queries
-    // This is consistent with existing search method behavior
+    // This is consistent with existing search method behavior where empty queries yield no matches
     if query.is_empty() {
         return Vec::new();
     }
@@ -247,7 +247,7 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
 **Test Scenarios:**
 - Basic subsequence matching
 - Non-matching sequences
-- **Empty query handling**: Verify empty queries return empty results, consistent with existing search method behavior
+- **Empty query handling**: Verify empty queries return empty results, consistent with existing search method behavior where empty queries yield no matches
 - Exact matches
 - **UTF-8 Character Handling**: Test with multi-byte UTF-8 sequences (emoji, accented characters, etc.) to verify proper `chars()` iterator usage
 - Result ranking verification
@@ -309,7 +309,7 @@ else if "fuzzy-subsequence" == operation {
 **Test Case 3: Empty Query Handling**
 - **Scenario**: Send "fuzzy-subsequence<RS>" with empty query string
 - **Validation**: Verify empty response (no matches)
-- **Expected Behavior**: Returns empty results consistent with existing search method behavior
+- **Expected Behavior**: Returns empty results consistent with existing search method behavior where empty queries yield no matches
 - **Success Criteria**: No error, empty response, consistent with prefix/substring search behavior
 
 **Test Case 4: Response Format Verification**
@@ -388,7 +388,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
      - Test with standardized dataset sizes (10K, 50K, 100K words)
      - Compare against existing search methods (prefix, substring, similarity)
      - Measure performance with various query patterns (short, medium, long queries)
-     - Include edge cases (**empty queries** return empty results efficiently, single character queries, no matches)
+     - Include edge cases (**empty queries** return empty results efficiently consistent with existing search method behavior, single character queries, no matches)
    - **Acceptable Performance**:
      - Should not degrade existing search method performance
      - Should scale linearly with dataset size up to 100K words
@@ -440,11 +440,17 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - This differs from other search methods (like `get_similar_words`) where higher scores are better
 - The design choice is justified by the nature of span-based scoring where compactness is the primary quality metric
 
+**Justification for Different Sorting Strategy:**
+- **Intentional Design Difference**: The score (ascending) sorting is correct and intentional for fuzzy-subsequence search
+- **Scoring Nature**: Unlike similarity scores where higher values indicate better matches, span-based scores use lower values for better matches (more compact subsequences)
+- **Consistency Within Feature**: The sorting strategy is consistent with the scoring algorithm design where lower scores represent more desirable matches
+- **No Inconsistency**: This is not an inconsistency but rather a deliberate design choice appropriate for the specific scoring metric used
+
 ### Performance Optimization
 
 **Filtering Strategy:**
-- Use prefix filtering like existing `get_similar_words`
-  - **Implementation**: Use `query[0..1].to_string().as_str()` to get first character of query
+- Use prefix filtering like existing `get_similar_words` (identical implementation)
+  - **Implementation**: Use `query[0..1].to_string().as_str()` to get first character of query (same as `get_similar_words()`)
   - **Filtering**: Only consider candidates that start with first character of query using `find_by_prefix()`
   - **Performance benefit**: Significantly reduces search space by filtering candidates early
 - Reduces search space significantly
@@ -594,7 +600,7 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 
 ### Inconsistencies Found:
 
-1. **Inconsistent Result Sorting Strategy**
+1. **Inconsistent Result Sorting Strategy** - **RESOLVED**
 **Description**: The plan specifies sorting by "score (ascending), then by frequency (descending), then by age (descending)" but existing search methods use different sorting patterns
 **Analysis**:
 - `find_by_prefix()` sorts by frequency (descending) only
@@ -602,13 +608,19 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - `get_similar_words()` sorts by score (descending), then frequency (descending), then age (descending)
 - however, lower scores are better for `score_match_span`
 **Recommendation**: Clarify the sorting strategy in the plan is correct due to the opposite nature of scores in `score_match_span` (lower scores are better) compared to other search methods
+**Resolution**: Added explicit justification section in "Result Sorting Strategy" explaining that the score (ascending) sorting is intentional and correct for fuzzy-subsequence search due to the nature of span-based scoring where lower scores indicate better matches. This is a deliberate design choice appropriate for the specific scoring metric used, not an inconsistency.
 
-2. **Inconsistent Prefix Filtering Approach**
+2. **Inconsistent Prefix Filtering Approach** - **RESOLVED**
 **Description**: The plan mentions using prefix filtering "like existing `get_similar_words`" but the implementation details don't match
 **Analysis**:
 - `get_similar_words()` uses `word[0..1].to_string().as_str()` for prefix filtering
 - The plan's algorithm implementation doesn't show this filtering
 **Recommendation**: Explicitly implement prefix filtering using the first character of the query, similar to `get_similar_words()`
+**Resolution**: Plan updated with explicit documentation that prefix filtering uses identical implementation to `get_similar_words()`:
+- **Main Search Function**: Added "(identical to `get_similar_words()` implementation)" to prefix filtering description
+- **Phase 1 Implementation**: Added "(identical to `get_similar_words()` approach)" to prefix filtering section
+- **Performance Optimization**: Added "(identical implementation)" and "(same as `get_similar_words()`)" to filtering strategy
+- All sections now explicitly show that `query[0..1].to_string().as_str()` is used for prefix filtering, matching the existing `get_similar_words()` implementation
 
 3. **Inconsistent Error Message Format**
 **Description**: The plan shows "ERROR - invalid parameters (length = X)" but existing protocol uses "ERROR\nInvalid parameters (length = X)" for similar command
@@ -634,15 +646,17 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - **Acceptable performance standards**: Linear scaling, faster than substring search, no degradation of existing functionality
 - **Success criteria updated** with measurable performance benchmarks
 
-3. **Empty Query Handling**
+3. **Empty Query Handling** - **RESOLVED**
 **Description**: The plan mentions handling empty queries but doesn't specify the exact behavior
 **Analysis**: Existing search methods return empty vectors for empty queries
 **Recommendation**: Explicitly state that empty queries return empty results, consistent with existing behavior
+**Resolution**: Plan updated with explicit empty query handling documentation in multiple sections including core algorithm description, main search function implementation, test scenarios, and error handling strategy. Empty queries now explicitly return empty results, consistent with existing search method behavior.
 
-4. **Result Limiting Implementation**
+4. **Result Limiting Implementation** - **RESOLVED**
 **Description**: The plan mentions limiting to 10 results but doesn't specify how this interacts with the sorting strategy
 **Analysis**: The `get_similar_words()` method uses `matches.truncate(n)` after initial sorting
 **Recommendation**: Specify that result limiting happens after all sorting is complete, similar to `get_similar_words()`
+**Resolution**: Plan updated with explicit documentation in multiple sections that result limiting occurs after all sorting is complete using `matches.truncate(10)`, following the same approach as `get_similar_words()`. The implementation details clearly show truncation happening after the full sorting process, ensuring the best 10 matches are selected based on the complete sorting criteria.
 
 5. **Protocol Integration Testing** - **RESOLVED**
 **Description**: No specific test cases for protocol integration are outlined
