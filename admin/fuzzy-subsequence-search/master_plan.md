@@ -68,6 +68,7 @@ fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>
 - Returns `None` if query is not a subsequence of candidate
 - **UTF-8 Character Handling**: Uses Rust's `chars()` iterator for proper Unicode character-by-character matching, correctly handling multi-byte UTF-8 sequences
 - Case-sensitive (matching existing search behavior)
+- **Implementation Pattern**: Implemented as a private standalone function following existing patterns like `similar()` and `get_close_matches()`
 
 **Span-Based Scoring:**
 ```rust
@@ -77,6 +78,7 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64
 - Span length = last_match_index - first_match_index + 1
 - **Lower scores are better (closer matches)** - this is intentional and differs from other search methods where higher scores are better
 - The scoring algorithm is designed so that more compact matches (shorter spans) receive lower scores, making them rank higher
+- **Implementation Pattern**: Implemented as a private standalone function
 
 **Main Search Function:**
 ```rust
@@ -151,13 +153,13 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 ### Phase 1: Core Algorithm Implementation
 
 1. **Implement Subsequence Detection Helper**
-   - Add `is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>` as a private method on `StringSpace`
+   - Add `is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>>` as a private standalone function (following existing pattern like `similar()` and `get_close_matches()`)
    - Handle UTF-8 strings correctly
    - Implement case-sensitive matching
    - Add comprehensive unit tests for various scenarios
 
 2. **Implement Scoring Function**
-   - Add `score_match_span(match_indices: &[usize], candidate: &str) -> f64` as a private method on `StringSpace`
+   - Add `score_match_span(match_indices: &[usize], candidate: &str) -> f64` as a private standalone function
    - Implement span-based scoring formula
    - Add unit tests for scoring calculations
 
@@ -175,7 +177,7 @@ def fuzzy_subsequence_search(self, query: str) -> List[str]
 
 **Implementation Details:**
 ```rust
-// Private helper methods implemented on StringSpace
+// Private helper functions (standalone, not methods)
 fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>> {
     let mut query_chars = query.chars();
     let mut current_char = query_chars.next();
@@ -205,7 +207,7 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
     span_length + (candidate_length * 0.1)
 }
 
-// Main search method implemented on StringSpace
+// Main search method implemented on StringSpaceInner
 fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
     // Empty query handling: return empty vector for empty queries
     // This is consistent with existing search method behavior where empty queries yield no matches
@@ -214,13 +216,13 @@ fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
     }
 
     // Use prefix filtering like get_similar_words for performance
-    let possibilities = self.inner.find_by_prefix(query[0..1].to_string().as_str());
+    let possibilities = self.find_by_prefix(query[0..1].to_string().as_str());
 
     let mut matches: Vec<(StringRef, f64)> = Vec::new();
 
     for candidate in possibilities {
-        if let Some(match_indices) = Self::is_subsequence(query, &candidate.string) {
-            let score = Self::score_match_span(&match_indices, &candidate.string);
+        if let Some(match_indices) = is_subsequence(query, &candidate.string) {
+            let score = score_match_span(&match_indices, &candidate.string);
             matches.push((candidate, score));
         }
     }
@@ -250,11 +252,122 @@ The fuzzy-subsequence search implementation will directly access the `string` fi
    - Delegate to inner implementation
    - Follow existing API patterns
 
+**Implementation Details:**
+```rust
+// Add to StringSpace implementation (around line 120, after find_with_substring method)
+pub fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
+    self.inner.fuzzy_subsequence_search(query)
+}
+```
+
 2. **Update StringSpace Tests**
    - Extend existing test module in `string_space.rs`
    - Add comprehensive unit tests for fuzzy-subsequence search within a new `mod fuzzy_subsequence_search` module
    - Follow existing test patterns and organization (same as `mod find_by_prefix` and `mod get_similar_words`)
    - Test edge cases and boundary conditions
+
+**Test Implementation Details:**
+```rust
+// Add to the existing tests module in string_space.rs (around line 790, after mod get_similar_words)
+mod fuzzy_subsequence_search {
+    use super::*;
+
+    #[test]
+    fn test_basic_subsequence_matching() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("hello", 1).unwrap();
+        ss.insert_string("world", 2).unwrap();
+        ss.insert_string("help", 3).unwrap();
+        ss.insert_string("helicopter", 1).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("hl");
+        assert_eq!(results.len(), 2);
+        assert!(results[0].string == "hello");
+        assert!(results[1].string == "help");
+    }
+
+    #[test]
+    fn test_non_matching_sequences() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("hello", 1).unwrap();
+        ss.insert_string("world", 2).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("xyz");
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_empty_query_handling() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("hello", 1).unwrap();
+        ss.insert_string("world", 2).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("");
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_exact_matches() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("hello", 1).unwrap();
+        ss.insert_string("world", 2).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("hello");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].string == "hello");
+    }
+
+    #[test]
+    fn test_utf8_character_handling() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("café", 1).unwrap();
+        ss.insert_string("naïve", 2).unwrap();
+        ss.insert_string("über", 3).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("cf");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].string == "café");
+
+        let results = ss.fuzzy_subsequence_search("nv");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].string == "naïve");
+    }
+
+    #[test]
+    fn test_result_ranking_verification() {
+        let mut ss = StringSpace::new();
+        // Insert strings with different frequencies and ages
+        ss.insert_string("hello", 1).unwrap();  // frequency 1
+        ss.insert_string("help", 3).unwrap();   // frequency 3
+        ss.insert_string("helicopter", 2).unwrap(); // frequency 2
+
+        let results = ss.fuzzy_subsequence_search("hl");
+        assert_eq!(results.len(), 3);
+        // Results should be sorted by score (ascending), then frequency (descending), then age (descending)
+        // "hello" and "help" should have similar scores, but "help" has higher frequency
+        // "helicopter" should have worse score due to longer span
+        assert!(results[0].string == "help");
+        assert!(results[1].string == "hello");
+        assert!(results[2].string == "helicopter");
+    }
+
+    #[test]
+    fn test_abbreviation_matching() {
+        let mut ss = StringSpace::new();
+        ss.insert_string("openai/gpt-4o-2024-08-06", 1).unwrap();
+        ss.insert_string("openai/gpt-5", 2).unwrap();
+        ss.insert_string("anthropic/claude-3-opus", 3).unwrap();
+
+        let results = ss.fuzzy_subsequence_search("g4");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].string == "openai/gpt-4o-2024-08-06");
+
+        let results = ss.fuzzy_subsequence_search("ogp5");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].string == "openai/gpt-5");
+    }
+}
+```
 
 **Test Scenarios:**
 - Basic subsequence matching
@@ -295,6 +408,16 @@ else if "fuzzy-subsequence" == operation {
     }
     return response;
 }
+```
+
+**Note on Error Format Consistency:**
+The "similar" command currently uses a different error format ("ERROR\nInvalid parameters") compared to other commands ("ERROR - invalid parameters"). For consistency, the "similar" command's error format should be updated to use the dash format during this implementation:
+
+```rust
+// In the "similar" command section (around line 68), update from:
+let response_str = format!("ERROR\nInvalid parameters (length = {})", params.len());
+// To:
+let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
 ```
 
 2. **Add Protocol-Level Tests**
@@ -370,7 +493,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
     try:
         request_elements = ["fuzzy-subsequence", query]
         response = self.request(request_elements)
-        return response.split('\n')
+        # Remove empty strings from the result (consistent with other search methods)
+        return [line for line in response.split('\n') if line]
     except ProtocolError as e:
         if self.debug:
             print(f"Error: {e}")
@@ -382,6 +506,47 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
    - Add integration tests for new method following existing patterns
    - Add a new `fuzzy_subsequence_test(client)` function that mirrors the structure of existing test functions like `similar_test(client)`
    - Verify error handling and response parsing
+
+**Test Implementation Details:**
+```python
+def fuzzy_subsequence_test(client):
+    try:
+        query = "hl"
+        words = client.fuzzy_subsequence_search(query)
+        print(f"Fuzzy-subsequence search for '{query}':")
+        for word in words:
+            print(f"  {word}")
+    except ProtocolError as e:
+        print(f"ProtocolError: {e}")
+```
+
+**Main Function Integration:**
+Add the fuzzy-subsequence test to the main function in `tests/client.py`:
+```python
+def main():
+    # read the first argument as the port number
+    if len(sys.argv) < 2:
+        print("Usage: python client.py <port>")
+        sys.exit(1)
+    port = int(sys.argv[1])
+    client = StringSpaceClient('127.0.0.1', port)
+    prexix_test(client)
+    substring_test(client)
+    similar_test(client)
+    fuzzy_subsequence_test(client)  # Add this line
+    prefix = "testi"
+    print("Prefix search:" + prefix)
+    print("\n".join(client.prefix_search(prefix=prefix)))
+    insert_test(client)
+    data_file_test(client)
+    # remove_test(client)
+    # get_all_strings_test(client)
+    # empty_test(client)
+    # len_test(client)
+    # capacity_test(client)
+    # clear_space_test(client)
+    # print_strings_test(client)
+```
 
 ### Phase 5: Integration Testing and Validation
 
@@ -424,10 +589,270 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
      - Should scale linearly with dataset size up to 100K words
      - Should be faster than substring search for equivalent queries
 
+**Concrete Benchmark Implementation:**
+```rust
+// Search by fuzzy-subsequence - add this after line 100 in benchmark.rs
+let mut found_strings: Vec<StringRef> = Vec::new();
+let find_time = time_execution(|| {
+    found_strings = space.fuzzy_subsequence_search(substring);
+    println!("Found {} strings with fuzzy-subsequence '{}':", found_strings.len(), substring);
+    let max_len = std::cmp::min(found_strings.len(), 5);
+    for string_ref in found_strings[0..max_len].iter() {
+        println!("  {} {}", string_ref.string, string_ref.meta.frequency);
+    }
+});
+println!("Finding strings with fuzzy-subsequence '{}' took {:?}", substring, find_time);
+
+// Additional test queries for comprehensive benchmarking
+let test_queries = vec!["he", "lo", "wor", "hl", "elp", "rld"];
+for query in test_queries {
+    let mut found_strings: Vec<StringRef> = Vec::new();
+    let find_time = time_execution(|| {
+        found_strings = space.fuzzy_subsequence_search(query);
+    });
+    println!("Fuzzy-subsequence search for '{}' found {} strings in {:?}", query, found_strings.len(), find_time);
+}
+```
+
+**Performance Validation Code:**
+```rust
+// Performance validation function for integration testing
+fn validate_fuzzy_subsequence_performance(space: &StringSpace) -> bool {
+    let test_cases = vec![
+        ("he", 3, 100),  // query, min_expected_results, max_ms
+        ("lo", 1, 100),
+        ("wor", 1, 100),
+        ("", 0, 10),     // empty query should be fast
+        ("xyz", 0, 100), // no matches should be fast
+    ];
+
+    for (query, min_results, max_ms) in test_cases {
+        let start = std::time::Instant::now();
+        let results = space.fuzzy_subsequence_search(query);
+        let duration = start.elapsed();
+
+        if results.len() < min_results {
+            eprintln!("Performance validation failed for query '{}': expected at least {} results, got {}",
+                     query, min_results, results.len());
+            return false;
+        }
+
+        if duration.as_millis() > max_ms as u128 {
+            eprintln!("Performance validation failed for query '{}': took {}ms, expected < {}ms",
+                     query, duration.as_millis(), max_ms);
+            return false;
+        }
+
+        println!("Query '{}': {} results in {:?} (OK)", query, results.len(), duration);
+    }
+
+    true
+}
+```
+
+**Integration Test Suite:**
+```rust
+// Add to integration tests (could be in a separate test file or within existing test infrastructure)
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+    use std::time::Duration;
+    use std::io::{Read, Write};
+    use crate::modules::protocol::{StringSpaceProtocol, Protocol};
+
+    #[test]
+    fn test_end_to_end_fuzzy_subsequence() {
+        // Start server in background thread
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let server_thread = thread::spawn(move || {
+            let mut space = StringSpace::new();
+            space.insert_string("hello", 1).unwrap();
+            space.insert_string("world", 2).unwrap();
+            space.insert_string("help", 3).unwrap();
+            space.insert_string("helicopter", 1).unwrap();
+
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut stream) => {
+                        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+                        protocol.handle_client(&mut stream);
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        // Give server time to start
+        thread::sleep(Duration::from_millis(100));
+
+        // Test client connection and fuzzy-subsequence command
+        let mut client = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
+        let request = "fuzzy-subsequence\x1ehl\x04";
+        client.write_all(request.as_bytes()).unwrap();
+
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+
+        // Verify response contains expected results
+        assert!(response.contains("hello"));
+        assert!(response.contains("help"));
+        assert!(!response.contains("world"));
+
+        server_thread.join().unwrap();
+    }
+
+    #[test]
+    fn test_protocol_error_handling() {
+        // Test invalid parameter count
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Simulate invalid request with missing query parameter
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec![]; // Empty params - should trigger error
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        assert!(response_str.starts_with("ERROR - invalid parameters"));
+    }
+
+    #[test]
+    fn test_protocol_command_integration() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Test valid fuzzy-subsequence command
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Test empty query handling
+        let params_empty: Vec<&str> = vec![""];
+        let response_empty = protocol.create_response(operation, params_empty);
+        let response_empty_str = String::from_utf8(response_empty).unwrap();
+
+        // Empty query should return empty results (no error)
+        assert!(!response_empty_str.starts_with("ERROR"));
+
+        // Test too many parameters
+        let params_too_many: Vec<&str> = vec!["hl", "extra"];
+        let response_too_many = protocol.create_response(operation, params_too_many);
+        let response_too_many_str = String::from_utf8(response_too_many).unwrap();
+
+        assert!(response_too_many_str.starts_with("ERROR - invalid parameters"));
+    }
+
+    #[test]
+    fn test_performance_under_load() {
+        let mut space = StringSpace::new();
+
+        // Insert large dataset
+        for i in 0..10000 {
+            space.insert_string(&format!("testword{}", i), 1).unwrap();
+        }
+
+        // Test multiple concurrent searches
+        let start = std::time::Instant::now();
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let space_clone = space.clone();
+                thread::spawn(move || {
+                    for _ in 0..100 {
+                        let _ = space_clone.fuzzy_subsequence_search("test");
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let duration = start.elapsed();
+        assert!(duration.as_secs() < 10, "Performance test took too long: {:?}", duration);
+    }
+}
+```
+
 3. **Manual Testing and Validation**
    - Test with live server and client
    - Verify real-world usage scenarios
    - Validate edge cases and error conditions
+
+**Manual Testing Script:**
+```bash
+#!/bin/bash
+# manual_test.sh - Comprehensive manual testing for fuzzy-subsequence search
+
+echo "=== Manual Testing: Fuzzy-Subsequence Search ==="
+
+# Build the project
+echo "Building project..."
+cargo build --release
+
+# Start server in background
+echo "Starting server..."
+./target/release/string_space start test_data.txt --port 7878 --host 127.0.0.1 &
+SERVER_PID=$!
+sleep 2
+
+echo "Testing basic functionality..."
+
+# Test 1: Basic fuzzy-subsequence search
+echo "Test 1: Basic search"
+python3 -c "
+from string_space_client import StringSpaceClient
+client = StringSpaceClient('127.0.0.1', 7878)
+
+# Insert test data
+client.insert(['hello', 'world', 'help', 'helicopter', 'openai/gpt-4o-2024-08-06'])
+
+# Test fuzzy-subsequence search
+results = client.fuzzy_subsequence_search('hl')
+print('Search for \"hl\":', results)
+
+results = client.fuzzy_subsequence_search('g4')
+print('Search for \"g4\":', results)
+
+results = client.fuzzy_subsequence_search('')
+print('Search for empty string:', results)
+"
+
+# Test 2: Performance with large dataset
+echo "Test 2: Performance testing"
+./target/release/string_space benchmark test_data.txt --count 10000
+
+# Test 3: Protocol error handling
+echo "Test 3: Error handling"
+python3 -c "
+from string_space_client import StringSpaceClient
+client = StringSpaceClient('127.0.0.1', 7878)
+
+# Test invalid parameter count (simulate by sending malformed request)
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 7878))
+s.send(b'fuzzy-subsequence\x1e\x04')  # Missing query
+response = s.recv(1024).decode()
+print('Error response:', repr(response))
+s.close()
+"
+
+# Cleanup
+echo "Cleaning up..."
+kill $SERVER_PID
+rm -f test_data.txt
+
+echo "=== Manual testing complete ==="
+```
 
 ### Phase 6: Documentation and Polish
 
@@ -528,7 +953,8 @@ def fuzzy_subsequence_search(self, query: str) -> list[str]:
 - Follow existing memory management patterns
 
 **Method Integration:**
-- Add to existing `StringSpace` struct in `src/modules/string_space.rs`
+- Add `fuzzy_subsequence_search()` method to existing `StringSpace` struct in `src/modules/string_space.rs`
+- Add `is_subsequence()` and `score_match_span()` as private standalone functions following existing patterns like `similar()` and `get_close_matches()`
 - Follow existing method signature patterns
 - Maintain consistency with other search methods
 
