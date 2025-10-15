@@ -1218,3 +1218,52 @@ echo "=== Manual testing complete ==="
 **Analysis**: The current implementation shows `&candidate.string` but this may not be the correct way to access the string content from `StringRef` objects
 **Recommendation**: Verify the correct way to access string content from `StringRef` objects and update the implementation accordingly
 **Resolution**: Plan updated with correct string access patterns. The `StringRef` struct has a `string` field that contains the actual string content, so `candidate.string` is the correct access pattern. The implementation code has been verified against the existing codebase patterns.
+
+### Additional Issues Found:
+
+17. **Inconsistent Method Implementation Location** - **NEW ISSUE**
+**Description**: The plan shows `is_subsequence()` and `score_match_span()` as methods of `StringSpaceInner` but the implementation code shows them as methods of `StringSpace`
+**Analysis**: The implementation code in Phase 1 shows `Self::is_subsequence()` and `Self::score_match_span()` calls, which would require these methods to be implemented on `StringSpace`, not `StringSpaceInner`
+**Recommendation**: Clarify whether these helper methods should be implemented on `StringSpace` or `StringSpaceInner` and ensure consistency throughout the plan
+**Resolution**: Plan should be updated to clarify that `is_subsequence()` and `score_match_span()` should be implemented as private methods on `StringSpace` (not `StringSpaceInner`) since they don't need access to the internal buffer structure. The implementation code should be corrected to show proper method placement and calling patterns.
+
+18. **Missing StringRefInfo.string_ref() Method Usage in Implementation** - **NEW ISSUE**
+**Description**: The plan mentions using `StringRefInfo.string_ref()` method but the implementation code in Phase 1 doesn't show how this method is actually used
+**Analysis**: The current implementation code shows direct access to `candidate.string` but should use `string_ref()` method for consistency with other search methods
+**Recommendation**: Update the implementation code in Phase 1 to show proper usage of `string_ref()` method when accessing candidate strings from the `StringSpaceInner` structure
+**Resolution**: Plan should be updated with corrected implementation code that properly uses `string_ref()` method for accessing candidate strings, ensuring consistency with existing search method patterns. The implementation should show `candidate.string_ref(&self.inner)` instead of direct `candidate.string` access.
+
+21. **Missing Test Infrastructure Details** - **NEW ISSUE**
+**Description**: The plan mentions comprehensive testing but doesn't specify how to integrate tests with the existing test infrastructure
+**Analysis**: The codebase has unit tests embedded directly in the string_space.rs file (lines 584-791) following Rust's standard testing conventions. The plan should specify:
+- Where new unit tests should be placed (within the existing test module)
+- How to structure integration tests
+- Whether to use the existing test patterns or create new ones
+**Recommendation**: Add specific guidance on test integration:
+- Unit tests should be added to the existing `#[cfg(test)] mod tests` section in string_space.rs
+- Follow existing test patterns (e.g., `mod find_by_prefix`, `mod get_similar_words`)
+- Use the same test organization and naming conventions
+- Integration tests should follow the existing protocol testing patterns, namely look at tests/client.py
+**Resolution**: Plan should be updated with specific test infrastructure integration guidance:
+- **Unit Test Placement**: Add fuzzy-subsequence search tests within the existing `#[cfg(test)] mod tests` section in `string_space.rs`, following the same nested module pattern as `mod find_by_prefix` and `mod get_similar_words`
+- **Test Organization**: Create a new `mod fuzzy_subsequence_search` module within the existing test module, following the same structure as existing search method test modules
+- **Test Patterns**: Use the same test naming conventions (`test_` prefix), assertion patterns, and test setup approaches as existing tests
+- **Integration Tests**: Follow the existing protocol testing patterns from `tests/client.py`, adding a new `fuzzy_subsequence_test(client)` function that mirrors the structure of existing test functions like `similar_test(client)`
+- **Test Coverage**: Include comprehensive test scenarios covering basic matching, edge cases, empty queries, UTF-8 handling, and result ranking verification
+
+22. **Benchmark Integration Details** - **NEW ISSUE**
+**Description**: The plan mentions adding fuzzy-subsequence search to the existing benchmark suite but doesn't specify the exact implementation approach
+**Analysis**: The existing benchmark.rs file uses `time_execution()` utility and follows specific patterns for measuring different operations. The plan should specify:
+- Where in the benchmark function to add the new search benchmark
+- What test queries to use for benchmarking
+- How to compare results with existing search methods
+**Recommendation**: Add specific benchmark integration details:
+- Add fuzzy-subsequence search timing after existing prefix and substring search benchmarks
+- Use standardized test queries (e.g., "he", "lo", "wor")
+- Include performance comparison output in the benchmark results
+- Follow the existing benchmark pattern of using `time_execution()` and printing results
+**Resolution**: Plan should be updated with specific benchmark integration implementation details:
+- **Location**: Add fuzzy-subsequence search benchmark immediately after existing prefix and substring search benchmarks (lines 74-100 in benchmark.rs)
+- **Test Queries**: Use standardized queries "he", "lo", "wor" to match existing search patterns
+- **Implementation Pattern**: Follow existing `time_execution()` pattern with result display and timing output
+- **Performance Comparison**: Include timing comparison output showing fuzzy-subsequence search performance relative to prefix and substring searches
