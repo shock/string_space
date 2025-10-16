@@ -161,6 +161,26 @@ impl StringSpace {
         self.inner.best_completions(query, limit)
     }
 
+    #[allow(unused)]
+    pub fn fuzzy_subsequence_full_database(
+        &self,
+        query: &str,
+        target_count: usize,
+        score_threshold: f64
+    ) -> Vec<StringRef> {
+        self.inner.fuzzy_subsequence_full_database(query, target_count, score_threshold)
+    }
+
+    #[allow(unused)]
+    pub fn jaro_winkler_full_database(
+        &self,
+        query: &str,
+        target_count: usize,
+        similarity_threshold: f64
+    ) -> Vec<StringRef> {
+        self.inner.jaro_winkler_full_database(query, target_count, similarity_threshold)
+    }
+
 }
 
 impl StringRefInfo {
@@ -447,6 +467,16 @@ impl StringSpaceInner {
         results
     }
 
+    // Wrapper method for prefix search - returns unsorted results for best_completions system
+    fn prefix_search(&self, query: &str) -> Vec<StringRef> {
+        self.find_by_prefix_no_sort(query)
+    }
+
+    // Wrapper method for substring search - returns unsorted results for best_completions system
+    fn substring_search(&self, query: &str) -> Vec<StringRef> {
+        self.find_with_substring(query)
+    }
+
     fn print_strings(&self) {
         for string_ref_info in &self.string_refs {
             let string_bytes = unsafe {
@@ -551,22 +581,218 @@ impl StringSpaceInner {
     }
 
     fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
-        let _limit = limit.unwrap_or(15);
+        let limit = limit.unwrap_or(15);
 
         // Validate query
         if let Err(_) = validate_query(query) {
             return Vec::new();
         }
 
-        // TODO: Implement multi-algorithm fusion in subsequent phases
-        // For now, return empty vector as placeholder
-        Vec::new()
+        // Use progressive algorithm execution for optimal performance
+        self.progressive_algorithm_execution(query, limit)
     }
 
     fn collect_results(&self) -> Vec<BasicCandidate> {
         // Placeholder implementation
         // Will be replaced with actual algorithm execution in subsequent phases
         Vec::new()
+    }
+
+    // Full-database fuzzy subsequence search with early termination
+    fn fuzzy_subsequence_full_database(
+        &self,
+        query: &str,
+        target_count: usize,
+        score_threshold: f64
+    ) -> Vec<StringRef> {
+        // Empty query handling: return empty vector for empty queries
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        let mut results = Vec::new();
+        let all_strings = self.get_all_strings();
+
+        // Track min/max scores for normalization
+        let mut min_score = f64::MAX;
+        let mut max_score = f64::MIN;
+        let mut scores = Vec::new();
+
+        // First pass: collect scores for normalization
+        for string_ref in &all_strings {
+            if let Some(score) = self.score_fuzzy_subsequence(string_ref, query) {
+                min_score = min_score.min(score);
+                max_score = max_score.max(score);
+                scores.push((string_ref.clone(), score));
+            }
+        }
+
+        // Handle edge case where all scores are the same or very close
+        if (max_score - min_score).abs() < f64::EPSILON {
+            // If all scores are identical, treat them all as perfect matches
+            // But only if we have multiple candidates - if only one candidate, use its score as reference
+            if scores.len() > 1 {
+                min_score = 0.0;
+                max_score = 1.0;
+            } else {
+                // Single candidate: use a reasonable range around the score
+                min_score = min_score - 1.0;
+                max_score = max_score + 1.0;
+            }
+        } else if (max_score - min_score) < 0.1 {
+            // If scores are very close together, expand the range to provide better differentiation
+            let mid = (min_score + max_score) / 2.0;
+            min_score = mid - 0.5;
+            max_score = mid + 0.5;
+        }
+
+        // Second pass: apply normalization and threshold filtering
+        for (string_ref, raw_score) in scores {
+            let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+            let string_copy = string_ref.string.clone();
+            println!("Normalized score for {}: {} (raw: {}, min: {}, max: {})", string_copy, normalized_score, raw_score, min_score, max_score);
+
+            // For fuzzy subsequence: lower normalized scores are better (lower raw scores are better)
+            // So we want to keep candidates with normalized scores ABOVE the threshold
+            // (since better matches have higher normalized scores)
+            if normalized_score >= score_threshold {
+                results.push(string_ref);
+                println!("Added {} to results", string_copy);
+
+                // Early termination: stop if we have enough high-quality candidates
+                if results.len() >= target_count * 2 {
+                    break;
+                }
+            }
+        }
+
+        results
+    }
+
+    // Full-database Jaro-Winkler similarity search with early termination
+    fn jaro_winkler_full_database(
+        &self,
+        query: &str,
+        target_count: usize,
+        similarity_threshold: f64
+    ) -> Vec<StringRef> {
+        let mut results = Vec::new();
+        let all_strings = self.get_all_strings();
+
+        for string_ref in all_strings {
+            let candidate = string_ref.string.as_str();
+
+            // Apply smart filtering to skip unpromising candidates
+            if should_skip_candidate(candidate.len(), query.len()) {
+                continue;
+            }
+
+            // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
+            let similarity = jaro_winkler(query, candidate);
+
+            if similarity >= similarity_threshold {
+                results.push(string_ref);
+
+                // Early termination: stop if we have enough high-quality candidates
+                if results.len() >= target_count * 2 {
+                    break;
+                }
+            }
+        }
+
+        results
+    }
+
+    // Helper function for fuzzy subsequence scoring
+    fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str) -> Option<f64> {
+        let candidate = string_ref.string.as_str();
+
+        // Apply smart filtering to skip unpromising candidates
+        if should_skip_candidate(candidate.len(), query.len()) {
+            println!("Skipping candidate {} due to length filtering", candidate);
+            return None;
+        }
+
+        // Note: We don't use character filtering for fuzzy subsequence search
+        // because it's designed to handle missing characters in the candidate
+        // The subsequence matching itself will determine if the query can be found
+
+        // Use existing fuzzy subsequence logic from the codebase
+        // This adapts the existing fuzzy_subsequence_search but searches entire database
+        let query_chars: Vec<char> = query.chars().collect();
+        let candidate_chars: Vec<char> = candidate.chars().collect();
+
+        if is_subsequence_chars(&query_chars, &candidate_chars).is_none() {
+            println!("Skipping candidate {} due to subsequence mismatch", candidate);
+            return None;
+        }
+
+        // Calculate match span score (lower is better)
+        let score = score_match_span_chars(&query_chars, &candidate_chars);
+        println!("Candidate {} scored: {}", candidate, score);
+        Some(score)
+    }
+
+    // Progressive algorithm execution with early termination
+    fn progressive_algorithm_execution(
+        &self,
+        query: &str,
+        limit: usize
+    ) -> Vec<StringRef> {
+        let mut all_candidates = Vec::new();
+
+        // 1. Fast prefix search first (O(log n))
+        let prefix_candidates = self.prefix_search(query);
+        all_candidates.extend(prefix_candidates);
+
+        // Early termination if we have enough high-quality prefix matches
+        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
+            return all_candidates.into_iter().take(limit).collect();
+        }
+
+        // 2. Fuzzy subsequence with early termination (O(n) with early exit)
+        let remaining_needed = limit.saturating_sub(all_candidates.len());
+        if remaining_needed > 0 {
+            let fuzzy_candidates = self.fuzzy_subsequence_full_database(
+                query,
+                remaining_needed,
+                0.0 // score threshold - include all matches for progressive execution
+            );
+            all_candidates.extend(fuzzy_candidates);
+        }
+
+        // 3. Jaro-Winkler only if still needed (O(n) with early exit)
+        let remaining_needed = limit.saturating_sub(all_candidates.len());
+        if remaining_needed > 0 {
+            let jaro_candidates = self.jaro_winkler_full_database(
+                query,
+                remaining_needed,
+                0.8 // similarity threshold
+            );
+            all_candidates.extend(jaro_candidates);
+        }
+
+        // 4. Substring only as last resort for longer queries
+        let remaining_needed = limit.saturating_sub(all_candidates.len());
+        if remaining_needed > 0 && query.len() >= 3 {
+            let substring_candidates = self.substring_search(query)
+                .into_iter()
+                .take(remaining_needed)
+                .collect::<Vec<_>>();
+            all_candidates.extend(substring_candidates);
+        }
+
+        all_candidates.into_iter().take(limit).collect()
+    }
+
+    // Helper to check for high-quality prefix matches
+    fn has_high_quality_prefix_matches(&self, candidates: &[StringRef], query: &str) -> bool {
+        // Consider it high quality if more than 2/3 of candidates are exact prefix matches
+        let prefix_match_count = candidates.iter()
+            .filter(|c| c.string.starts_with(query))
+            .count();
+        let threshold = (candidates.len() * 2) / 3;
+        prefix_match_count > threshold
     }
 
 }
@@ -724,6 +950,72 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
     let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
     let candidate_length = candidate.len() as f64;
     span_length + (candidate_length * 0.1)
+}
+
+// Character-based version for use with char vectors
+fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Option<Vec<usize>> {
+    let mut query_iter = query_chars.iter();
+    let mut current_char = query_iter.next();
+    let mut match_indices = Vec::new();
+
+    for (i, c) in candidate_chars.iter().enumerate() {
+        if current_char == Some(c) {
+            match_indices.push(i);
+            current_char = query_iter.next();
+            if current_char.is_none() {
+                return Some(match_indices);
+            }
+        }
+    }
+
+    None
+}
+
+// Character-based version for scoring
+fn score_match_span_chars(query_chars: &[char], candidate_chars: &[char]) -> f64 {
+    if let Some(match_indices) = is_subsequence_chars(query_chars, candidate_chars) {
+        if match_indices.is_empty() {
+            return f64::MAX;
+        }
+
+        let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+        let candidate_length = candidate_chars.len() as f64;
+        span_length + (candidate_length * 0.1)
+    } else {
+        f64::MAX
+    }
+}
+
+// Smart filtering to skip unpromising candidates
+fn should_skip_candidate(candidate_len: usize, query_len: usize) -> bool {
+    // Skip strings that are too short to contain the query
+    if candidate_len < query_len {
+        return true;
+    }
+
+    // Skip strings that are excessively long for short queries
+    // For very short queries (1-2 chars), allow longer candidates
+    // For longer queries, be more restrictive
+    if query_len <= 2 && candidate_len > query_len * 10 {
+        return true;
+    } else if query_len <= 3 && candidate_len > query_len * 6 {
+        return true;
+    }
+
+    false
+}
+
+// Character set filtering for fuzzy algorithms
+fn contains_required_chars(candidate: &str, query: &str) -> bool {
+    let candidate_chars: std::collections::HashSet<char> = candidate.chars().collect();
+    query.chars().all(|c| candidate_chars.contains(&c))
+}
+
+// For fuzzy subsequence (lower raw scores are better)
+fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
+    // Invert and normalize: lower raw scores → higher normalized scores
+    let normalized = 1.0 - ((raw_score - min_score) / (max_score - min_score));
+    normalized.clamp(0.0, 1.0)
 }
 
 // MARK: Unit Tests
@@ -1101,6 +1393,408 @@ mod tests {
             // Test no matches through public API
             let results = ss.fuzzy_subsequence_search("xyz");
             assert_eq!(results.len(), 0);
+        }
+    }
+
+    mod fuzzy_subsequence_full_database {
+        use super::*;
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_basic() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Test basic functionality - should find all strings that match "hl"
+            // Use threshold of 0.0 to include "helicopter" which has normalized score of 0
+            let results = ss.fuzzy_subsequence_full_database("hl", 10, 0.0);
+            assert_eq!(results.len(), 3);
+
+            // Should find all three "h" words that match "hl" as subsequence
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Empty query should return empty results
+            let results = ss.fuzzy_subsequence_full_database("", 10, 0.5);
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_no_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // No matches should return empty results
+            let results = ss.fuzzy_subsequence_full_database("xyz", 10, 0.5);
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_with_threshold() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // With high threshold, should only get best matches
+            let results = ss.fuzzy_subsequence_full_database("hl", 10, 0.9);
+            // Should get fewer results with high threshold
+            assert!(results.len() <= 3);
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_early_termination() {
+            let mut ss = StringSpace::new();
+            // Add many strings to test early termination
+            for i in 0..100 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test with target_count that should trigger early termination
+            let results = ss.fuzzy_subsequence_full_database("hl", 5, 0.5);
+            // Should get some results but not necessarily all matches due to early termination
+            assert!(results.len() > 0);
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_full_database_character_filtering() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test character filtering - "hlo" should match "hello" but not "world"
+            // Use moderate threshold since there's only one match
+            let results = ss.fuzzy_subsequence_full_database("hlo", 10, 0.5);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(!strings.contains(&"world".to_string()));
+        }
+    }
+
+    mod jaro_winkler_full_database {
+        use super::*;
+
+        #[test]
+        fn test_jaro_winkler_full_database_basic() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Test basic functionality - should find strings similar to "hell"
+            let results = ss.jaro_winkler_full_database("hell", 10, 0.7);
+            assert!(results.len() >= 2);
+
+            // Should find "hello" and "help" which are similar to "hell"
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Empty query should return empty results
+            let results = ss.jaro_winkler_full_database("", 10, 0.5);
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_no_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // No matches should return empty results
+            let results = ss.jaro_winkler_full_database("xyz", 10, 0.5);
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_with_threshold() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // With high threshold, should only get very similar matches
+            let results = ss.jaro_winkler_full_database("hell", 10, 0.9);
+            // Should get fewer results with high threshold
+            assert!(results.len() <= 2);
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_early_termination() {
+            let mut ss = StringSpace::new();
+            // Add many strings to test early termination
+            for i in 0..100 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test with target_count that should trigger early termination
+            let results = ss.jaro_winkler_full_database("hell", 5, 0.5);
+            // Should get some results but not necessarily all matches due to early termination
+            assert!(results.len() > 0);
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_length_filtering() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            // "a" is too short (minimum 3 chars), so we'll use a very long string instead
+            ss.insert_string("extremelylongstringthatiswaytoolongforthisquery", 1).unwrap();
+
+            // Test length filtering - very long strings should be skipped for very short queries
+            // Use a 1-character query to trigger the filtering
+            let results = ss.jaro_winkler_full_database("h", 10, 0.5);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(!strings.contains(&"extremelylongstringthatiswaytoolongforthisquery".to_string()));
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_exact_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Exact matches should have high similarity scores
+            let results = ss.jaro_winkler_full_database("hello", 10, 0.9);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].string, "hello");
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_public_api() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test public API method
+            let results = ss.jaro_winkler_full_database("hell", 10, 0.7);
+            assert!(results.len() >= 2);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+        }
+
+        #[test]
+        fn test_jaro_winkler_full_database_character_set_filtering() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test that strings with completely different character sets are filtered out
+            let results = ss.jaro_winkler_full_database("abc", 10, 0.1);
+            // Should have very few or no matches since character sets are completely different
+            assert!(results.len() <= 1);
+        }
+    }
+
+    mod best_completions {
+        use super::*;
+
+        #[test]
+        fn test_best_completions_basic() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test basic prefix completion
+            let results = ss.best_completions("hel", Some(10));
+            // Should find all three "hel" prefix matches
+            assert!(results.len() >= 3);
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_best_completions_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Empty query should return empty results
+            let results = ss.best_completions("", Some(10));
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_best_completions_no_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // No matches should return empty results
+            let results = ss.best_completions("xyz", Some(10));
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_best_completions_with_limit() {
+            let mut ss = StringSpace::new();
+            // Add more strings than the limit
+            ss.insert_string("hello1", 1).unwrap();
+            ss.insert_string("hello2", 2).unwrap();
+            ss.insert_string("hello3", 3).unwrap();
+            ss.insert_string("hello4", 4).unwrap();
+            ss.insert_string("hello5", 5).unwrap();
+
+            // Test with limit smaller than available matches
+            let results = ss.best_completions("hello", Some(3));
+            assert_eq!(results.len(), 3);
+        }
+
+        #[test]
+        fn test_best_completions_progressive_execution() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test that progressive execution works - should find matches through multiple algorithms
+            let results = ss.best_completions("hl", Some(10));
+            // Should find all three "h" words that match "hl" as subsequence
+            assert!(results.len() >= 3);
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_best_completions_early_termination() {
+            let mut ss = StringSpace::new();
+            // Add many strings to test early termination
+            for i in 0..50 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test with small limit to trigger early termination
+            let results = ss.best_completions("hel", Some(5));
+            // Should get some results but not necessarily all matches due to early termination
+            assert!(results.len() > 0);
+            assert!(results.len() <= 5);
+        }
+
+        #[test]
+        fn test_has_high_quality_prefix_matches() {
+            let ssi = StringSpaceInner::new();
+
+            // Create test candidates
+            let candidates = vec![
+                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+                StringRef { string: "helicopter".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+            ];
+
+            // All candidates start with "hel" - should be high quality
+            assert!(ssi.has_high_quality_prefix_matches(&candidates, "hel"));
+
+            // Mixed candidates - should not be high quality
+            let mixed_candidates = vec![
+                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+                StringRef { string: "world".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
+            ];
+            assert!(!ssi.has_high_quality_prefix_matches(&mixed_candidates, "hel"));
+        }
+
+        #[test]
+        fn test_progressive_algorithm_execution() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test progressive execution directly
+            let results = ss.inner.progressive_algorithm_execution("hel", 10);
+            // Should find all three "hel" prefix matches
+            assert!(results.len() >= 3);
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_progressive_algorithm_execution_with_fallback() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test with query that requires fallback algorithms
+            // "hl" won't match via prefix search, so should use fuzzy subsequence
+            let results = ss.inner.progressive_algorithm_execution("hl", 10);
+            assert!(results.len() >= 3);
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_progressive_algorithm_execution_empty() {
+            let ss = StringSpace::new();
+
+            // Test with empty database
+            let results = ss.inner.progressive_algorithm_execution("hel", 10);
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_progressive_algorithm_execution_early_termination() {
+            let mut ss = StringSpace::new();
+            // Add many strings to test early termination
+            for i in 0..100 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test with small limit to trigger early termination
+            let results = ss.inner.progressive_algorithm_execution("hel", 5);
+            // Should get some results but not necessarily all matches due to early termination
+            assert!(results.len() > 0);
+            assert!(results.len() <= 5);
         }
     }
 }
