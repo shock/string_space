@@ -127,6 +127,26 @@ class StringSpaceClient:
                 print(f"Error: {e}")
             return [f"ERROR: {e}"]
 
+    def fuzzy_subsequence_search(self, query: str) -> list[str]:
+        """
+        Perform fuzzy-subsequence search for strings where query characters appear in order.
+
+        Args:
+            query: The subsequence pattern to search for
+
+        Returns:
+            list[str]: List of matching strings, or error message in list format
+        """
+        try:
+            request_elements = ["fuzzy-subsequence", query]
+            response = self.request(request_elements)
+            # Remove empty strings from the result (consistent with other search methods)
+            return [line for line in response.split('\n') if line]
+        except ProtocolError as e:
+            if self.debug:
+                print(f"Error: {e}")
+            return [f"ERROR: {e}"]
+
     def data_file(self) -> str:
         try:
             request_elements = ["data-file"]

@@ -65,7 +65,7 @@ impl StringSpaceProtocol {
         }
         else if "similar" == operation {
             if params.len() != 2 {
-                let response_str = format!("ERROR\nInvalid parameters (length = {})", params.len());
+                let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
                 return response;
             }
@@ -93,6 +93,26 @@ impl StringSpaceProtocol {
                     response.extend_from_slice(m.meta.age_days.to_string().as_bytes());
                 }
                 // add a newline between each record
+                response.extend_from_slice("\n".as_bytes());
+            }
+            return response;
+        }
+        else if "fuzzy-subsequence" == operation {
+            if params.len() != 1 {
+                let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
+                response.extend_from_slice(response_str.as_bytes());
+                return response;
+            }
+            let query = params[0];
+            let matches = self.space.fuzzy_subsequence_search(query);
+            for m in matches {
+                response.extend_from_slice(m.string.as_bytes());
+                if SEND_METADATA {
+                    response.extend_from_slice(" ".as_bytes());
+                    response.extend_from_slice(m.meta.frequency.to_string().as_bytes());
+                    response.extend_from_slice(" ".as_bytes());
+                    response.extend_from_slice(m.meta.age_days.to_string().as_bytes());
+                }
                 response.extend_from_slice("\n".as_bytes());
             }
             return response;
@@ -241,5 +261,451 @@ where F: FnMut()
             eprintln!("Failed to bind to port {}: {}", port, e);
             return Err(e);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fuzzy_subsequence_command_valid() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_valid_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+        writeln!(file, "help 2 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test valid fuzzy-subsequence command
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_invalid_params() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_invalid_params_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test invalid parameter count - empty params
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec![];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        assert!(response_str.starts_with("ERROR - invalid parameters"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_empty_query() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_empty_query_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test empty query handling
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec![""];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Empty query should return empty results (no error)
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_too_many_params() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_too_many_params_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test too many parameters
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl", "extra"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        assert!(response_str.starts_with("ERROR - invalid parameters"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_with_utf8() {
+        // Create a temporary test file with UTF-8 data
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_utf8_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "café 1 0").unwrap();
+        writeln!(file, "naïve 2 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test UTF-8 character handling
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["cf"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_response_format() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_response_format_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+        writeln!(file, "help 2 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test response format consistency
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Response should either be empty or contain newline-separated strings
+        if !response_str.is_empty() {
+            // If there are results, they should be separated by newlines
+            assert!(response_str.contains('\n') || !response_str.contains("ERROR"));
+        }
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_unknown_operation() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_unknown_op_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test unknown operation
+        let operation = "unknown-operation";
+        let params: Vec<&str> = vec!["test"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        assert!(response_str.starts_with("ERROR - unknown operation"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_parameter_validation() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_param_validation_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test various parameter validation scenarios
+        let operation = "fuzzy-subsequence";
+
+        // Test with 0 parameters
+        let params_empty: Vec<&str> = vec![];
+        let response_empty = protocol.create_response(operation, params_empty);
+        let response_str_empty = String::from_utf8(response_empty).unwrap();
+        assert!(response_str_empty.starts_with("ERROR - invalid parameters"));
+
+        // Test with 1 parameter (valid)
+        let params_valid: Vec<&str> = vec!["test"];
+        let response_valid = protocol.create_response(operation, params_valid);
+        let response_str_valid = String::from_utf8(response_valid).unwrap();
+        assert!(!response_str_valid.starts_with("ERROR"));
+
+        // Test with 2 parameters (invalid)
+        let params_invalid: Vec<&str> = vec!["test", "extra"];
+        let response_invalid = protocol.create_response(operation, params_invalid);
+        let response_str_invalid = String::from_utf8(response_invalid).unwrap();
+        assert!(response_str_invalid.starts_with("ERROR - invalid parameters"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_command_integration() {
+        // Create a temporary test file with some data
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_integration_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+        writeln!(file, "world 2 0").unwrap();
+        writeln!(file, "help 3 0").unwrap();
+        writeln!(file, "helicopter 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test integration with other commands to ensure no conflicts
+        let operations = vec![
+            ("prefix", vec!["he"]),
+            ("substring", vec!["or"]),
+            ("fuzzy-subsequence", vec!["hl"]),
+            ("similar", vec!["hello", "0.6"]),
+        ];
+
+        for (operation, params) in operations {
+            let response = protocol.create_response(operation, params);
+            let response_str = String::from_utf8(response).unwrap();
+
+            // Each operation should handle its own parameter validation
+            // We just verify that the protocol doesn't crash
+            assert!(!response_str.starts_with("ERROR"));
+        }
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_end_to_end_fuzzy_subsequence() {
+        // Use a simpler approach - test the protocol directly without network
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert test data directly into the protocol's space
+        protocol.space.insert_string("hello", 1).unwrap();
+        protocol.space.insert_string("world", 2).unwrap();
+        protocol.space.insert_string("help", 3).unwrap();
+        protocol.space.insert_string("helicopter", 1).unwrap();
+
+        // Test fuzzy-subsequence command directly
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Verify response contains expected results
+        assert!(response_str.contains("hello"), "Expected 'hello' in response: {}", response_str);
+        assert!(response_str.contains("help"), "Expected 'help' in response: {}", response_str);
+        assert!(!response_str.contains("world"), "Did not expect 'world' in response: {}", response_str);
+    }
+
+    #[test]
+    fn test_protocol_error_handling() {
+        // Test invalid parameter count
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Simulate invalid request with missing query parameter
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec![]; // Empty params - should trigger error
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        assert!(response_str.starts_with("ERROR - invalid parameters"));
+    }
+
+    #[test]
+    fn test_protocol_command_integration() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Test valid fuzzy-subsequence command
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Test empty query handling
+        let params_empty: Vec<&str> = vec![""];
+        let response_empty = protocol.create_response(operation, params_empty);
+        let response_empty_str = String::from_utf8(response_empty).unwrap();
+
+        // Empty query should return empty results (no error)
+        assert!(!response_empty_str.starts_with("ERROR"));
+
+        // Test too many parameters
+        let params_too_many: Vec<&str> = vec!["hl", "extra"];
+        let response_too_many = protocol.create_response(operation, params_too_many);
+        let response_too_many_str = String::from_utf8(response_too_many).unwrap();
+
+        assert!(response_too_many_str.starts_with("ERROR - invalid parameters"));
+    }
+
+    #[test]
+    fn test_performance_under_load() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert large dataset
+        for i in 0..10000 {
+            protocol.space.insert_string(&format!("testword{}", i), 1).unwrap();
+        }
+
+        // Test multiple concurrent searches
+        let start = std::time::Instant::now();
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                thread::spawn(move || {
+                    let mut local_protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+                    // Each thread gets its own data to avoid sharing mutable state
+                    for i in 0..10000 {
+                        local_protocol.space.insert_string(&format!("testword{}", i), 1).unwrap();
+                    }
+                    for _ in 0..100 {
+                        let _ = local_protocol.space.fuzzy_subsequence_search("test");
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let duration = start.elapsed();
+        assert!(duration.as_secs() < 10, "Performance test took too long: {:?}", duration);
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_with_actual_results() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert test data directly into the space
+        protocol.space.insert_string("hello", 1).unwrap();
+        protocol.space.insert_string("help", 2).unwrap();
+        protocol.space.insert_string("helicopter", 3).unwrap();
+        protocol.space.insert_string("world", 1).unwrap();
+
+        // Test fuzzy subsequence search
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["hl"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Verify we get expected results
+        assert!(response_str.contains("hello"));
+        assert!(response_str.contains("help"));
+        assert!(response_str.contains("helicopter"));
+        assert!(!response_str.contains("world"));
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_no_results() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert test data that won't match our query
+        protocol.space.insert_string("apple", 1).unwrap();
+        protocol.space.insert_string("banana", 2).unwrap();
+
+        // Test fuzzy subsequence search with no matches
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["xyz"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should return empty results (no error)
+        assert!(!response_str.starts_with("ERROR"));
+        assert!(response_str.is_empty() || response_str.trim().is_empty());
+    }
+
+    #[test]
+    fn test_fuzzy_subsequence_case_sensitivity() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert test data with mixed case
+        protocol.space.insert_string("Hello", 1).unwrap();
+        protocol.space.insert_string("HELP", 2).unwrap();
+        protocol.space.insert_string("helicopter", 3).unwrap();
+
+        // Test fuzzy subsequence search with different case
+        let operation = "fuzzy-subsequence";
+        let params: Vec<&str> = vec!["HL"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        println!("Response: '{}'", response_str);
+        println!("Contains 'Hello': {}", response_str.contains("Hello"));
+        println!("Contains 'HELP': {}", response_str.contains("HELP"));
+        println!("Contains 'helicopter': {}", response_str.contains("helicopter"));
+
+        // The search is case-sensitive:
+        // - "HELP" matches "HL" because both H and L are uppercase
+        // - "Hello" doesn't match because the second character is 'e' (not 'L')
+        // - "helicopter" doesn't match because the first character is lowercase 'h' (not uppercase 'H')
+        assert!(!response_str.contains("Hello"), "Expected 'Hello' not to be in response");
+        assert!(response_str.contains("HELP"), "Expected 'HELP' to be in response");
+        assert!(!response_str.contains("helicopter"), "Expected 'helicopter' not to be in response");
     }
 }

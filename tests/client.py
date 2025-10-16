@@ -7,7 +7,7 @@ from string_space_client import ProtocolError, StringSpaceClient
 def prexix_test(client):
     try:
         # create a list of all the lower case prefix letters
-        prefixes = list(map(lambda x: x.lower(), string.ascii_letters))
+        prefixes = list(string.ascii_lowercase)
         for prefix in prefixes:
             words = client.prefix_search(prefix=prefix)
             print(f"Prefix '{prefix}':")
@@ -95,6 +95,16 @@ def similar_test(client):
     except ProtocolError as e:
         print(f"ProtocolError: {e}")
 
+def fuzzy_subsequence_test(client):
+    try:
+        query = "hl"
+        words = client.fuzzy_subsequence_search(query)
+        print(f"Fuzzy-subsequence search for '{query}':")
+        for word in words:
+            print(f"  {word}")
+    except ProtocolError as e:
+        print(f"ProtocolError: {e}")
+
 def data_file_test(client):
     try:
         data_file = client.data_file()
@@ -114,6 +124,7 @@ def main():
     prexix_test(client)
     substring_test(client)
     similar_test(client)
+    fuzzy_subsequence_test(client)
     prefix = "testi"
     print("Prefix search:" + prefix)
     print("\n".join(client.prefix_search(prefix=prefix)))

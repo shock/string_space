@@ -22,6 +22,7 @@ String Space is a Rust-based word-list database server with efficient string sto
 - **Custom Memory Management**: Uses raw pointer allocation with 4KB alignment for optimal string storage
 - **Efficient Search**: Binary search for prefix matching, linear scan for substring search
 - **Fuzzy Search**: Jaro-Winkler similarity matching with configurable thresholds
+- **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing
 - **TCP Network Protocol**: ASCII RS (0x1E) as separator, EOT (0x04) as terminator
 - **Daemon Mode**: Proper UNIX daemon implementation with PID file management
 - **Frequency & Age Tracking**: Word usage frequency and insertion time tracking
@@ -39,9 +40,9 @@ make install         # Install to /opt/local/bin
 
 ### Testing
 ```bash
-cargo test           # Run unit tests
-make test            # Run full test suite including integration tests
-./tests/run_tests.sh # Run comprehensive test script (requires SS_TEST=true)
+make test            # Run full test suite including integration tests and unit tests
+cargo test           # Run rust unit tests
+./tests/run_tests.sh # Run comprehensive test script (requires SS_TEST=true) (same as `make test`)
 ```
 
 ### Running
@@ -95,6 +96,7 @@ cargo run -- restart <data-file>  # Restart server (daemon mode only)
 - `prefix <prefix>` - Search by prefix
 - `substring <substring>` - Search by substring
 - `similar <word> <threshold>` - Fuzzy search with Jaro-Winkler
+- `fuzzy-subsequence <query>` - Fuzzy subsequence search with character order preservation
 - `data-file` - Get data file path
 - `remove <words...>` - Remove words from storage
 - `clear_space` - Clear all strings

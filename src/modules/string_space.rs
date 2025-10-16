@@ -122,6 +122,11 @@ impl StringSpace {
     }
 
     #[allow(unused)]
+    pub fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
+        self.inner.fuzzy_subsequence_search(query)
+    }
+
+    #[allow(unused)]
     pub fn get_all_strings(&self) -> Vec<StringRef> {
         self.inner.get_all_strings()
     }
@@ -464,6 +469,40 @@ impl StringSpaceInner {
         Ok(())
     }
 
+    fn fuzzy_subsequence_search(&self, query: &str) -> Vec<StringRef> {
+        // Empty query handling: return empty vector for empty queries
+        // This is consistent with existing search method behavior where empty queries yield no matches
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        // Use prefix filtering like get_similar_words for performance
+        // Identical implementation to get_similar_words()
+        let possibilities = self.find_by_prefix(query[0..1].to_string().as_str());
+
+        let mut matches: Vec<(StringRef, f64)> = Vec::new();
+
+        for candidate in possibilities {
+            if let Some(match_indices) = is_subsequence(query, &candidate.string) {
+                let score = score_match_span(&match_indices, &candidate.string);
+                matches.push((candidate, score));
+            }
+        }
+
+        // Sort by score (ascending - lower scores are better), then frequency (descending), then age (descending)
+        matches.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1).unwrap()
+                .then(b.0.meta.frequency.cmp(&a.0.meta.frequency))
+                .then(b.0.meta.age_days.cmp(&a.0.meta.age_days))
+        });
+
+        // Limit to top 10 results AFTER all sorting is complete
+        // This ensures the best 10 matches are selected based on the full sorting criteria
+        matches.truncate(10);
+
+        matches.into_iter().map(|(string_ref, _)| string_ref).collect()
+    }
+
 }
 
 impl Drop for StringSpaceInner {
@@ -579,6 +618,35 @@ fn get_close_matches(word: &str, possibilities: &[StringRef], n: usize, cutoff: 
     }).collect();
 
     matches
+}
+
+fn is_subsequence(query: &str, candidate: &str) -> Option<Vec<usize>> {
+    let mut query_chars = query.chars();
+    let mut current_char = query_chars.next();
+    let mut match_indices = Vec::new();
+
+    // UTF-8 Character Handling: Use chars() iterator for proper Unicode character-by-character matching
+    // This correctly handles multi-byte UTF-8 sequences like emoji, accented characters, etc.
+    for (i, c) in candidate.chars().enumerate() {
+        if current_char == Some(c) {
+            match_indices.push(i);
+            current_char = query_chars.next();
+            if current_char.is_none() {
+                return Some(match_indices);
+            }
+        }
+    }
+
+    None
+}
+
+fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
+    if match_indices.is_empty() {
+        return f64::MAX;
+    }
+    let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+    let candidate_length = candidate.len() as f64;
+    span_length + (candidate_length * 0.1)
 }
 
 // MARK: Unit Tests
@@ -786,6 +854,176 @@ mod tests {
             assert!(results[2].string == "hello1");  // same frequency and age
             assert!(results[3].string == "help");  // lower score
             assert!(results[4].string == "helicopter");  // lowest score
+        }
+    }
+
+    mod fuzzy_subsequence_search {
+        use super::*;
+
+        #[test]
+        fn test_fuzzy_subsequence_search() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 5).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("hel");
+            assert_eq!(results.len(), 3);
+
+            // Results should be sorted by score (ascending), then frequency (descending), then age (descending)
+            // "hello" and "help" should have better scores than "helicopter"
+            assert!(results[0].string == "hello" || results[0].string == "help");
+            assert!(results[1].string == "hello" || results[1].string == "help");
+            assert_eq!(results[2].string, "helicopter");
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_search_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 1).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("");
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_fuzzy_subsequence_search_no_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 1).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("xyz");
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_basic_subsequence_matching() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("hl");
+            assert_eq!(results.len(), 3);
+            // All three "h" words match "hl" as subsequence
+            // Results are sorted by score (ascending), then frequency (descending)
+            // "help" has highest frequency (3), then "hello" (1), then "helicopter" (1)
+            // "helicopter" has worst score due to longer span
+            assert!(results[0].string == "help");
+            assert!(results[1].string == "hello");
+            assert!(results[2].string == "helicopter");
+        }
+
+        #[test]
+        fn test_non_matching_sequences() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("xyz");
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_exact_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("hello");
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "hello");
+        }
+
+        #[test]
+        fn test_utf8_character_handling() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("café", 1).unwrap();
+            ss.insert_string("naïve", 2).unwrap();
+            ss.insert_string("über", 3).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("cf");
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "café");
+
+            let results = ss.fuzzy_subsequence_search("nv");
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "naïve");
+        }
+
+        #[test]
+        fn test_result_ranking_verification() {
+            let mut ss = StringSpace::new();
+            // Insert strings with different frequencies and ages
+            ss.insert_string("hello", 1).unwrap();  // frequency 1
+            ss.insert_string("help", 3).unwrap();   // frequency 3
+            ss.insert_string("helicopter", 2).unwrap(); // frequency 2
+
+            let results = ss.fuzzy_subsequence_search("hl");
+            assert_eq!(results.len(), 3);
+            // Results should be sorted by score (ascending), then frequency (descending), then age (descending)
+            // "hello" and "help" should have similar scores, but "help" has higher frequency
+            // "helicopter" should have worse score due to longer span
+            assert!(results[0].string == "help");
+            assert!(results[1].string == "hello");
+            assert!(results[2].string == "helicopter");
+        }
+
+        #[test]
+        fn test_abbreviation_matching() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("openai/gpt-4o-2024-08-06", 1).unwrap();
+            ss.insert_string("openai/gpt-5", 2).unwrap();
+            ss.insert_string("anthropic/claude-3-opus", 3).unwrap();
+
+            let results = ss.fuzzy_subsequence_search("og4");
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "openai/gpt-4o-2024-08-06");
+
+            let results = ss.fuzzy_subsequence_search("ogp5");
+            assert_eq!(results.len(), 1);
+            assert!(results[0].string == "openai/gpt-5");
+        }
+
+        #[test]
+        fn test_public_api_fuzzy_subsequence_search() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Test public API method
+            let results = ss.fuzzy_subsequence_search("hl");
+            assert_eq!(results.len(), 3);
+            assert!(results[0].string == "help");  // Higher frequency
+            assert!(results[1].string == "hello"); // Lower frequency
+            assert!(results[2].string == "helicopter"); // Worst score due to longer span
+        }
+
+        #[test]
+        fn test_public_api_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test empty query handling through public API
+            let results = ss.fuzzy_subsequence_search("");
+            assert_eq!(results.len(), 0);
+        }
+
+        #[test]
+        fn test_public_api_no_matches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test no matches through public API
+            let results = ss.fuzzy_subsequence_search("xyz");
+            assert_eq!(results.len(), 0);
         }
     }
 }
