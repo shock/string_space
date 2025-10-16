@@ -47,16 +47,6 @@ This document outlines the implementation strategy for a new `best_completions` 
 
 ## Unified Scoring System
 
-### ScoreCandidate Structure
-```rust
-struct ScoreCandidate {
-    string_ref: StringRef,
-    algorithm: AlgorithmType, // PREFIX, FUZZY_SUBSEQ, JARO_WINKLER, SUBSTRING
-    raw_score: f64,          // Algorithm-specific raw score
-    normalized_score: f64,   // Normalized to 0.0-1.0 (higher = better)
-    final_score: f64,        // After weighted combination and metadata adjustments
-}
-```
 
 ### Important Note: Age Scoring Direction
 - **Current Implementation**: `age_days` stores days since epoch (higher = more recent)
@@ -87,25 +77,6 @@ struct ScoreCandidate {
 - **Direction**: Lower position = better ✗
 - **Normalization Required**: Position-based normalization to 0.0-1.0 scale
 
-### Score Normalization Functions
-
-#### Fuzzy Subsequence Normalization
-```rust
-// For fuzzy subsequence (lower raw scores are better)
-fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
-    // Invert and normalize: lower raw scores → higher normalized scores
-    let normalized = 1.0 - ((raw_score - min_score) / (max_score - min_score));
-    normalized.clamp(0.0, 1.0)
-}
-```
-
-#### Substring Search Normalization
-```rust
-// For substring search (earlier matches are better)
-fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
-    1.0 - (position as f64 / max_position as f64)
-}
-```
 
 ### Algorithm Weighting System
 
@@ -130,8 +101,521 @@ fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
 
 **Query Length Categories and Weight Tables**
 
+*Note: Implementation details moved to Phase 3: Unified Scoring System*
+
+**Dynamic Weight Selection Implementation**
+
+*Note: Implementation details moved to Phase 3: Unified Scoring System*
+
+**Weight Validation and Effectiveness Testing**
+
+*Note: Test implementation details moved to Phase 5: Testing and Optimization*
+
+**Dynamic Weighting Strategy Rationale**
+
+- **Very Short Queries (1-2 chars)**: Prioritize prefix and fuzzy subsequence since users are likely typing the beginning of words
+- **Short Queries (3-4 chars)**: Balanced approach with emphasis on prefix and fuzzy subsequence
+- **Medium Queries (5-6 chars)**: More balanced distribution as query provides more context
+- **Long Queries (7+ chars)**: Emphasize Jaro-Winkler for typo correction and substring for partial matches
+
+### Metadata Integration
+
+#### Frequency Weighting with Conflict Resolution
+- Use logarithmic scaling to prevent high-frequency words from dominating
+- Formula: `frequency_factor = 1.0 + (ln(frequency + 1) * 0.1)`
+- **Conflict Resolution**: Logarithmic scaling prevents extreme frequency values from overriding age and length preferences
+
+#### Age-Based Recency Bonus with Bounded Influence
+- Newer items get slight preference (higher `age_days` values are more recent)
+- Formula: `age_factor = 1.0 + (current_age / max_age) * 0.05`
+- **Conflict Resolution**: Small bounded influence (5% max) prevents age from overriding relevance
+
+#### Length Normalization with Threshold
+- Penalize only very long matches for short queries (when candidate_len > query_len * 3)
+- Formula: `length_penalty = 1.0 - (candidate_len - query_len) / max_len * 0.1`
+- **Conflict Resolution**: Length penalty only applied for significant length mismatches to avoid over-penalizing good matches
+
+#### Metadata Factor Interaction Matrix
+
+| Scenario | Frequency | Age | Length | Conflict Type | Resolution Strategy |
+|----------|-----------|-----|--------|---------------|---------------------|
+| High-freq old word | High | Old | Normal | Frequency vs Age | Log scaling limits frequency dominance |
+| Low-freq new word | Low | New | Normal | Age preference | Age bonus provides slight advantage |
+| Long high-freq word | High | Any | Long | Length vs Frequency | Length penalty capped, frequency log-scaled |
+| Short low-freq word | Low | Any | Short | No conflict | All factors aligned |
+| Medium-freq medium-age | Medium | Medium | Medium | Balanced | Multiplicative approach works well |
+
+#### Enhanced Metadata Integration Implementation
+
+*Note: Implementation details moved to Phase 3: Unified Scoring System*
+
+### Final Score Calculation
+
+*Note: Implementation details moved to Phase 3: Unified Scoring System*
+
+## Result Merging and Ranking
+
+### Deduplication Strategy
+- Merge results from all algorithms
+- For duplicates, keep the candidate with the highest final score
+- Preserve source algorithm information for debugging
+
+### Ranking Priority
+1. **Primary**: Final score (descending)
+
+### Result Limiting
+- Return top 15 results for performance
+- Configurable limit parameter
+
+## Implementation Phases
+
+### Phase 1: Core Method Structure
+
+#### Implementation Steps
+
+**1. Add `best_completions` method signature to `StringSpaceInner` impl**
+
+```rust
+// In src/modules/string_space.rs, within the StringSpaceInner impl block
+fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    let limit = limit.unwrap_or(15);
+
+    // Basic query validation
+    if query.is_empty() {
+        return Vec::new();
+    }
+
+    // TODO: Implement multi-algorithm fusion in subsequent phases
+    // For now, return empty vector as placeholder
+    Vec::new()
+}
+```
+
+**2. Add public `best_completions` method to `StringSpace` struct**
+
+```rust
+// In src/modules/string_space.rs, within the StringSpace impl block
+#[allow(unused)]
+pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    self.inner.best_completions(query, limit)
+}
+```
+
+**3. Implement basic query validation and empty query handling**
+
+```rust
+// Query validation helper function
+fn validate_query(query: &str) -> Result<(), &'static str> {
+    if query.is_empty() {
+        return Err("Query cannot be empty");
+    }
+
+    // Additional validation can be added here
+    // For example: minimum length requirements, character restrictions, etc.
+
+    Ok(())
+}
+
+// Enhanced best_completions method with validation
+fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    let limit = limit.unwrap_or(15);
+
+    // Validate query
+    if let Err(_) = validate_query(query) {
+        return Vec::new();
+    }
+
+    // TODO: Implement multi-algorithm fusion in subsequent phases
+    // For now, return empty vector as placeholder
+    Vec::new()
+}
+```
+
+**4. Create result collection infrastructure**
+
+```rust
+// Basic result collection structure for Phase 1
+// This will be expanded in Phase 3 with the full ScoreCandidate struct
+
+struct BasicCandidate {
+    string_ref: StringRef,
+    algorithm: AlgorithmType,
+    score: f64,
+}
+
+impl BasicCandidate {
+    fn new(string_ref: StringRef, algorithm: AlgorithmType, score: f64) -> Self {
+        Self {
+            string_ref,
+            algorithm,
+            score,
+        }
+    }
+}
+
+
+// Result collection helper
+fn collect_results(&self) -> Vec<BasicCandidate> {
+    // Placeholder implementation
+    // Will be replaced with actual algorithm execution in subsequent phases
+    Vec::new()
+}
+```
+
+### Phase 2: Individual Algorithm Integration
+
+#### Implementation Steps
+
+**1. Implement full-database fuzzy subsequence search with early termination**
+
+```rust
+// Full-database fuzzy subsequence search with early termination
+fn fuzzy_subsequence_full_database(
+    &self,
+    query: &str,
+    target_count: usize,
+    score_threshold: f64
+) -> Vec<StringRef> {
+    let mut results = Vec::new();
+    let all_strings = self.get_all_strings();
+
+    // Track min/max scores for normalization
+    let mut min_score = f64::MAX;
+    let mut max_score = f64::MIN;
+    let mut scores = Vec::new();
+
+    // First pass: collect scores for normalization
+    for string_ref in &all_strings {
+        if let Some(score) = self.score_fuzzy_subsequence(string_ref, query) {
+            min_score = min_score.min(score);
+            max_score = max_score.max(score);
+            scores.push((string_ref.clone(), score));
+        }
+    }
+
+    // Handle edge case where all scores are the same
+    if (max_score - min_score).abs() < f64::EPSILON {
+        min_score = 0.0;
+        max_score = 1.0;
+    }
+
+    // Second pass: apply normalization and threshold filtering
+    for (string_ref, raw_score) in scores {
+        let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+        if normalized_score >= score_threshold {
+            results.push(string_ref);
+
+            // Early termination: stop if we have enough high-quality candidates
+            if results.len() >= target_count * 2 {
+                break;
+            }
+        }
+    }
+
+    results
+}
+
+// Helper function for fuzzy subsequence scoring
+fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str) -> Option<f64> {
+    let candidate = string_ref.as_str();
+
+    // Apply smart filtering to skip unpromising candidates
+    if should_skip_candidate(candidate.len(), query.len()) {
+        return None;
+    }
+
+    if !contains_required_chars(candidate, query) {
+        return None;
+    }
+
+    // Use existing fuzzy subsequence logic from the codebase
+    // This adapts the existing fuzzy_subsequence_search but searches entire database
+    let query_chars: Vec<char> = query.chars().collect();
+    let candidate_chars: Vec<char> = candidate.chars().collect();
+
+    if !is_subsequence(&query_chars, &candidate_chars) {
+        return None;
+    }
+
+    // Calculate match span score (lower is better)
+    let score = score_match_span(&query_chars, &candidate_chars);
+    Some(score)
+}
+
+```
+
+**2. Implement full-database Jaro-Winkler similarity search with early termination**
+
+```rust
+// Full-database Jaro-Winkler similarity search with early termination
+fn jaro_winkler_full_database(
+    &self,
+    query: &str,
+    target_count: usize,
+    similarity_threshold: f64
+) -> Vec<StringRef> {
+    let mut results = Vec::new();
+    let all_strings = self.get_all_strings();
+
+    for string_ref in all_strings {
+        let candidate = string_ref.as_str();
+
+        // Apply smart filtering to skip unpromising candidates
+        if should_skip_candidate(candidate.len(), query.len()) {
+            continue;
+        }
+
+        // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
+        let similarity = jaro_winkler(query, candidate);
+
+        if similarity >= similarity_threshold {
+            results.push(string_ref);
+
+            // Early termination: stop if we have enough high-quality candidates
+            if results.len() >= target_count * 2 {
+                break;
+            }
+        }
+    }
+
+    results
+}
+```
+
+**3. Integrate existing prefix and substring search methods**
+
+```rust
+// Use existing prefix search method (already efficient)
+fn prefix_search(&self, query: &str) -> Vec<StringRef> {
+    self.find_by_prefix_no_sort(query)
+}
+
+// Use existing substring search method
+fn substring_search(&self, query: &str) -> Vec<StringRef> {
+    self.find_with_substring(query)
+}
+
+```
+
+**4. Performance optimization strategies**
+
+```rust
+// Smart filtering to skip unpromising candidates
+fn should_skip_candidate(candidate_len: usize, query_len: usize) -> bool {
+    // Skip strings that are too short to contain the query
+    if candidate_len < query_len {
+        return true;
+    }
+
+    // Skip strings that are excessively long for short queries
+    if query_len <= 3 && candidate_len > query_len * 4 {
+        return true;
+    }
+
+    false
+}
+
+// Character set filtering for fuzzy algorithms
+fn contains_required_chars(candidate: &str, query: &str) -> bool {
+    let candidate_chars: HashSet<char> = candidate.chars().collect();
+    query.chars().all(|c| candidate_chars.contains(&c))
+}
+
+// Progressive algorithm execution with early termination
+fn progressive_algorithm_execution(
+    &self,
+    query: &str,
+    limit: usize
+) -> Vec<StringRef> {
+    let mut all_candidates = Vec::new();
+
+    // 1. Fast prefix search first (O(log n))
+    let prefix_candidates = self.prefix_search(query);
+    all_candidates.extend(prefix_candidates);
+
+    // Early termination if we have enough high-quality prefix matches
+    if all_candidates.len() >= limit && has_high_quality_prefix_matches(&all_candidates, query) {
+        return all_candidates.into_iter().take(limit).collect();
+    }
+
+    // 2. Fuzzy subsequence with early termination (O(n) with early exit)
+    let remaining_needed = limit.saturating_sub(all_candidates.len());
+    if remaining_needed > 0 {
+        let fuzzy_candidates = self.fuzzy_subsequence_full_database(
+            query,
+            remaining_needed,
+            0.7 // score threshold
+        );
+        all_candidates.extend(fuzzy_candidates);
+    }
+
+    // 3. Jaro-Winkler only if still needed (O(n) with early exit)
+    let remaining_needed = limit.saturating_sub(all_candidates.len());
+    if remaining_needed > 0 {
+        let jaro_candidates = self.jaro_winkler_full_database(
+            query,
+            remaining_needed,
+            0.8 // similarity threshold
+        );
+        all_candidates.extend(jaro_candidates);
+    }
+
+    // 4. Substring only as last resort for longer queries
+    let remaining_needed = limit.saturating_sub(all_candidates.len());
+    if remaining_needed > 0 && query.len() >= 3 {
+        let substring_candidates = self.substring_search(query)
+            .into_iter()
+            .take(remaining_needed)
+            .collect::<Vec<_>>();
+        all_candidates.extend(substring_candidates);
+    }
+
+    all_candidates.into_iter().take(limit).collect()
+}
+
+// Helper to check for high-quality prefix matches
+fn has_high_quality_prefix_matches(candidates: &[StringRef], query: &str) -> bool {
+    candidates.iter()
+        .filter(|c| c.as_str().starts_with(query))
+        .count() >= candidates.len() / 2
+}
+```
+
+### Phase 3: Unified Scoring System
+
+#### Implementation Steps
+
+**1. Create `ScoreCandidate` struct and related types**
+
+```rust
+// In src/modules/string_space.rs
+
+/// Represents a candidate string with scoring information from multiple algorithms
+#[derive(Debug, Clone)]
+struct ScoreCandidate {
+    string_ref: StringRef,
+    algorithm: AlgorithmType,
+    raw_score: f64,
+    normalized_score: f64,
+    final_score: f64,
+    alternative_scores: Vec<AlternativeScore>,
+}
+
+/// Alternative score from other algorithms for the same string
+#[derive(Debug, Clone)]
+struct AlternativeScore {
+    algorithm: AlgorithmType,
+    normalized_score: f64,
+}
+
+/// Algorithm type enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum AlgorithmType {
+    PREFIX,
+    FUZZY_SUBSEQ,
+    JARO_WINKLER,
+    SUBSTRING,
+}
+
+impl ScoreCandidate {
+    fn new(string_ref: StringRef, algorithm: AlgorithmType, raw_score: f64, normalized_score: f64) -> Self {
+        Self {
+            string_ref,
+            algorithm,
+            raw_score,
+            normalized_score,
+            final_score: 0.0,
+            alternative_scores: Vec::new(),
+        }
+    }
+
+    /// Add an alternative score from another algorithm
+    fn add_alternative_score(&mut self, algorithm: AlgorithmType, normalized_score: f64) {
+        self.alternative_scores.push(AlternativeScore {
+            algorithm,
+            normalized_score,
+        });
+    }
+
+    /// Get the best available score for this candidate (primary or alternative)
+    fn get_best_score(&self) -> f64 {
+        let mut best_score = self.normalized_score;
+        for alt in &self.alternative_scores {
+            if alt.normalized_score > best_score {
+                best_score = alt.normalized_score;
+            }
+        }
+        best_score
+    }
+}
+```
+
+**2. Implement frequency, age, and length normalization**
+
+```rust
+// Metadata integration functions
+fn apply_metadata_adjustments(
+    weighted_score: f64,
+    frequency: u32,
+    age_days: u32,
+    candidate_len: usize,
+    query_len: usize,
+    max_len: usize
+) -> f64 {
+    // 1. Frequency factor with logarithmic scaling to prevent dominance
+    let frequency_factor = 1.0 + (ln(frequency as f64 + 1.0) * 0.1);
+
+    // 2. Age factor with bounded influence (newer items get slight preference)
+    let max_age = 365; // Maximum age in days for normalization
+    let age_factor = 1.0 + (age_days as f64 / max_age as f64) * 0.05;
+
+    // 3. Length penalty applied only for significant length mismatches
+    let length_penalty = if candidate_len > query_len * 3 {
+        // Only penalize when candidate is 3x longer than query
+        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.1
+    } else {
+        1.0 // No penalty for reasonable length differences
+    };
+
+    // 4. Apply multiplicative combination with bounds checking
+    let final_score = weighted_score * frequency_factor * age_factor * length_penalty;
+
+    // Ensure score doesn't exceed reasonable bounds
+    final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
+}
+
+// Score normalization functions
+
+/// For fuzzy subsequence (lower raw scores are better)
+fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
+    // Invert and normalize: lower raw scores → higher normalized scores
+    let normalized = 1.0 - ((raw_score - min_score) / (max_score - min_score));
+    normalized.clamp(0.0, 1.0)
+}
+
+/// For substring search (earlier matches are better)
+fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
+    1.0 - (position as f64 / max_position as f64)
+}
+
+/// Get metadata for a string reference
+fn get_string_metadata(&self, string_ref: &StringRef) -> (u32, u32, usize) {
+    // Get the word struct to access frequency and age
+    if let Some(word_struct) = self.get_word_struct(string_ref) {
+        (word_struct.frequency, word_struct.age_days, string_ref.as_str().len())
+    } else {
+        // Default values if word struct not found
+        (1, 0, string_ref.as_str().len())
+    }
+}
+```
+
+**3. Create dynamic weighting system with query length categorization**
+
 ```rust
 // Query length categories for dynamic weighting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum QueryLengthCategory {
     VeryShort,  // 1-2 characters
     Short,      // 3-4 characters
@@ -188,17 +672,18 @@ impl AlgorithmWeights {
         }
     }
 }
-```
 
-**Dynamic Weight Selection Implementation**
-
-```rust
+/// Get dynamic weights based on query length
 fn get_dynamic_weights(query: &str) -> AlgorithmWeights {
     let category = QueryLengthCategory::from_query(query);
     AlgorithmWeights::for_category(category)
 }
+```
 
-// Integration into scoring system
+**4. Implement score calculation logic with dynamic weights**
+
+```rust
+/// Calculate weighted score combining all algorithm contributions
 fn calculate_weighted_score(
     prefix_score: f64,
     fuzzy_score: f64,
@@ -213,162 +698,966 @@ fn calculate_weighted_score(
     weights.jaro_winkler * jaro_score +
     weights.substring * substring_score
 }
+
+/// Calculate final score for a candidate with metadata adjustments
+fn calculate_final_score(
+    candidate: &mut ScoreCandidate,
+    query: &str,
+    string_space: &StringSpaceInner
+) -> f64 {
+    // Get all algorithm scores for this candidate
+    let mut prefix_score = 0.0;
+    let mut fuzzy_score = 0.0;
+    let mut jaro_score = 0.0;
+    let mut substring_score = 0.0;
+
+    // Extract scores from primary and alternative algorithms
+    match candidate.algorithm {
+        AlgorithmType::PREFIX => prefix_score = candidate.normalized_score,
+        AlgorithmType::FUZZY_SUBSEQ => fuzzy_score = candidate.normalized_score,
+        AlgorithmType::JARO_WINKLER => jaro_score = candidate.normalized_score,
+        AlgorithmType::SUBSTRING => substring_score = candidate.normalized_score,
+    }
+
+    // Add alternative scores
+    for alt in &candidate.alternative_scores {
+        match alt.algorithm {
+            AlgorithmType::PREFIX => prefix_score = prefix_score.max(alt.normalized_score),
+            AlgorithmType::FUZZY_SUBSEQ => fuzzy_score = fuzzy_score.max(alt.normalized_score),
+            AlgorithmType::JARO_WINKLER => jaro_score = jaro_score.max(alt.normalized_score),
+            AlgorithmType::SUBSTRING => substring_score = substring_score.max(alt.normalized_score),
+        }
+    }
+
+    // Calculate weighted algorithm score
+    let weighted_score = calculate_weighted_score(
+        prefix_score, fuzzy_score, jaro_score, substring_score, query
+    );
+
+    // Apply metadata adjustments
+    let (frequency, age_days, candidate_len) = string_space.get_string_metadata(&candidate.string_ref);
+    let query_len = query.len();
+    let max_len = string_space.get_max_string_length();
+
+    let final_score = apply_metadata_adjustments(
+        weighted_score,
+        frequency,
+        age_days,
+        candidate_len,
+        query_len,
+        max_len
+    );
+
+    candidate.final_score = final_score;
+    final_score
+}
+
+/// Get maximum string length in the database
+fn get_max_string_length(&self) -> usize {
+    self.get_all_strings()
+        .iter()
+        .map(|s| s.as_str().len())
+        .max()
+        .unwrap_or(0)
+}
 ```
 
-**Weight Validation and Effectiveness Testing**
+### Phase 4: Result Processing
+
+#### Implementation Steps
+
+**1. Implement result merging with deduplication**
 
 ```rust
-// Test cases for dynamic weight validation
-fn test_dynamic_weighting_effectiveness() {
-    let test_cases = vec![
-        ("a", QueryLengthCategory::VeryShort, 0.45, 0.35, 0.15, 0.05),
-        ("ab", QueryLengthCategory::VeryShort, 0.45, 0.35, 0.15, 0.05),
-        ("abc", QueryLengthCategory::Short, 0.40, 0.30, 0.20, 0.10),
-        ("abcd", QueryLengthCategory::Short, 0.40, 0.30, 0.20, 0.10),
-        ("abcde", QueryLengthCategory::Medium, 0.35, 0.25, 0.25, 0.15),
-        ("abcdef", QueryLengthCategory::Medium, 0.35, 0.25, 0.25, 0.15),
-        ("abcdefg", QueryLengthCategory::Long, 0.25, 0.20, 0.35, 0.20),
-        ("abcdefghij", QueryLengthCategory::Long, 0.25, 0.20, 0.35, 0.20),
-    ];
+/// Merge candidates from different algorithms and calculate final scores
+fn merge_and_score_candidates(
+    candidates: Vec<ScoreCandidate>,
+    query: &str,
+    string_space: &StringSpaceInner
+) -> Vec<ScoreCandidate> {
+    let mut merged: HashMap<StringRef, ScoreCandidate> = HashMap::new();
 
-    for (query, expected_category, exp_prefix, exp_fuzzy, exp_jaro, exp_substring) in test_cases {
-        let category = QueryLengthCategory::from_query(query);
-        let weights = AlgorithmWeights::for_category(category);
+    // Merge candidates by string reference
+    for candidate in candidates {
+        if let Some(existing) = merged.get_mut(&candidate.string_ref) {
+            // Add as alternative score if this algorithm provides a better score
+            if candidate.normalized_score > existing.normalized_score {
+                existing.add_alternative_score(existing.algorithm, existing.normalized_score);
+                existing.algorithm = candidate.algorithm;
+                existing.raw_score = candidate.raw_score;
+                existing.normalized_score = candidate.normalized_score;
+            } else {
+                existing.add_alternative_score(candidate.algorithm, candidate.normalized_score);
+            }
+        } else {
+            merged.insert(candidate.string_ref.clone(), candidate);
+        }
+    }
 
-        assert_eq!(category, expected_category);
-        assert_eq!(weights.prefix, exp_prefix);
-        assert_eq!(weights.fuzzy_subseq, exp_fuzzy);
-        assert_eq!(weights.jaro_winkler, exp_jaro);
-        assert_eq!(weights.substring, exp_substring);
+    // Calculate final scores for all merged candidates
+    let mut scored_candidates: Vec<ScoreCandidate> = merged.into_values().collect();
+    for candidate in &mut scored_candidates {
+        calculate_final_score(candidate, query, string_space);
+    }
 
-        // Verify weights sum to 1.0
-        let total = weights.prefix + weights.fuzzy_subseq + weights.jaro_winkler + weights.substring;
-        assert!((total - 1.0).abs() < 0.0001, "Weights for query '{}' don't sum to 1.0: {}", query, total);
+    scored_candidates
+}
+```
+
+**2. Create final ranking logic**
+
+```rust
+/// Sort candidates by final score in descending order
+fn rank_candidates_by_score(candidates: &mut [ScoreCandidate]) {
+    candidates.sort_by(|a, b| {
+        b.final_score.partial_cmp(&a.final_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
+
+/// Apply result limiting and convert to StringRef output
+fn limit_and_convert_results(candidates: Vec<ScoreCandidate>, limit: usize) -> Vec<StringRef> {
+    candidates
+        .into_iter()
+        .take(limit)
+        .map(|candidate| candidate.string_ref)
+        .collect()
+}
+```
+
+**3. Add result limiting and integrate with progressive algorithm execution**
+
+```rust
+/// Complete best_completions method that integrates all phases
+fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    let limit = limit.unwrap_or(15);
+
+    // Basic query validation
+    if query.is_empty() {
+        return Vec::new();
+    }
+
+    // Use progressive algorithm execution from Phase 2
+    let all_candidates = self.progressive_algorithm_execution(query, limit);
+
+    // If we have enough high-quality prefix matches, return them directly
+    if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
+        return all_candidates.into_iter().take(limit).collect();
+    }
+
+    // Otherwise, collect detailed scores from all algorithms
+    let mut scored_candidates = self.collect_detailed_scores(query, &all_candidates);
+
+    // Merge duplicate candidates and calculate final scores
+    let merged_candidates = self.merge_and_score_candidates(scored_candidates, query);
+
+    // Sort by final score
+    let mut ranked_candidates = merged_candidates;
+    self.rank_candidates_by_score(&mut ranked_candidates);
+
+    // Apply limit and return
+    self.limit_and_convert_results(ranked_candidates, limit)
+}
+
+/// Collect detailed scores for candidates from all algorithms
+fn collect_detailed_scores(&self, query: &str, candidates: &[StringRef]) -> Vec<ScoreCandidate> {
+    let mut scored_candidates = Vec::new();
+
+    for string_ref in candidates {
+        // Calculate scores from all algorithms for this candidate
+        let prefix_score = self.calculate_prefix_score(string_ref, query);
+        let fuzzy_score = self.calculate_fuzzy_subsequence_score(string_ref, query);
+        let jaro_score = self.calculate_jaro_winkler_score(string_ref, query);
+        let substring_score = self.calculate_substring_score(string_ref, query);
+
+        // Create candidate with the best algorithm score
+        let (best_algorithm, best_score) = self.select_best_algorithm_score(
+            prefix_score, fuzzy_score, jaro_score, substring_score
+        );
+
+        let mut candidate = ScoreCandidate::new(
+            string_ref.clone(),
+            best_algorithm,
+            best_score.raw_score,
+            best_score.normalized_score
+        );
+
+        // Add alternative scores from other algorithms
+        if let Some(score) = prefix_score {
+            if score.algorithm != best_algorithm {
+                candidate.add_alternative_score(score.algorithm, score.normalized_score);
+            }
+        }
+        if let Some(score) = fuzzy_score {
+            if score.algorithm != best_algorithm {
+                candidate.add_alternative_score(score.algorithm, score.normalized_score);
+            }
+        }
+        if let Some(score) = jaro_score {
+            if score.algorithm != best_algorithm {
+                candidate.add_alternative_score(score.algorithm, score.normalized_score);
+            }
+        }
+        if let Some(score) = substring_score {
+            if score.algorithm != best_algorithm {
+                candidate.add_alternative_score(score.algorithm, score.normalized_score);
+            }
+        }
+
+        scored_candidates.push(candidate);
+    }
+
+    scored_candidates
+}
+
+/// Helper struct for algorithm scores
+struct AlgorithmScore {
+    algorithm: AlgorithmType,
+    raw_score: f64,
+    normalized_score: f64,
+}
+
+/// Calculate prefix score for a candidate
+fn calculate_prefix_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+    let candidate = string_ref.as_str();
+
+    if candidate.starts_with(query) {
+        Some(AlgorithmScore {
+            algorithm: AlgorithmType::PREFIX,
+            raw_score: 1.0,
+            normalized_score: 1.0,
+        })
+    } else if candidate.to_lowercase().starts_with(&query.to_lowercase()) {
+        Some(AlgorithmScore {
+            algorithm: AlgorithmType::PREFIX,
+            raw_score: 0.8,
+            normalized_score: 0.8,
+        })
+    } else {
+        None
+    }
+}
+
+/// Calculate fuzzy subsequence score for a candidate
+fn calculate_fuzzy_subsequence_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+    if let Some(raw_score) = self.score_fuzzy_subsequence(string_ref, query) {
+        // For fuzzy subsequence, we need min/max for normalization
+        // This would be calculated during the initial search phase
+        let normalized_score = self.normalize_fuzzy_score(raw_score, 0.0, 100.0); // Placeholder values
+        Some(AlgorithmScore {
+            algorithm: AlgorithmType::FUZZY_SUBSEQ,
+            raw_score,
+            normalized_score,
+        })
+    } else {
+        None
+    }
+}
+
+/// Calculate Jaro-Winkler score for a candidate
+fn calculate_jaro_winkler_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+    let candidate = string_ref.as_str();
+    let similarity = jaro_winkler(query, candidate);
+
+    if similarity >= 0.7 { // Threshold for meaningful matches
+        Some(AlgorithmScore {
+            algorithm: AlgorithmType::JARO_WINKLER,
+            raw_score: similarity,
+            normalized_score: similarity, // Already normalized
+        })
+    } else {
+        None
+    }
+}
+
+/// Calculate substring score for a candidate
+fn calculate_substring_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+    let candidate = string_ref.as_str();
+
+    if let Some(position) = candidate.find(query) {
+        let normalized_score = self.normalize_substring_score(position, candidate.len());
+        Some(AlgorithmScore {
+            algorithm: AlgorithmType::SUBSTRING,
+            raw_score: position as f64,
+            normalized_score,
+        })
+    } else {
+        None
+    }
+}
+
+/// Select the best algorithm score for a candidate
+fn select_best_algorithm_score(
+    &self,
+    prefix_score: Option<AlgorithmScore>,
+    fuzzy_score: Option<AlgorithmScore>,
+    jaro_score: Option<AlgorithmScore>,
+    substring_score: Option<AlgorithmScore>
+) -> (AlgorithmType, AlgorithmScore) {
+    let mut best_score = None;
+    let mut best_algorithm = AlgorithmType::PREFIX;
+
+    // Compare all available scores and select the best one
+    if let Some(score) = prefix_score {
+        best_score = Some(score);
+        best_algorithm = AlgorithmType::PREFIX;
+    }
+
+    if let Some(score) = fuzzy_score {
+        if best_score.as_ref().map_or(true, |best| score.normalized_score > best.normalized_score) {
+            best_score = Some(score);
+            best_algorithm = AlgorithmType::FUZZY_SUBSEQ;
+        }
+    }
+
+    if let Some(score) = jaro_score {
+        if best_score.as_ref().map_or(true, |best| score.normalized_score > best.normalized_score) {
+            best_score = Some(score);
+            best_algorithm = AlgorithmType::JARO_WINKLER;
+        }
+    }
+
+    if let Some(score) = substring_score {
+        if best_score.as_ref().map_or(true, |best| score.normalized_score > best.normalized_score) {
+            best_score = Some(score);
+            best_algorithm = AlgorithmType::SUBSTRING;
+        }
+    }
+
+    // If no algorithm found a match, use a fallback
+    let fallback_score = AlgorithmScore {
+        algorithm: AlgorithmType::SUBSTRING,
+        raw_score: 0.0,
+        normalized_score: 0.0,
+    };
+
+    (best_algorithm, best_score.unwrap_or(fallback_score))
+}
+```
+
+### Phase 5: Testing and Optimization
+
+#### Implementation Steps
+
+**1. Add comprehensive unit tests for algorithm fusion and scoring**
+
+```rust
+// In src/modules/string_space.rs, within the test module
+
+#[cfg(test)]
+mod best_completions_tests {
+    use super::*;
+    use std::collections::{HashMap, HashSet};
+
+    // Helper function to create test string space with common words
+    fn create_test_string_space() -> StringSpaceInner {
+        let mut string_space = StringSpaceInner::new();
+
+        // Add common test words
+        let test_words = vec![
+            "apple", "application", "apply", "appliance",
+            "complete", "completion", "completely", "completing",
+            "test", "testing", "tester", "testable",
+            "program", "programming", "programmer", "programmable",
+            "conflict", "conflicting", "confirmation", "configure",
+            "fuzzy", "fuzziness", "fuzzier", "fuzzily",
+            "jaro", "jarring", "jargon", "jarful",
+            "prefix", "prefixed", "prefixes", "prefixing",
+            "substring", "substrings", "substructure", "subsequent"
+        ];
+
+        for word in test_words {
+            string_space.insert(word.to_string());
+        }
+
+        string_space
+    }
+
+    #[test]
+    fn test_best_completions_basic_functionality() {
+        let string_space = create_test_string_space();
+
+        // Test basic prefix completion
+        let results = string_space.best_completions("app", Some(5));
+        assert!(!results.is_empty(), "Should find prefix matches for 'app'");
+
+        // Verify results contain expected words
+        let result_strings: Vec<&str> = results.iter()
+            .map(|sr| sr.as_str())
+            .collect();
+
+        assert!(result_strings.contains(&"apple"), "Should contain 'apple'");
+        assert!(result_strings.contains(&"application"), "Should contain 'application'");
+    }
+
+    #[test]
+    fn test_algorithm_fusion_effectiveness() {
+        let string_space = create_test_string_space();
+
+        // Test query where multiple algorithms should contribute
+        let query = "cmpt"; // Abbreviation for "complete"
+        let results = string_space.best_completions(query, Some(10));
+
+        assert!(!results.is_empty(), "Should find matches for abbreviation query");
+
+        // Verify we get relevant results despite the abbreviation
+        let result_strings: Vec<&str> = results.iter()
+            .map(|sr| sr.as_str())
+            .collect();
+
+        // Fuzzy subsequence should find "complete" despite abbreviation
+        assert!(result_strings.contains(&"complete"),
+                "Fuzzy subsequence should find 'complete' for abbreviation 'cmpt'");
+    }
+
+    #[test]
+    fn test_empty_query_handling() {
+        let string_space = create_test_string_space();
+
+        let results = string_space.best_completions("", Some(10));
+        assert!(results.is_empty(), "Empty query should return empty results");
+    }
+
+    #[test]
+    fn test_result_limiting() {
+        let string_space = create_test_string_space();
+
+        // Test with different limit values
+        let results_5 = string_space.best_completions("app", Some(5));
+        let results_10 = string_space.best_completions("app", Some(10));
+
+        assert_eq!(results_5.len(), 5, "Should respect limit of 5");
+        assert_eq!(results_10.len(), 10, "Should respect limit of 10");
+        assert!(results_5.len() <= results_10.len(),
+                "Smaller limit should return fewer or equal results");
+    }
+
+    #[test]
+    fn test_typo_correction_scenario() {
+        let string_space = create_test_string_space();
+
+        // Test common typo
+        let query = "compleet"; // Common typo for "complete"
+        let results = string_space.best_completions(query, Some(5));
+
+        assert!(!results.is_empty(), "Should find matches for typo query");
+
+        let result_strings: Vec<&str> = results.iter()
+            .map(|sr| sr.as_str())
+            .collect();
+
+        // Jaro-Winkler should correct the typo
+        assert!(result_strings.contains(&"complete"),
+                "Jaro-Winkler should correct 'compleet' to 'complete'");
+    }
+
+    #[test]
+    fn test_substring_fallback() {
+        let string_space = create_test_string_space();
+
+        // Test query that should trigger substring search
+        let query = "gram"; // Substring of "program"
+        let results = string_space.best_completions(query, Some(5));
+
+        assert!(!results.is_empty(), "Should find substring matches");
+
+        let result_strings: Vec<&str> = results.iter()
+            .map(|sr| sr.as_str())
+            .collect();
+
+        // Substring search should find "program" and related words
+        assert!(result_strings.contains(&"program"),
+                "Substring search should find 'program' for 'gram'");
+        assert!(result_strings.contains(&"programming"),
+                "Substring search should find 'programming' for 'gram'");
+    }
+
+    #[test]
+    fn test_algorithm_conflict_resolution() {
+        let string_space = create_test_string_space();
+
+        // Add words that might trigger multiple algorithms
+        string_space.insert("conflicting".to_string());
+        string_space.insert("conflict".to_string());
+        string_space.insert("confirmation".to_string());
+
+        let query = "conf";
+        let results = string_space.best_completions(query, Some(10));
+
+        // Analyze algorithm contributions
+        let mut algorithm_contributions: HashMap<String, Vec<AlgorithmType>> = HashMap::new();
+
+        for candidate in &results {
+            // This would require access to ScoreCandidate internals
+            // For now, we just verify we get reasonable results
+            let word = candidate.as_str().to_string();
+            algorithm_contributions.entry(word)
+                .or_insert_with(Vec::new);
+            // Note: In actual implementation, we'd track which algorithms contributed
+        }
+
+        // Verify we get multiple relevant words
+        assert!(results.len() >= 3, "Should find multiple matches for 'conf'");
     }
 }
 ```
 
-**Dynamic Weighting Strategy Rationale**
+**2. Implement debugging infrastructure for scoring analysis**
 
-- **Very Short Queries (1-2 chars)**: Prioritize prefix and fuzzy subsequence since users are likely typing the beginning of words
-- **Short Queries (3-4 chars)**: Balanced approach with emphasis on prefix and fuzzy subsequence
-- **Medium Queries (5-6 chars)**: More balanced distribution as query provides more context
-- **Long Queries (7+ chars)**: Emphasize Jaro-Winkler for typo correction and substring for partial matches
-
-### Metadata Integration
-
-#### Frequency Weighting with Conflict Resolution
-- Use logarithmic scaling to prevent high-frequency words from dominating
-- Formula: `frequency_factor = 1.0 + (ln(frequency + 1) * 0.1)`
-- **Conflict Resolution**: Logarithmic scaling prevents extreme frequency values from overriding age and length preferences
-
-#### Age-Based Recency Bonus with Bounded Influence
-- Newer items get slight preference (higher `age_days` values are more recent)
-- Formula: `age_factor = 1.0 + (current_age / max_age) * 0.05`
-- **Conflict Resolution**: Small bounded influence (5% max) prevents age from overriding relevance
-
-#### Length Normalization with Threshold
-- Penalize only very long matches for short queries (when candidate_len > query_len * 3)
-- Formula: `length_penalty = 1.0 - (candidate_len - query_len) / max_len * 0.1`
-- **Conflict Resolution**: Length penalty only applied for significant length mismatches to avoid over-penalizing good matches
-
-#### Metadata Factor Interaction Matrix
-
-| Scenario | Frequency | Age | Length | Conflict Type | Resolution Strategy |
-|----------|-----------|-----|--------|---------------|---------------------|
-| High-freq old word | High | Old | Normal | Frequency vs Age | Log scaling limits frequency dominance |
-| Low-freq new word | Low | New | Normal | Age preference | Age bonus provides slight advantage |
-| Long high-freq word | High | Any | Long | Length vs Frequency | Length penalty capped, frequency log-scaled |
-| Short low-freq word | Low | Any | Short | No conflict | All factors aligned |
-| Medium-freq medium-age | Medium | Medium | Medium | Balanced | Multiplicative approach works well |
-
-#### Enhanced Metadata Integration Implementation
 ```rust
-fn apply_metadata_adjustments(
-    weighted_score: f64,
-    frequency: u32,
-    age_days: u32,
-    candidate_len: usize,
-    query_len: usize,
-    max_len: usize
-) -> f64 {
-    // 1. Frequency factor with logarithmic scaling to prevent dominance
-    let frequency_factor = 1.0 + (ln(frequency as f64 + 1.0) * 0.1);
+// In src/modules/string_space.rs
 
-    // 2. Age factor with bounded influence (newer items get slight preference)
-    let max_age = 365; // Maximum age in days for normalization
-    let age_factor = 1.0 + (age_days as f64 / max_age as f64) * 0.05;
+/// Enhanced debugging infrastructure for scoring analysis
+#[derive(Debug, Clone)]
+pub struct ScoringDebugInfo {
+    pub query: String,
+    pub candidate_string: String,
+    pub algorithm_scores: Vec<AlgorithmScoreDetail>,
+    pub normalization_steps: Vec<NormalizationStep>,
+    pub metadata_factors: MetadataFactors,
+    pub final_score_breakdown: FinalScoreBreakdown,
+}
 
-    // 3. Length penalty applied only for significant length mismatches
-    let length_penalty = if candidate_len > query_len * 3 {
-        // Only penalize when candidate is 3x longer than query
-        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.1
-    } else {
-        1.0 // No penalty for reasonable length differences
-    };
+#[derive(Debug, Clone)]
+pub struct AlgorithmScoreDetail {
+    pub algorithm: AlgorithmType,
+    pub raw_score: f64,
+    pub normalized_score: f64,
+    pub weight: f64,
+    pub weighted_contribution: f64,
+}
 
-    // 4. Apply multiplicative combination with bounds checking
-    let final_score = weighted_score * frequency_factor * age_factor * length_penalty;
+#[derive(Debug, Clone)]
+pub struct NormalizationStep {
+    pub algorithm: AlgorithmType,
+    pub raw_score: f64,
+    pub min_score: f64,
+    pub max_score: f64,
+    pub normalized_score: f64,
+    pub inversion_applied: bool,
+}
 
-    // Ensure score doesn't exceed reasonable bounds
-    final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
+#[derive(Debug, Clone)]
+pub struct MetadataFactors {
+    pub frequency: u32,
+    pub frequency_factor: f64,
+    pub age_days: u32,
+    pub age_factor: f64,
+    pub length: usize,
+    pub length_penalty: f64,
+    pub query_length: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct FinalScoreBreakdown {
+    pub weighted_algorithm_score: f64,
+    pub metadata_adjusted_score: f64,
+    pub final_score: f64,
+    pub ranking_position: usize,
+}
+
+impl StringSpaceInner {
+    /// Generate detailed scoring report for debugging
+    pub fn generate_scoring_report(&self, query: &str, limit: Option<usize>) -> String {
+        let limit = limit.unwrap_or(15);
+        let results = self.best_completions(query, Some(limit));
+
+        let mut report = String::new();
+        report.push_str(&format!("Scoring Report for query: '{}'\n", query));
+        report.push_str(&format!("Total results: {}\n", results.len()));
+        report.push_str("\nRanking Analysis:\n");
+
+        // Note: This would need access to ScoreCandidate internals
+        // For now, provide basic result listing
+        for (rank, candidate) in results.iter().enumerate() {
+            report.push_str(&format!(
+                "{}. {} - Score: N/A (Debug info not available in current implementation)\n",
+                rank + 1,
+                candidate.as_str()
+            ));
+        }
+
+        report
+    }
+
+    /// Debug function to trace scoring decisions (placeholder)
+    #[allow(dead_code)]
+    fn trace_scoring_decisions(
+        &self,
+        query: &str,
+        candidate: &ScoreCandidate,
+        algorithm_scores: &[AlgorithmScoreDetail],
+        metadata: &MetadataFactors
+    ) -> ScoringDebugInfo {
+        ScoringDebugInfo {
+            query: query.to_string(),
+            candidate_string: candidate.string_ref.as_str().to_string(),
+            algorithm_scores: algorithm_scores.to_vec(),
+            normalization_steps: vec![], // Would be populated during normalization
+            metadata_factors: metadata.clone(),
+            final_score_breakdown: FinalScoreBreakdown {
+                weighted_algorithm_score: 0.0,
+                metadata_adjusted_score: 0.0,
+                final_score: candidate.final_score,
+                ranking_position: 0,
+            },
+        }
+    }
 }
 ```
 
-### Final Score Calculation
-```rust
-// Step 1: Weighted algorithm combination
-let weighted_score = (prefix_weight * prefix_score +
-                     fuzzy_weight * fuzzy_score +
-                     jaro_weight * jaro_score +
-                     substring_weight * substring_score);
+**3. Create performance benchmarking framework**
 
-// Step 2: Apply metadata adjustments
-final_score = weighted_score * frequency_factor * age_factor * length_penalty
+```rust
+// In src/modules/string_space.rs
+
+/// Performance testing infrastructure
+pub struct PerformanceBenchmark {
+    pub dataset_size: usize,
+    pub query: String,
+    pub execution_time_ms: f64,
+    pub memory_usage_bytes: usize,
+    pub result_count: usize,
+    pub algorithm_breakdown: HashMap<AlgorithmType, f64>, // Time spent per algorithm
+}
+
+impl StringSpaceInner {
+    /// Run performance benchmark with specified dataset and queries
+    pub fn run_performance_benchmark(
+        &self,
+        queries: &[&str],
+        iterations: usize
+    ) -> Vec<PerformanceBenchmark> {
+        let mut benchmarks = Vec::new();
+
+        for query in queries {
+            let mut total_time_ms = 0.0;
+            let mut total_results = 0;
+
+            for _ in 0..iterations {
+                let start_time = std::time::Instant::now();
+                let results = self.best_completions(query, Some(15));
+                let elapsed = start_time.elapsed();
+
+                total_time_ms += elapsed.as_secs_f64() * 1000.0;
+                total_results += results.len();
+            }
+
+            let avg_time_ms = total_time_ms / iterations as f64;
+            let avg_results = total_results / iterations;
+
+            benchmarks.push(PerformanceBenchmark {
+                dataset_size: self.len(),
+                query: query.to_string(),
+                execution_time_ms: avg_time_ms,
+                memory_usage_bytes: 0, // Would need memory profiling
+                result_count: avg_results,
+                algorithm_breakdown: HashMap::new(), // Would need detailed timing
+            });
+        }
+
+        benchmarks
+    }
+
+    /// Generate performance report
+    pub fn generate_performance_report(&self, benchmarks: &[PerformanceBenchmark]) -> String {
+        let mut report = String::new();
+        report.push_str("Performance Benchmark Report\n");
+        report.push_str(&format!("Dataset size: {} words\n", self.len()));
+        report.push_str("\nQuery Performance:\n");
+
+        for benchmark in benchmarks {
+            report.push_str(&format!(
+                "Query '{}': {:.2}ms, {} results\n",
+                benchmark.query, benchmark.execution_time_ms, benchmark.result_count
+            ));
+        }
+
+        // Calculate overall statistics
+        let avg_time: f64 = benchmarks.iter()
+            .map(|b| b.execution_time_ms)
+            .sum::<f64>() / benchmarks.len() as f64;
+        let max_time = benchmarks.iter()
+            .map(|b| b.execution_time_ms)
+            .fold(0.0, |a, b| a.max(b));
+
+        report.push_str(&format!("\nOverall Statistics:\n"));
+        report.push_str(&format!("Average time: {:.2}ms\n", avg_time));
+        report.push_str(&format!("Maximum time: {:.2}ms\n", max_time));
+
+        report
+    }
+
+    /// Performance-aware method selection with fallbacks
+    pub fn best_completions_with_fallback(&self, query: &str, limit: usize) -> Vec<StringRef> {
+        // For very short queries, use fast prefix-only approach
+        if query.len() <= 1 {
+            return self.find_by_prefix_no_sort(query)
+                .into_iter()
+                .take(limit)
+                .collect();
+        }
+
+        // For short queries, use progressive approach
+        if query.len() <= 3 {
+            return self.progressive_algorithm_execution(query, limit);
+        }
+
+        // For longer queries, use full multi-algorithm approach
+        self.best_completions(query, Some(limit))
+    }
+}
 ```
 
-## Result Merging and Ranking
+**4. Implement weight validation and effectiveness testing**
 
-### Deduplication Strategy
-- Merge results from all algorithms
-- For duplicates, keep the candidate with the highest final score
-- Preserve source algorithm information for debugging
+```rust
+// In src/modules/string_space.rs
 
-### Ranking Priority
-1. **Primary**: Final score (descending)
+/// Weight validation and effectiveness testing
+impl StringSpaceInner {
+    /// Test dynamic weighting effectiveness
+    pub fn test_dynamic_weighting_effectiveness(&self, test_queries: &[&str]) -> HashMap<String, f64> {
+        let mut effectiveness_scores = HashMap::new();
 
-### Result Limiting
-- Return top 15 results for performance
-- Configurable limit parameter
+        for query in test_queries {
+            let category = QueryLengthCategory::from_query(query);
+            let weights = AlgorithmWeights::for_category(category);
 
-## Implementation Phases
+            let results = self.best_completions(query, Some(10));
 
-### Phase 1: Core Method Structure
-1. Add `best_completions` method signature to `StringSpaceInner` impl
-2. Add public `best_completions` method to `StringSpace` struct
-3. Implement basic query validation and empty query handling
-4. Create result collection infrastructure
+            if !results.is_empty() {
+                // Calculate effectiveness score based on result quality
+                let effectiveness = self.calculate_weight_effectiveness(query, &results, &weights);
+                effectiveness_scores.insert(query.to_string(), effectiveness);
+            }
+        }
 
-### Phase 2: Individual Algorithm Integration
-1. Implement full-database fuzzy subsequence search
-2. Implement full-database Jaro-Winkler similarity search
-3. Integrate existing prefix and substring search
+        effectiveness_scores
+    }
 
-### Phase 3: Unified Scoring System
-1. Create `ScoreCandidate` struct and related types
-2. Implement frequency, age, and length normalization
-3. Create dynamic weighting system with query length categorization
-4. Implement score calculation logic with dynamic weights
+    /// Calculate how effective the current weights are for a query
+    fn calculate_weight_effectiveness(
+        &self,
+        query: &str,
+        results: &[StringRef],
+        weights: &AlgorithmWeights
+    ) -> f64 {
+        // Simplified effectiveness calculation
+        // In practice, this would analyze result quality metrics
 
-### Phase 4: Result Processing
-1. Implement result merging with deduplication
-2. Create final ranking logic
-3. Add result limiting
+        let mut score = 0.0;
 
-### Phase 5: Testing and Optimization
-1. Add comprehensive unit tests
-2. Benchmark performance with various dataset sizes
-3. Fine-tune algorithm weights and scoring parameters
+        // Check if top results are relevant
+        for (i, result) in results.iter().enumerate().take(3) {
+            let result_str = result.as_str();
+
+            // Higher score for prefix matches in top positions
+            if result_str.starts_with(query) {
+                score += (3 - i) as f64 * 0.1;
+            }
+
+            // Bonus for finding expected words
+            if self.is_expected_match(query, result_str) {
+                score += 0.05;
+            }
+        }
+
+        score.clamp(0.0, 1.0)
+    }
+
+    /// Check if a result is an expected match for the query
+    fn is_expected_match(&self, query: &str, result: &str) -> bool {
+        // Simple heuristic for expected matches
+        // In practice, this would use a predefined set of expected results
+
+        result.starts_with(query) ||
+        result.contains(query) ||
+        self.calculate_similarity(query, result) > 0.7
+    }
+
+    /// Calculate similarity between query and result (simplified)
+    fn calculate_similarity(&self, query: &str, result: &str) -> f64 {
+        // Simplified similarity calculation
+        // In practice, would use Jaro-Winkler or other similarity metrics
+
+        let query_len = query.len();
+        let result_len = result.len();
+
+        if query_len == 0 || result_len == 0 {
+            return 0.0;
+        }
+
+        // Simple character overlap ratio
+        let query_chars: HashSet<char> = query.chars().collect();
+        let result_chars: HashSet<char> = result.chars().collect();
+
+        let intersection: HashSet<&char> = query_chars.intersection(&result_chars).collect();
+        let union: HashSet<&char> = query_chars.union(&result_chars).collect();
+
+        if union.is_empty() {
+            return 0.0;
+        }
+
+        intersection.len() as f64 / union.len() as f64
+    }
+
+    /// Generate weight optimization report
+    pub fn generate_weight_optimization_report(&self, test_queries: &[&str]) -> String {
+        let effectiveness_scores = self.test_dynamic_weighting_effectiveness(test_queries);
+
+        let mut report = String::new();
+        report.push_str("Weight Optimization Report\n");
+        report.push_str("========================\n\n");
+
+        for (query, score) in &effectiveness_scores {
+            let category = QueryLengthCategory::from_query(query);
+            let weights = AlgorithmWeights::for_category(category);
+
+            report.push_str(&format!("Query: '{}' (Category: {:?})\n", query, category));
+            report.push_str(&format!("  Effectiveness Score: {:.3}\n", score));
+            report.push_str(&format!("  Weights: Prefix={:.2}, Fuzzy={:.2}, Jaro={:.2}, Substring={:.2}\n",
+                weights.prefix, weights.fuzzy_subseq, weights.jaro_winkler, weights.substring));
+
+            if *score < 0.5 {
+                report.push_str("  ⚠️  Low effectiveness - consider weight adjustment\n");
+            } else if *score > 0.8 {
+                report.push_str("  ✅ High effectiveness\n");
+            } else {
+                report.push_str("  ⚠️  Medium effectiveness\n");
+            }
+
+            report.push_str("\n");
+        }
+
+        // Overall statistics
+        let avg_effectiveness: f64 = effectiveness_scores.values().sum::<f64>() / effectiveness_scores.len() as f64;
+        report.push_str(&format!("Overall Average Effectiveness: {:.3}\n", avg_effectiveness));
+
+        report
+    }
+}
+```
+
+**5. Add performance monitoring and optimization utilities**
+
+```rust
+// In src/modules/string_space.rs
+
+/// Performance monitoring utilities
+pub struct PerformanceMonitor {
+    query_times: Vec<f64>,
+    algorithm_times: HashMap<AlgorithmType, Vec<f64>>,
+    memory_usage_samples: Vec<usize>,
+}
+
+impl PerformanceMonitor {
+    pub fn new() -> Self {
+        Self {
+            query_times: Vec::new(),
+            algorithm_times: HashMap::new(),
+            memory_usage_samples: Vec::new(),
+        }
+    }
+
+    pub fn record_query_time(&mut self, time_ms: f64) {
+        self.query_times.push(time_ms);
+    }
+
+    pub fn record_algorithm_time(&mut self, algorithm: AlgorithmType, time_ms: f64) {
+        self.algorithm_times
+            .entry(algorithm)
+            .or_insert_with(Vec::new)
+            .push(time_ms);
+    }
+
+    pub fn generate_performance_summary(&self) -> String {
+        let mut summary = String::new();
+
+        // Query time statistics
+        if !self.query_times.is_empty() {
+            let avg_query_time: f64 = self.query_times.iter().sum::<f64>() / self.query_times.len() as f64;
+            let max_query_time = self.query_times.iter().fold(0.0, |a, &b| a.max(b));
+            let min_query_time = self.query_times.iter().fold(f64::MAX, |a, &b| a.min(b));
+
+            summary.push_str(&format!("Query Performance Summary:\n"));
+            summary.push_str(&format!("  Total queries: {}\n", self.query_times.len()));
+            summary.push_str(&format!("  Average time: {:.2}ms\n", avg_query_time));
+            summary.push_str(&format!("  Min time: {:.2}ms\n", min_query_time));
+            summary.push_str(&format!("  Max time: {:.2}ms\n", max_query_time));
+        }
+
+        // Algorithm time statistics
+        if !self.algorithm_times.is_empty() {
+            summary.push_str("\nAlgorithm Performance:\n");
+            for (algorithm, times) in &self.algorithm_times {
+                let avg_time: f64 = times.iter().sum::<f64>() / times.len() as f64;
+                summary.push_str(&format!("  {:?}: {:.2}ms average\n", algorithm, avg_time));
+            }
+        }
+
+        summary
+    }
+}
+
+impl StringSpaceInner {
+    /// Get performance monitor instance (thread-local or shared)
+    pub fn get_performance_monitor(&self) -> PerformanceMonitor {
+        // In practice, this would return a shared or thread-local instance
+        PerformanceMonitor::new()
+    }
+
+    /// Check if performance is within acceptable limits
+    pub fn check_performance_limits(&self, query: &str, execution_time_ms: f64) -> bool {
+        let acceptable_limits = match self.len() {
+            0..=1000 => 50.0,    // 50ms for small datasets
+            1001..=10000 => 100.0, // 100ms for medium datasets
+            10001..=50000 => 150.0, // 150ms for large datasets
+            _ => 200.0,           // 200ms for very large datasets
+        };
+
+        execution_time_ms <= acceptable_limits
+    }
+
+    /// Generate optimization suggestions based on performance data
+    pub fn generate_optimization_suggestions(&self, monitor: &PerformanceMonitor) -> String {
+        let mut suggestions = String::new();
+        suggestions.push_str("Optimization Suggestions:\n");
+        suggestions.push_str("========================\n\n");
+
+        // Analyze algorithm performance
+        if let Some(fuzzy_times) = monitor.algorithm_times.get(&AlgorithmType::FUZZY_SUBSEQ) {
+            let avg_fuzzy_time: f64 = fuzzy_times.iter().sum::<f64>() / fuzzy_times.len() as f64;
+
+            if avg_fuzzy_time > 50.0 {
+                suggestions.push_str("• Fuzzy subsequence search is slow. Consider:\n");
+                suggestions.push_str("  - Increasing early termination thresholds\n");
+                suggestions.push_str("  - Adding more aggressive candidate filtering\n");
+                suggestions.push_str("  - Reducing the number of candidates processed\n\n");
+            }
+        }
+
+        // Check overall query performance
+        if !monitor.query_times.is_empty() {
+            let avg_query_time: f64 = monitor.query_times.iter().sum::<f64>() / monitor.query_times.len() as f64;
+
+            if avg_query_time > 100.0 {
+                suggestions.push_str("• Overall query performance is slow. Consider:\n");
+                suggestions.push_str("  - Implementing query caching for repeated queries\n");
+                suggestions.push_str("  - Adding query-length based algorithm selection\n");
+                suggestions.push_str("  - Optimizing memory access patterns\n\n");
+            }
+        }
+
+        if suggestions.len() == "Optimization Suggestions:\n========================\n\n".len() {
+            suggestions.push_str("No major optimization issues detected. Current performance is acceptable.\n");
+        }
+
+        suggestions
+    }
+}
+```
 
 ## Performance Considerations
 
@@ -432,91 +1721,12 @@ final_score = weighted_score * frequency_factor * age_factor * length_penalty
 #### Sequential Progressive Execution (Recommended Approach)
 
 **Implementation Strategy: Sequential Progressive Algorithm Execution**
-```rust
-fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
-    let limit = limit.unwrap_or(15);
-    let mut all_candidates = Vec::new();
 
-    // 1. Fast prefix search first (O(log n))
-    let prefix_candidates = self.find_by_prefix_no_sort(query);
-    all_candidates.extend(prefix_candidates);
-
-    // Early termination if we have enough high-quality prefix matches
-    if all_candidates.len() >= limit && has_high_quality_prefix_matches(&all_candidates, query) {
-        return rank_and_limit(all_candidates, limit);
-    }
-
-    // 2. Fuzzy subsequence with early termination (O(n) with early exit)
-    let remaining_needed = limit.saturating_sub(all_candidates.len());
-    if remaining_needed > 0 {
-        let fuzzy_candidates = self.fuzzy_subsequence_with_early_termination(
-            query,
-            remaining_needed,
-            0.7 // score threshold
-        );
-        all_candidates.extend(fuzzy_candidates);
-    }
-
-    // 3. Jaro-Winkler only if still needed (O(n) with early exit)
-    let remaining_needed = limit.saturating_sub(all_candidates.len());
-    if remaining_needed > 0 {
-        let jaro_candidates = self.jaro_winkler_with_early_termination(
-            query,
-            remaining_needed,
-            0.8 // similarity threshold
-        );
-        all_candidates.extend(jaro_candidates);
-    }
-
-    // 4. Substring only as last resort for longer queries
-    let remaining_needed = limit.saturating_sub(all_candidates.len());
-    if remaining_needed > 0 && query.len() >= 3 {
-        let substring_candidates = self.find_with_substring(query)
-            .into_iter()
-            .take(remaining_needed)
-            .collect::<Vec<_>>();
-        all_candidates.extend(substring_candidates);
-    }
-
-    rank_and_limit(all_candidates, limit)
-}
-```
+The progressive algorithm execution strategy is implemented in Phase 2 as the `progressive_algorithm_execution` method, which executes algorithms in order of speed and complexity, with early termination when sufficient high-quality results are found.
 
 #### 1. Early Termination Implementation
-```rust
-// Early termination for fuzzy algorithms
-fn fuzzy_subsequence_with_early_termination(
-    &self,
-    query: &str,
-    target_count: usize,
-    score_threshold: f64
-) -> Vec<ScoreCandidate> {
-    let mut results = Vec::new();
-    let all_strings = self.get_all_strings();
 
-    for string_ref in all_strings {
-        if let Some(score) = self.score_fuzzy_subsequence(&string_ref, query) {
-            let normalized_score = normalize_fuzzy_score(score, min_score, max_score);
-
-            if normalized_score >= score_threshold {
-                results.push(ScoreCandidate {
-                    string_ref,
-                    algorithm: AlgorithmType::FUZZY_SUBSEQ,
-                    raw_score: score,
-                    normalized_score,
-                    final_score: 0.0,
-                });
-
-                // Early termination: stop if we have enough high-quality candidates
-                if results.len() >= target_count * 2 {
-                    break;
-                }
-            }
-        }
-    }
-    results
-}
-```
+Early termination is implemented in the Phase 2 algorithm methods (`fuzzy_subsequence_full_database` and `jaro_winkler_full_database`) which stop searching once enough high-quality candidates are found.
 
 #### 2. Smart Filtering Strategies
 
@@ -607,54 +1817,11 @@ fn fuzzy_subsequence_with_early_termination(
 
 #### 2. Smart Filtering Strategies
 
-**Length-Based Pre-filtering**
-```rust
-// Skip strings that are too long or too short for the query
-fn should_skip_candidate(candidate_len: usize, query_len: usize) -> bool {
-    // Skip strings that are too short to contain the query
-    if candidate_len < query_len {
-        return true;
-    }
-
-    // Skip strings that are excessively long for short queries
-    if query_len <= 3 && candidate_len > query_len * 4 {
-        return true;
-    }
-
-    false
-}
-```
-
-**Character Set Filtering**
-```rust
-// Skip strings that don't contain required characters
-fn contains_required_chars(candidate: &str, query: &str) -> bool {
-    let candidate_chars: HashSet<char> = candidate.chars().collect();
-    query.chars().all(|c| candidate_chars.contains(&c))
-}
-```
+Smart filtering strategies are implemented in Phase 2 as the `should_skip_candidate` and `contains_required_chars` functions, which filter out unpromising candidates before expensive similarity calculations.
 
 #### 3. Performance Monitoring and Fallbacks
-```rust
-// Performance-aware method selection
-fn best_completions_with_fallback(&self, query: &str, limit: usize) -> Vec<StringRef> {
-    // For very short queries, use fast prefix-only approach
-    if query.len() <= 1 {
-        return self.find_by_prefix_no_sort(query)
-            .into_iter()
-            .take(limit)
-            .collect();
-    }
 
-    // For medium queries, use progressive approach
-    if query.len() <= 3 {
-        return self.progressive_best_completions(query, limit);
-    }
-
-    // For long queries, use full multi-algorithm approach
-    self.best_completions_full(query, Some(limit))
-}
-```
+Performance-aware fallbacks are implemented in Phase 2 as part of the progressive algorithm execution strategy, which adapts the search approach based on query characteristics and result quality.
 
 ### Parallel Execution Analysis (NOT RECOMMENDED)
 
@@ -844,664 +2011,7 @@ const PERFORMANCE_TARGETS: [(usize, f64); 4] = [
 - **Load testing**: Simulate multiple concurrent queries
 - **Memory profiling**: Monitor memory usage during full database scans
 
-## Testing Strategy
 
-### Comprehensive Testing Infrastructure for Multi-Algorithm Fusion
-
-#### 1. Enhanced Test Infrastructure with Algorithm Fusion Analysis
-
-```rust
-// Test infrastructure for multi-algorithm fusion analysis
-struct AlgorithmFusionTest {
-    query: String,
-    expected_top_results: Vec<String>,
-    algorithm_contributions: HashMap<String, Vec<AlgorithmType>>,
-    fusion_quality_metrics: FusionQualityMetrics,
-}
-
-struct FusionQualityMetrics {
-    individual_algorithm_rank: usize, // Best rank from any single algorithm
-    fusion_rank: usize,               // Rank in fused results
-    quality_improvement: f64,         // Fusion rank improvement
-    algorithm_coverage: usize,        // Number of algorithms contributing
-}
-
-// Test suite for algorithm fusion effectiveness
-fn test_algorithm_fusion_effectiveness() {
-    let test_cases = vec![
-        AlgorithmFusionTest {
-            query: "app".to_string(),
-            expected_top_results: vec!["apple", "application", "apply", "appliance"],
-            algorithm_contributions: HashMap::new(),
-            fusion_quality_metrics: FusionQualityMetrics::default(),
-        },
-        AlgorithmFusionTest {
-            query: "complet".to_string(),
-            expected_top_results: vec!["complete", "completion", "completely", "completing"],
-            algorithm_contributions: HashMap::new(),
-            fusion_quality_metrics: FusionQualityMetrics::default(),
-        },
-    ];
-
-    for test_case in test_cases {
-        let fusion_results = string_space.best_completions(&test_case.query, Some(20));
-        let individual_results = get_individual_algorithm_results(&test_case.query);
-
-        // Validate fusion produces better results than individual algorithms
-        assert_fusion_improvement(&fusion_results, &individual_results, &test_case);
-
-        // Track algorithm contributions for debugging
-        track_algorithm_contributions(&fusion_results, &mut test_case.algorithm_contributions);
-
-        // Calculate fusion quality metrics
-        calculate_fusion_quality_metrics(&fusion_results, &individual_results, &mut test_case.fusion_quality_metrics);
-    }
-}
-```
-
-#### 2. Debugging Infrastructure for Scoring Analysis
-
-```rust
-// Enhanced debugging infrastructure
-#[derive(Debug, Clone)]
-struct ScoringDebugInfo {
-    query: String,
-    candidate: ScoreCandidate,
-    algorithm_scores: Vec<AlgorithmScoreDetail>,
-    normalization_steps: Vec<NormalizationStep>,
-    metadata_factors: MetadataFactors,
-    final_score_breakdown: FinalScoreBreakdown,
-}
-
-#[derive(Debug, Clone)]
-struct AlgorithmScoreDetail {
-    algorithm: AlgorithmType,
-    raw_score: f64,
-    normalized_score: f64,
-    weight: f64,
-    weighted_contribution: f64,
-}
-
-#[derive(Debug, Clone)]
-struct NormalizationStep {
-    algorithm: AlgorithmType,
-    raw_score: f64,
-    min_score: f64,
-    max_score: f64,
-    normalized_score: f64,
-    inversion_applied: bool,
-}
-
-#[derive(Debug, Clone)]
-struct MetadataFactors {
-    frequency: f64,
-    frequency_factor: f64,
-    age_days: u32,
-    age_factor: f64,
-    length: usize,
-    length_penalty: f64,
-    query_length: usize,
-}
-
-#[derive(Debug, Clone)]
-struct FinalScoreBreakdown {
-    weighted_algorithm_score: f64,
-    metadata_adjusted_score: f64,
-    final_score: f64,
-    ranking_position: usize,
-}
-
-// Debug function to trace scoring decisions
-fn trace_scoring_decisions(
-    query: &str,
-    candidate: &ScoreCandidate,
-    algorithm_scores: &[AlgorithmScoreDetail],
-    metadata: &MetadataFactors
-) -> ScoringDebugInfo {
-    ScoringDebugInfo {
-        query: query.to_string(),
-        candidate: candidate.clone(),
-        algorithm_scores: algorithm_scores.to_vec(),
-        normalization_steps: vec![], // Populated during normalization
-        metadata_factors: metadata.clone(),
-        final_score_breakdown: FinalScoreBreakdown {
-            weighted_algorithm_score: 0.0,
-            metadata_adjusted_score: 0.0,
-            final_score: candidate.final_score,
-            ranking_position: 0,
-        },
-    }
-}
-
-// Function to generate detailed scoring report
-fn generate_scoring_report(results: &[ScoreCandidate], query: &str) -> String {
-    let mut report = String::new();
-    report.push_str(&format!("Scoring Report for query: '{}'\n", query));
-    report.push_str(&format!("Total results: {}\n", results.len()));
-    report.push_str("\nRanking Analysis:\n");
-
-    for (rank, candidate) in results.iter().enumerate() {
-        report.push_str(&format!(
-            "{}. {} - Score: {:.3} (Primary: {:?})\n",
-            rank + 1,
-            candidate.string_ref.as_str(),
-            candidate.final_score,
-            candidate.algorithm
-        ));
-
-        if !candidate.alternative_scores.is_empty() {
-            report.push_str("   Alternative scores: ");
-            for alt in &candidate.alternative_scores {
-                report.push_str(&format!("{:?}:{:.3} ", alt.algorithm, alt.normalized_score));
-            }
-            report.push_str("\n");
-        }
-    }
-
-    report
-}
-```
-
-#### 3. Comprehensive Test Suite for Algorithm Interactions
-
-```rust
-// Test module for multi-algorithm fusion
-#[cfg(test)]
-mod fusion_tests {
-    use super::*;
-
-    #[test]
-    fn test_algorithm_interaction_scenarios() {
-        // Scenario 1: Prefix dominates for exact matches
-        test_prefix_dominance_scenario();
-
-        // Scenario 2: Fuzzy subsequence finds abbreviation matches
-        test_fuzzy_abbreviation_scenario();
-
-        // Scenario 3: Jaro-Winkler corrects typos
-        test_typo_correction_scenario();
-
-        // Scenario 4: Substring finds matches anywhere
-        test_substring_fallback_scenario();
-
-        // Scenario 5: Algorithm conflicts and resolution
-        test_algorithm_conflict_scenario();
-    }
-
-    fn test_prefix_dominance_scenario() {
-        let string_space = create_test_string_space();
-        let query = "comp";
-        let results = string_space.best_completions(query, Some(10));
-
-        // Prefix matches should dominate for short queries
-        let top_result = &results[0];
-        assert_eq!(top_result.algorithm, AlgorithmType::PREFIX);
-        assert!(top_result.final_score >= 0.9);
-
-        // Verify prefix matches appear before other algorithm results
-        let prefix_results_count = results.iter()
-            .filter(|c| c.algorithm == AlgorithmType::PREFIX)
-            .count();
-        let non_prefix_results = results.iter()
-            .filter(|c| c.algorithm != AlgorithmType::PREFIX)
-            .count();
-
-        // Prefix results should be prioritized
-        assert!(prefix_results_count >= non_prefix_results);
-    }
-
-    fn test_fuzzy_abbreviation_scenario() {
-        let string_space = create_test_string_space();
-        let query = "cmpt"; // Abbreviation for "complete"
-        let results = string_space.best_completions(query, Some(10));
-
-        // Fuzzy subsequence should find abbreviation matches
-        let fuzzy_matches: Vec<_> = results.iter()
-            .filter(|c| c.algorithm == AlgorithmType::FUZZY_SUBSEQ)
-            .collect();
-
-        assert!(!fuzzy_matches.is_empty(), "Fuzzy subsequence should find abbreviation matches");
-
-        // Verify fuzzy matches have reasonable scores
-        for candidate in fuzzy_matches {
-            assert!(candidate.final_score >= 0.5, "Fuzzy match score too low: {}", candidate.final_score);
-        }
-    }
-
-    fn test_typo_correction_scenario() {
-        let string_space = create_test_string_space();
-        let query = "compleet"; // Common typo for "complete"
-        let results = string_space.best_completions(query, Some(10));
-
-        // Jaro-Winkler should correct typos
-        let jaro_matches: Vec<_> = results.iter()
-            .filter(|c| c.algorithm == AlgorithmType::JARO_WINKLER)
-            .collect();
-
-        assert!(!jaro_matches.is_empty(), "Jaro-Winkler should correct typos");
-
-        // Verify typo-corrected results have high similarity scores
-        for candidate in jaro_matches {
-            assert!(candidate.final_score >= 0.7, "Jaro-Winkler score too low: {}", candidate.final_score);
-        }
-    }
-
-    fn test_algorithm_conflict_scenario() {
-        // Test case where different algorithms produce conflicting scores for same word
-        let string_space = create_test_string_space();
-
-        // Add test words that trigger multiple algorithms
-        string_space.insert("conflicting".to_string());
-        string_space.insert("conflict".to_string());
-        string_space.insert("confirmation".to_string());
-
-        let query = "conf";
-        let results = string_space.best_completions(query, Some(10));
-
-        // Analyze algorithm contributions for conflicts
-        let mut algorithm_contributions: HashMap<String, Vec<AlgorithmType>> = HashMap::new();
-
-        for candidate in &results {
-            let word = candidate.string_ref.as_str().to_string();
-            algorithm_contributions.entry(word)
-                .or_insert_with(Vec::new)
-                .push(candidate.algorithm);
-
-            // Also include alternative scores
-            for alt in &candidate.alternative_scores {
-                algorithm_contributions.get_mut(&word)
-                    .unwrap()
-                    .push(alt.algorithm);
-            }
-        }
-
-        // Verify conflicts are resolved properly
-        for (word, algorithms) in algorithm_contributions {
-            if algorithms.len() > 1 {
-                // Multiple algorithms contributed to this word
-                let unique_algorithms: HashSet<AlgorithmType> = algorithms.into_iter().collect();
-                assert!(unique_algorithms.len() > 1,
-                    "Word '{}' should have contributions from multiple algorithms", word);
-            }
-        }
-    }
-}
-```
-
-#### 4. Fusion Validation Tests
-
-```rust
-// Test that fusion produces better results than individual algorithms
-#[test]
-fn test_fusion_produces_better_results() {
-    let string_space = create_large_test_dataset();
-    let test_queries = vec![
-        "a", "ab", "abc", "abcd", "abcde", "complet", "appl", "test", "fuzz", "jaro"
-    ];
-
-    for query in test_queries {
-        let fusion_results = string_space.best_completions(query, Some(15));
-        let individual_results = get_individual_algorithm_results(query);
-
-        // Calculate quality metrics for fusion vs individual algorithms
-        let fusion_quality = calculate_result_quality(&fusion_results, query);
-        let best_individual_quality = individual_results.iter()
-            .map(|results| calculate_result_quality(results, query))
-            .max_by(|a, b| a.overall_score.partial_cmp(&b.overall_score).unwrap())
-            .unwrap();
-
-        // Fusion should produce equal or better quality than any individual algorithm
-        assert!(
-            fusion_quality.overall_score >= best_individual_quality.overall_score * 0.95,
-            "Fusion produced worse results for query '{}': fusion={:.3}, best_individual={:.3}",
-            query, fusion_quality.overall_score, best_individual_quality.overall_score
-        );
-
-        // Fusion should provide better coverage (find matches individual algorithms miss)
-        assert!(
-            fusion_quality.coverage_score >= best_individual_quality.coverage_score,
-            "Fusion has worse coverage for query '{}': fusion={}, best_individual={}",
-            query, fusion_quality.coverage_score, best_individual_quality.coverage_score
-        );
-    }
-}
-
-struct ResultQuality {
-    overall_score: f64,
-    coverage_score: f64,
-    relevance_score: f64,
-    diversity_score: f64,
-}
-
-fn calculate_result_quality(results: &[ScoreCandidate], query: &str) -> ResultQuality {
-    // Implementation to calculate various quality metrics
-    // - Coverage: How many expected matches were found
-    // - Relevance: How relevant the top results are
-    // - Diversity: Variety of match types and algorithms
-    ResultQuality {
-        overall_score: 0.8, // Example implementation
-        coverage_score: 0.9,
-        relevance_score: 0.85,
-        diversity_score: 0.75,
-    }
-}
-```
-
-#### 5. Normalization and Weighting System Testing
-
-```rust
-// Comprehensive testing of normalization and weighting
-#[cfg(test)]
-mod normalization_tests {
-    use super::*;
-
-    #[test]
-    fn test_score_normalization_consistency() {
-        // Test that normalization produces consistent results across algorithms
-        let test_cases = vec![
-            (AlgorithmType::FUZZY_SUBSEQ, 10.0, 100.0, 50.0), // Raw score, min, max
-            (AlgorithmType::FUZZY_SUBSEQ, 5.0, 100.0, 25.0),
-            (AlgorithmType::SUBSTRING, 0, 100, 50), // Position, max_position
-            (AlgorithmType::SUBSTRING, 10, 100, 90),
-        ];
-
-        for (algorithm, raw_score, max_val, expected_normalized) in test_cases {
-            let normalized = match algorithm {
-                AlgorithmType::FUZZY_SUBSEQ => normalize_fuzzy_score(raw_score, 0.0, max_val),
-                AlgorithmType::SUBSTRING => normalize_substring_score(raw_score as usize, max_val as usize),
-                _ => raw_score, // Prefix and Jaro-Winkler don't need normalization
-            };
-
-            // Normalized scores should be in 0.0-1.0 range
-            assert!(normalized >= 0.0 && normalized <= 1.0,
-                "Normalized score out of range: {} for algorithm {:?}", normalized, algorithm);
-
-            // Verify expected normalization behavior
-            let expected_range = expected_normalized * 0.1; // Allow 10% tolerance
-            assert!(
-                (normalized - expected_normalized).abs() <= expected_range,
-                "Normalization failed for {:?}: got {}, expected {}",
-                algorithm, normalized, expected_normalized
-            );
-        }
-    }
-
-    #[test]
-    fn test_dynamic_weighting_effectiveness() {
-        // Test that dynamic weights improve results for different query lengths
-        let string_space = create_test_string_space();
-
-        let query_categories = vec![
-            ("a", QueryLengthCategory::VeryShort),
-            ("ab", QueryLengthCategory::VeryShort),
-            ("abc", QueryLengthCategory::Short),
-            ("abcd", QueryLengthCategory::Short),
-            ("abcde", QueryLengthCategory::Medium),
-            ("abcdef", QueryLengthCategory::Medium),
-            ("abcdefg", QueryLengthCategory::Long),
-            ("abcdefghij", QueryLengthCategory::Long),
-        ];
-
-        for (query, expected_category) in query_categories {
-            let category = QueryLengthCategory::from_query(query);
-            assert_eq!(category, expected_category,
-                "Query length categorization failed for '{}'", query);
-
-            let weights = AlgorithmWeights::for_category(category);
-
-            // Verify weights sum to 1.0
-            let total_weight = weights.prefix + weights.fuzzy_subseq + weights.jaro_winkler + weights.substring;
-            assert!((total_weight - 1.0).abs() < 0.0001,
-                "Weights for query '{}' don't sum to 1.0: {}", query, total_weight);
-
-            // Test that dynamic weights produce good results
-            let results = string_space.best_completions(query, Some(10));
-            assert!(!results.is_empty(),
-                "No results for query '{}' with dynamic weights", query);
-
-            // Analyze algorithm contributions for this query
-            let algorithm_distribution = analyze_algorithm_distribution(&results);
-
-            // For very short queries, prefix should dominate
-            if category == QueryLengthCategory::VeryShort {
-                let prefix_ratio = algorithm_distribution.get(&AlgorithmType::PREFIX)
-                    .unwrap_or(&0.0) / results.len() as f64;
-                assert!(prefix_ratio >= 0.3,
-                    "Prefix algorithm under-represented for very short query '{}': {}",
-                    query, prefix_ratio);
-            }
-        }
-    }
-
-    fn analyze_algorithm_distribution(results: &[ScoreCandidate]) -> HashMap<AlgorithmType, f64> {
-        let mut distribution = HashMap::new();
-        let total = results.len() as f64;
-
-        for candidate in results {
-            *distribution.entry(candidate.algorithm).or_insert(0.0) += 1.0;
-        }
-
-        // Convert to ratios
-        for count in distribution.values_mut() {
-            *count /= total;
-        }
-
-        distribution
-    }
-}
-```
-
-#### 6. Performance Testing with Realistic Datasets
-
-```rust
-// Performance testing infrastructure
-struct PerformanceTest {
-    dataset_size: usize,
-    query: String,
-    expected_max_latency_ms: f64,
-    memory_usage_target_mb: f64,
-}
-
-#[test]
-fn test_performance_with_realistic_datasets() {
-    let performance_tests = vec![
-        PerformanceTest {
-            dataset_size: 1_000,
-            query: "test".to_string(),
-            expected_max_latency_ms: 50.0,
-            memory_usage_target_mb: 10.0,
-        },
-        PerformanceTest {
-            dataset_size: 10_000,
-            query: "complet".to_string(),
-            expected_max_latency_ms: 100.0,
-            memory_usage_target_mb: 50.0,
-        },
-        PerformanceTest {
-            dataset_size: 50_000,
-            query: "applicat".to_string(),
-            expected_max_latency_ms: 150.0,
-            memory_usage_target_mb: 100.0,
-        },
-        PerformanceTest {
-            dataset_size: 100_000,
-            query: "programm".to_string(),
-            expected_max_latency_ms: 200.0,
-            memory_usage_target_mb: 200.0,
-        },
-    ];
-
-    for test in performance_tests {
-        let string_space = create_performance_test_dataset(test.dataset_size);
-
-        let start_time = std::time::Instant::now();
-        let results = string_space.best_completions(&test.query, Some(15));
-        let elapsed_ms = start_time.elapsed().as_millis() as f64;
-
-        // Verify performance targets are met
-        assert!(
-            elapsed_ms <= test.expected_max_latency_ms,
-            "Performance test failed for {} words: {}ms > {}ms target",
-            test.dataset_size, elapsed_ms, test.expected_max_latency_ms
-        );
-
-        // Verify results are meaningful
-        assert!(!results.is_empty(),
-            "No results for performance test with {} words", test.dataset_size);
-
-        // Memory usage monitoring (simplified)
-        let memory_usage = estimate_memory_usage(&results);
-        assert!(
-            memory_usage <= test.memory_usage_target_mb,
-            "Memory usage too high for {} words: {}MB > {}MB target",
-            test.dataset_size, memory_usage, test.memory_usage_target_mb
-        );
-    }
-}
-
-fn estimate_memory_usage(results: &[ScoreCandidate]) -> f64 {
-    // Simplified memory estimation
-    (results.len() * std::mem::size_of::<ScoreCandidate>()) as f64 / 1_000_000.0
-}
-```
-
-#### 7. Automated Consistency Testing
-
-```rust
-// Automated testing for scoring consistency
-#[test]
-fn test_scoring_consistency_across_query_patterns() {
-    let string_space = create_consistency_test_dataset();
-
-    // Test similar queries produce consistent rankings
-    let similar_queries = vec![
-        ("comp", "com", "comple"),
-        ("app", "ap", "appl"),
-        ("test", "tes", "testi"),
-    ];
-
-    for (query1, query2, query3) in similar_queries {
-        let results1 = string_space.best_completions(query1, Some(10));
-        let results2 = string_space.best_completions(query2, Some(10));
-        let results3 = string_space.best_completions(query3, Some(10));
-
-        // Calculate ranking consistency
-        let consistency_1_2 = calculate_ranking_consistency(&results1, &results2);
-        let consistency_1_3 = calculate_ranking_consistency(&results1, &results3);
-
-        // Similar queries should produce similar rankings
-        assert!(
-            consistency_1_2 >= 0.7,
-            "Low ranking consistency between '{}' and '{}': {}",
-            query1, query2, consistency_1_2
-        );
-
-        assert!(
-            consistency_1_3 >= 0.6,
-            "Low ranking consistency between '{}' and '{}': {}",
-            query1, query3, consistency_1_3
-        );
-    }
-}
-
-fn calculate_ranking_consistency(results1: &[ScoreCandidate], results2: &[ScoreCandidate]) -> f64 {
-    // Calculate how consistent the rankings are between two result sets
-    // Returns a value between 0.0 (completely different) and 1.0 (identical)
-
-    let common_words: HashSet<_> = results1.iter()
-        .map(|c| c.string_ref.as_str())
-        .collect();
-
-    let common_count = results2.iter()
-        .filter(|c| common_words.contains(c.string_ref.as_str()))
-        .count();
-
-    common_count as f64 / results1.len().min(results2.len()) as f64
-}
-```
-
-### Testing Strategy Summary
-
-#### 1. Algorithm Interaction Testing
-- **Prefix Dominance**: Verify prefix matches dominate for short queries
-- **Fuzzy Abbreviation**: Test fuzzy subsequence finds abbreviation-style matches
-- **Typo Correction**: Validate Jaro-Winkler corrects common misspellings
-- **Substring Fallback**: Ensure substring search provides fallback matches
-- **Algorithm Conflicts**: Test resolution when algorithms produce conflicting scores
-
-#### 2. Fusion Validation Testing
-- **Quality Improvement**: Prove fusion produces better results than individual algorithms
-- **Coverage Enhancement**: Verify fusion finds matches individual algorithms miss
-- **Diversity**: Ensure results include different types of matches
-- **Consistency**: Validate consistent ranking across similar queries
-
-#### 3. Normalization and Weighting Testing
-- **Score Normalization**: Test all normalization functions produce 0.0-1.0 scores
-- **Dynamic Weighting**: Validate weight selection based on query length
-- **Weight Effectiveness**: Prove dynamic weights improve result quality
-- **Boundary Conditions**: Test edge cases in normalization and weighting
-
-#### 4. Performance and Scalability Testing
-- **Latency Targets**: Verify performance meets interactive use requirements
-- **Memory Usage**: Monitor memory consumption during full database scans
-- **Scalability**: Test with datasets from 1K to 100K+ words
-- **Early Termination**: Validate early termination reduces search time
-
-#### 5. Debugging and Analysis Infrastructure
-- **Scoring Transparency**: Detailed scoring breakdown for each result
-- **Algorithm Contributions**: Track which algorithms contributed to each result
-- **Normalization Steps**: Trace each step of the scoring process
-- **Performance Monitoring**: Real-time performance metrics during execution
-
-### Risk Mitigation through Comprehensive Testing
-
-#### 1. Scoring Normalization Risks
-- **Mitigation**: Comprehensive normalization tests with boundary cases
-- **Validation**: Automated consistency checks across algorithm types
-- **Debugging**: Detailed normalization step tracing
-
-#### 2. Algorithm Weighting Risks
-- **Mitigation**: Dynamic weight validation with query length categories
-- **Testing**: Effectiveness tests proving weight improvements
-- **Monitoring**: Real-time weight selection analysis
-
-#### 3. Performance Regression Risks
-- **Mitigation**: Performance benchmarks with realistic datasets
-- **Monitoring**: Early termination and smart filtering validation
-- **Fallbacks**: Performance-aware algorithm selection
-
-#### 4. Debugging Complexity Risks
-- **Mitigation**: Comprehensive debugging infrastructure
-- **Transparency**: Detailed scoring reports and algorithm contributions
-- **Analysis Tools**: Functions to trace and analyze scoring decisions
-
-This comprehensive testing strategy ensures the multi-algorithm fusion system is robust, performant, and produces high-quality results while providing the necessary debugging infrastructure to understand and fix any scoring issues that arise.
-
-## API Design
-
-### StringSpaceInner Method Signature
-```rust
-fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef>
-```
-
-### StringSpace Public Method Signature
-```rust
-#[allow(unused)]
-pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef>
-```
-
-### Parameters
-- `query`: The search query string
-- `limit`: Optional maximum number of results (default: 15)
-
-### Return Value
-- Vector of `StringRef` objects sorted by relevance
-- Each result includes string and metadata (frequency, age)
-
-### Public Method Pattern
-- Follows existing pattern: delegates to `StringSpaceInner::best_completions()`
-- Located in `StringSpace` impl block in `src/modules/string_space.rs`
-- Added after existing public methods like `fuzzy_subsequence_search` and `get_all_strings`
 
 ## Success Metrics
 
