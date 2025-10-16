@@ -37,7 +37,32 @@ pub struct StringMeta {
     pub age_days: TAgeDays,
 }
 
-// #[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AlgorithmType {
+    Prefix,
+    FuzzySubseq,
+    JaroWinkler,
+    Substring,
+}
+
+#[derive(Debug, Clone)]
+pub struct BasicCandidate {
+    pub string_ref: StringRef,
+    pub algorithm: AlgorithmType,
+    pub score: f64,
+}
+
+impl BasicCandidate {
+    pub fn new(string_ref: StringRef, algorithm: AlgorithmType, score: f64) -> Self {
+        Self {
+            string_ref,
+            algorithm,
+            score,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 #[allow(unused)]
 pub struct StringRef {
     pub string: String,
@@ -129,6 +154,11 @@ impl StringSpace {
     #[allow(unused)]
     pub fn get_all_strings(&self) -> Vec<StringRef> {
         self.inner.get_all_strings()
+    }
+
+    #[allow(unused)]
+    pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+        self.inner.best_completions(query, limit)
     }
 
 }
@@ -520,6 +550,25 @@ impl StringSpaceInner {
         matches.into_iter().map(|(string_ref, _)| string_ref).collect()
     }
 
+    fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+        let _limit = limit.unwrap_or(15);
+
+        // Validate query
+        if let Err(_) = validate_query(query) {
+            return Vec::new();
+        }
+
+        // TODO: Implement multi-algorithm fusion in subsequent phases
+        // For now, return empty vector as placeholder
+        Vec::new()
+    }
+
+    fn collect_results(&self) -> Vec<BasicCandidate> {
+        // Placeholder implementation
+        // Will be replaced with actual algorithm execution in subsequent phases
+        Vec::new()
+    }
+
 }
 
 impl Drop for StringSpaceInner {
@@ -531,6 +580,17 @@ impl Drop for StringSpaceInner {
 }
 
 // MARK: Private Functions
+
+fn validate_query(query: &str) -> Result<(), &'static str> {
+    if query.is_empty() {
+        return Err("Query cannot be empty");
+    }
+
+    // Additional validation can be added here
+    // For example: minimum length requirements, character restrictions, etc.
+
+    Ok(())
+}
 
 fn days_since_epoch() -> TAgeDays {
     let now = SystemTime::now();
