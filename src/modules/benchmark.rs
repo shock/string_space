@@ -99,6 +99,28 @@ pub fn benchmark(args: Vec<String>) {
     found_strings.sort_by(|a, b| a.meta.frequency.cmp(&b.meta.frequency));
     println!("Finding strings with substring '{}' took {:?}", substring, find_time);
 
+    // Search by fuzzy-subsequence
+    let mut found_strings: Vec<StringRef> = Vec::new();
+    let find_time = time_execution(|| {
+        found_strings = space.fuzzy_subsequence_search(substring);
+        println!("Found {} strings with fuzzy-subsequence '{}':", found_strings.len(), substring);
+        let max_len = std::cmp::min(found_strings.len(), 5);
+        for string_ref in found_strings[0..max_len].iter() {
+            println!("  {} {}", string_ref.string, string_ref.meta.frequency);
+        }
+    });
+    println!("Finding strings with fuzzy-subsequence '{}' took {:?}", substring, find_time);
+
+    // Additional test queries for comprehensive benchmarking
+    let test_queries = vec!["he", "lo", "wor", "hl", "elp", "rld"];
+    for query in test_queries {
+        let mut found_strings: Vec<StringRef> = Vec::new();
+        let find_time = time_execution(|| {
+            found_strings = space.fuzzy_subsequence_search(query);
+        });
+        println!("Fuzzy-subsequence search for '{}' found {} strings in {:?}", query, found_strings.len(), find_time);
+    }
+
     let insert_time = time_execution(|| {
         // Insert strings
         space.insert_string("aaaaaaaaaaaaaaaa", 1).unwrap();
@@ -111,4 +133,37 @@ pub fn benchmark(args: Vec<String>) {
 
     space.write_to_file(file_path).unwrap();
 
+}
+
+// Performance validation function for integration testing
+pub fn validate_fuzzy_subsequence_performance(space: &StringSpace) -> bool {
+    let test_cases = vec![
+        ("he", 3, 100),  // query, min_expected_results, max_ms
+        ("lo", 1, 100),
+        ("wor", 1, 100),
+        ("", 0, 10),     // empty query should be fast
+        ("xyz", 0, 100), // no matches should be fast
+    ];
+
+    for (query, min_results, max_ms) in test_cases {
+        let start = std::time::Instant::now();
+        let results = space.fuzzy_subsequence_search(query);
+        let duration = start.elapsed();
+
+        if results.len() < min_results {
+            eprintln!("Performance validation failed for query '{}': expected at least {} results, got {}",
+                     query, min_results, results.len());
+            return false;
+        }
+
+        if duration.as_millis() > max_ms as u128 {
+            eprintln!("Performance validation failed for query '{}': took {}ms, expected < {}ms",
+                     query, duration.as_millis(), max_ms);
+            return false;
+        }
+
+        println!("Query '{}': {} results in {:?} (OK)", query, results.len(), duration);
+    }
+
+    true
 }
