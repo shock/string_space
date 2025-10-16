@@ -70,9 +70,9 @@ impl StringSpace {
         if word.len() < 2 {
             return Vec::new();
         }
-        let possibilities = self.inner.find_by_prefix(word[0..1].to_string().as_str());
+        let possibilities = self.inner.find_by_prefix_no_sort(word[0..1].to_string().as_str());
         // let matches = get_close_matches_levenshtein(word, &possibilities, threshold);
-        let matches = get_close_matches(word, &possibilities, 5, cutoff);
+        let matches = get_close_matches(word, &possibilities, 15, cutoff);
         matches
     }
 
@@ -289,6 +289,19 @@ impl StringSpaceInner {
     }
 
     fn find_by_prefix(&self, search_prefix: &str) -> Vec<StringRef> {
+        let mut results = self.find_by_prefix_no_sort(search_prefix);
+        // reverse sort the results by frequency
+        results.sort_by(|a, b| b.meta.frequency.cmp(&a.meta.frequency));
+        results
+    }
+
+    fn find_by_prefix_alpha_sort(&self, search_prefix: &str) -> Vec<StringRef> {
+        let mut results = self.find_by_prefix_no_sort(search_prefix);
+        results.sort_by(|a, b| a.string.cmp(&b.string));
+        results
+    }
+
+    fn find_by_prefix_no_sort(&self, search_prefix: &str) -> Vec<StringRef> {
         let search_bytes = search_prefix.as_bytes();
         let search_len = search_bytes.len();
         let mut results = Vec::new();
@@ -339,8 +352,6 @@ impl StringSpaceInner {
                 }
             }
         }
-        // reverse sort the results by frequency
-        results.sort_by(|a, b| b.meta.frequency.cmp(&a.meta.frequency));
         results
     }
 
@@ -478,7 +489,7 @@ impl StringSpaceInner {
 
         // Use prefix filtering like get_similar_words for performance
         // Identical implementation to get_similar_words()
-        let possibilities = self.find_by_prefix(query[0..1].to_string().as_str());
+        let possibilities = self.find_by_prefix_no_sort(query[0..1].to_string().as_str());
 
         let mut matches: Vec<(StringRef, f64)> = Vec::new();
 
@@ -492,13 +503,19 @@ impl StringSpaceInner {
         // Sort by score (ascending - lower scores are better), then frequency (descending), then age (descending)
         matches.sort_by(|a, b| {
             a.1.partial_cmp(&b.1).unwrap()
-                .then(b.0.meta.frequency.cmp(&a.0.meta.frequency))
-                .then(b.0.meta.age_days.cmp(&a.0.meta.age_days))
+                // .then(b.0.meta.frequency.cmp(&a.0.meta.frequency))
+                // .then(b.0.meta.age_days.cmp(&a.0.meta.age_days))
         });
 
         // Limit to top 10 results AFTER all sorting is complete
         // This ensures the best 10 matches are selected based on the full sorting criteria
         matches.truncate(10);
+
+        // print the matches for debugging
+        println!("Matches post-sorting:");
+        for (string_ref, score) in &matches {
+            println!("String: {}, Score: {}, TFreq: {}, AgeDays: {}", string_ref.string, score, string_ref.meta.frequency, string_ref.meta.age_days);
+        }
 
         matches.into_iter().map(|(string_ref, _)| string_ref).collect()
     }

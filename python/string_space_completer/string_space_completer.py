@@ -4,6 +4,7 @@
 from prompt_toolkit.completion import Completer, Completion
 import re
 from string_space_client import StringSpaceClient, ProtocolError
+import sys
 
 class StringSpaceCompleter(Completer):
     def __init__(self, **kwargs):
@@ -41,11 +42,12 @@ class StringSpaceCompleter(Completer):
 
         # filter only words that start with the same letter as word_before_cursor
         doc_words = [word for word in doc_words if word.lower().startswith(word_before_cursor.lower())]
-        completion_suggestions = self.client.prefix_search(word_before_cursor)
+        completion_suggestions = self.client.fuzzy_subsequence_search(word_before_cursor)
+        print("Completion suggestions:\n", completion_suggestions, file=sys.stderr, flush=True)
         spell_suggestions = self.client.similar_search(word_before_cursor, threshold=0.6)
-
-        # combine doc_words and completion_suggestions and spell_suggestions into a single list
-        suggestions = doc_words + completion_suggestions + spell_suggestions
+        print("Spell suggestions:\n", spell_suggestions, file=sys.stderr, flush=True)
+        # combine completion_suggestions and spell_suggestions into a single list
+        suggestions = completion_suggestions + spell_suggestions
 
         # remove duplicates in suggestions while preserving order
         seen = set()
@@ -58,7 +60,10 @@ class StringSpaceCompleter(Completer):
         if word_in_suggestions:
             # insert word_before_cursor at the beginning of the list
             result.insert(0, word_before_cursor)
-        suggestions = result
+        # sort suggestions by length (shortest first)
+        suggestions = sorted(result, key=len)
+        # for any suggestions that are in doc_words, move them to the front of the list
+        suggestions = sorted(suggestions, key=lambda x: (x not in doc_words, x))
         for suggestion in suggestions:
             if suggestion.strip() != '':
                 yield Completion(suggestion, start_position=-len(word_before_cursor))
