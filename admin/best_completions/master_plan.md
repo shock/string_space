@@ -26,7 +26,7 @@ This document outlines the implementation strategy for a new `best_completions` 
   let possibilities = self.get_all_strings(); // Search entire database
   // Keep existing is_subsequence and score_match_span logic
   ```
-- **Scoring**: Normalize current span-based score to 0.0-1.0 range
+- **Scoring**: Apply inverted normalization to convert span-based scores to 0.0-1.0 range
 - **Advantage**: Finds matches where query characters appear in order but not necessarily consecutively
 
 ### 3. Jaro-Winkler Similarity (Full Database)
@@ -37,12 +37,12 @@ This document outlines the implementation strategy for a new `best_completions` 
   let possibilities = self.get_all_strings(); // Search entire database
   // Keep existing jaro_winkler scoring and cutoff logic
   ```
-- **Scoring**: Use existing 0.0-1.0 Jaro-Winkler similarity score
+- **Scoring**: Use existing 0.0-1.0 Jaro-Winkler similarity score (already normalized)
 - **Advantage**: Handles typos, transpositions, and character substitutions
 
 ### 4. Substring Search
 - **Method**: Use existing `find_with_substring`
-- **Scoring**: Position-based scoring (earlier matches better)
+- **Scoring**: Apply position-based normalization to convert match positions to 0.0-1.0 range
 - **Advantage**: Finds matches where query appears anywhere in the string
 
 ## Unified Scoring System
@@ -52,8 +52,9 @@ This document outlines the implementation strategy for a new `best_completions` 
 struct ScoreCandidate {
     string_ref: StringRef,
     algorithm: AlgorithmType, // PREFIX, FUZZY_SUBSEQ, JARO_WINKLER, SUBSTRING
-    base_score: f64,         // Algorithm-specific score (0.0-1.0)
-    final_score: f64,        // After metadata adjustments
+    raw_score: f64,          // Algorithm-specific raw score
+    normalized_score: f64,   // Normalized to 0.0-1.0 (higher = better)
+    final_score: f64,        // After weighted combination and metadata adjustments
 }
 ```
 
@@ -61,6 +62,69 @@ struct ScoreCandidate {
 - **Current Implementation**: `age_days` stores days since epoch (higher = more recent)
 - **Existing Behavior**: Younger items (higher `age_days`) are preferred in current search methods
 - **Consistency**: The `best_completions` method should maintain this same preference pattern
+
+### Algorithm Scoring Analysis and Normalization
+
+#### Current Scoring Characteristics
+
+**Prefix Search**
+- **Range**: Already normalized (1.0 exact, 0.8 case-insensitive)
+- **Direction**: Higher = better ✓
+- **Normalization**: None needed
+
+**Fuzzy Subsequence Search**
+- **Range**: Unbounded positive values (span-based scoring)
+- **Direction**: Lower = better (ascending sort in current implementation) ✗
+- **Normalization Required**: Inverted normalization to 0.0-1.0 scale
+
+**Jaro-Winkler Similarity**
+- **Range**: 0.0-1.0 (already normalized)
+- **Direction**: Higher = better ✓
+- **Normalization**: None needed
+
+**Substring Search**
+- **Range**: Position-based (earlier matches better)
+- **Direction**: Lower position = better ✗
+- **Normalization Required**: Position-based normalization to 0.0-1.0 scale
+
+### Score Normalization Functions
+
+#### Fuzzy Subsequence Normalization
+```rust
+// For fuzzy subsequence (lower raw scores are better)
+fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
+    // Invert and normalize: lower raw scores → higher normalized scores
+    let normalized = 1.0 - ((raw_score - min_score) / (max_score - min_score));
+    normalized.clamp(0.0, 1.0)
+}
+```
+
+#### Substring Search Normalization
+```rust
+// For substring search (earlier matches are better)
+fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
+    1.0 - (position as f64 / max_position as f64)
+}
+```
+
+### Algorithm Weighting System
+
+#### Recommended Weights (sum to 1.0)
+- **Prefix Search**: `0.35` (highest weight)
+  - Most reliable for completion scenarios
+  - Users expect prefix matches to appear first
+
+- **Fuzzy Subsequence**: `0.30` (high weight)
+  - Excellent for abbreviation-style input
+  - Very useful for interactive completion
+
+- **Jaro-Winkler**: `0.25` (medium weight)
+  - Good for typo correction
+  - Less critical than prefix/fuzzy for completion
+
+- **Substring Search**: `0.10` (lowest weight)
+  - Least relevant for completion scenarios
+  - Useful as fallback
 
 ### Metadata Integration
 
@@ -78,7 +142,14 @@ struct ScoreCandidate {
 
 ### Final Score Calculation
 ```rust
-final_score = base_score * frequency_factor * age_factor * length_penalty
+// Step 1: Weighted algorithm combination
+let weighted_score = (prefix_weight * prefix_score +
+                     fuzzy_weight * fuzzy_score +
+                     jaro_weight * jaro_score +
+                     substring_weight * substring_score);
+
+// Step 2: Apply metadata adjustments
+final_score = weighted_score * frequency_factor * age_factor * length_penalty
 ```
 
 ## Result Merging and Ranking
@@ -146,6 +217,10 @@ final_score = base_score * frequency_factor * age_factor * length_penalty
 - **Exact matches**: Should appear at top of results
 - **Frequency weighting**: High-frequency words should get preference
 - **Age preference**: Newer items should get slight bonus
+- **Scoring normalization**: Verify fuzzy subsequence scores are properly inverted
+- **Algorithm weighting**: Verify prefix matches get highest weight
+- **Abbreviation matching**: Test fuzzy subsequence with character skipping
+- **Typo correction**: Test Jaro-Winkler with common misspellings
 
 ### Integration Tests
 - Test with realistic word lists (like the llm_chat_cli word list)
@@ -196,11 +271,16 @@ pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringR
 - **Smart filtering**: Use length-based pre-filtering for very long queries
 - **Algorithm selection**: Choose algorithms based on query characteristics
 - **Incremental search**: Return partial results while still processing
+- **Dynamic weighting**: Adjust algorithm weights based on query length and characteristics
 
 ### Feature Extensions
 - **Configurable weights**: Allow users to adjust algorithm importance
 - **Custom scoring**: Support user-defined scoring functions
 - **Plugin architecture**: Allow adding new search algorithms
+- **Query-length based weights**: Dynamic weighting system:
+  - **Short queries (1-3 chars)**: Higher weight for prefix and fuzzy subsequence
+  - **Medium queries (4-6 chars)**: Balanced weights
+  - **Long queries (7+ chars)**: Higher weight for Jaro-Winkler and substring
 
 ## Dependencies
 
@@ -213,10 +293,16 @@ pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringR
 - **Performance**: Full database search could be too slow for large datasets
 - **Memory usage**: Storing all candidates before filtering could use significant memory
 
+### Medium Risk Areas
+- **Scoring complexity**: Multiple normalization steps and weighted combination could introduce subtle bugs
+- **Algorithm weighting**: Suboptimal weights could degrade completion quality
+
 ### Mitigation Strategies
 - Implement early termination for large result sets
 - Add configurable limits and performance warnings
 - Provide fallback to simpler algorithms if performance is critical
+- Comprehensive testing of scoring normalization and weighting
+- Configurable algorithm weights for fine-tuning
 
 ## Timeline Estimate
 
