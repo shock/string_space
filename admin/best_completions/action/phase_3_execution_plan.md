@@ -32,6 +32,8 @@ Phase 3 implements the comprehensive scoring system for the `best_completions` m
 
 ## Implementation Steps
 
+**Critical**: Use sub-agents for each implementation step sequentially, giving all the necessary information to complete each step.
+
 ### Step 1: Create `ScoreCandidate` Struct and Related Types
 
 **File**: `src/modules/string_space.rs`
@@ -672,6 +674,13 @@ fn select_best_algorithm_score(
 - Handle missing metadata gracefully with default values
 - Ensure score calculations handle edge cases (division by zero, NaN values)
 - Maintain robust candidate deduplication and merging
+
+## Sub-Agent Usage Recommendations
+
+- Use sub-agents for atomic file modifications
+- Use sub-agents for test execution and debugging
+- Use sub-agents for performance profiling
+- Use sub-agents for code review of complex implementations
 
 ## Next Steps
 

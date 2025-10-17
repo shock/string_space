@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Write, BufReader, BufWriter, BufRead};
 use std::alloc::{alloc, dealloc, Layout};
@@ -45,20 +46,71 @@ pub enum AlgorithmType {
     Substring,
 }
 
+/// Alternative score from other algorithms for the same string
 #[derive(Debug, Clone)]
-pub struct BasicCandidate {
-    pub string_ref: StringRef,
+pub struct AlternativeScore {
     pub algorithm: AlgorithmType,
-    pub score: f64,
+    pub normalized_score: f64,
 }
 
-impl BasicCandidate {
-    pub fn new(string_ref: StringRef, algorithm: AlgorithmType, score: f64) -> Self {
+/// Helper struct for storing algorithm scores
+#[derive(Debug, Clone)]
+pub struct AlgorithmScore {
+    pub algorithm: AlgorithmType,
+    pub raw_score: f64,
+    pub normalized_score: f64,
+}
+
+impl AlgorithmScore {
+    pub fn new(algorithm: AlgorithmType, raw_score: f64, normalized_score: f64) -> Self {
+        Self {
+            algorithm,
+            raw_score,
+            normalized_score,
+        }
+    }
+}
+
+/// Represents a candidate string with scoring information from multiple algorithms
+#[derive(Debug, Clone)]
+pub struct ScoreCandidate {
+    pub string_ref: StringRef,
+    pub algorithm: AlgorithmType,
+    pub raw_score: f64,
+    pub normalized_score: f64,
+    pub final_score: f64,
+    pub alternative_scores: Vec<AlternativeScore>,
+}
+
+impl ScoreCandidate {
+    pub fn new(string_ref: StringRef, algorithm: AlgorithmType, raw_score: f64, normalized_score: f64) -> Self {
         Self {
             string_ref,
             algorithm,
-            score,
+            raw_score,
+            normalized_score,
+            final_score: 0.0,
+            alternative_scores: Vec::new(),
         }
+    }
+
+    /// Add an alternative score from another algorithm
+    pub fn add_alternative_score(&mut self, algorithm: AlgorithmType, normalized_score: f64) {
+        self.alternative_scores.push(AlternativeScore {
+            algorithm,
+            normalized_score,
+        });
+    }
+
+    /// Get the best available score for this candidate (primary or alternative)
+    pub fn get_best_score(&self) -> f64 {
+        let mut best_score = self.normalized_score;
+        for alt in &self.alternative_scores {
+            if alt.normalized_score > best_score {
+                best_score = alt.normalized_score;
+            }
+        }
+        best_score
     }
 }
 
@@ -588,14 +640,41 @@ impl StringSpaceInner {
             return Vec::new();
         }
 
-        // Use progressive algorithm execution for optimal performance
-        self.progressive_algorithm_execution(query, limit)
+        // Use progressive algorithm execution to get initial candidates
+        let all_candidates = self.progressive_algorithm_execution(query, limit);
+
+        // If we have enough high-quality prefix matches, return them directly
+        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
+            return all_candidates.into_iter().take(limit).collect();
+        }
+
+        // Otherwise, collect detailed scores from all algorithms
+        let scored_candidates = self.collect_detailed_scores(query, &all_candidates);
+
+        // Merge duplicate candidates and calculate final scores
+        let merged_candidates = merge_and_score_candidates(scored_candidates, query, self);
+
+        // Sort by final score
+        let mut ranked_candidates = merged_candidates;
+        rank_candidates_by_score(&mut ranked_candidates);
+
+        // Apply limit and return
+        limit_and_convert_results(ranked_candidates, limit)
     }
 
-    fn collect_results(&self) -> Vec<BasicCandidate> {
+    fn collect_results(&self) -> Vec<ScoreCandidate> {
         // Placeholder implementation
         // Will be replaced with actual algorithm execution in subsequent phases
         Vec::new()
+    }
+
+    /// Get maximum string length in the database
+    fn get_max_string_length(&self) -> usize {
+        self.get_all_strings()
+            .iter()
+            .map(|s| s.string.len())
+            .max()
+            .unwrap_or(0)
     }
 
     // Full-database fuzzy subsequence search with early termination
@@ -816,6 +895,247 @@ fn validate_query(query: &str) -> Result<(), &'static str> {
     // For example: minimum length requirements, character restrictions, etc.
 
     Ok(())
+}
+
+// Metadata integration functions
+
+/// Apply metadata adjustments to weighted score
+fn apply_metadata_adjustments(
+    weighted_score: f64,
+    frequency: TFreq,
+    age_days: TAgeDays,
+    candidate_len: usize,
+    query_len: usize,
+    max_len: usize
+) -> f64 {
+    // 1. Frequency factor with logarithmic scaling to prevent dominance
+    let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.1);
+
+    // 2. Age factor with bounded influence (newer items get slight preference)
+    let max_age = 365; // Maximum age in days for normalization
+    let age_factor = 1.0 + (1.0 - (age_days as f64 / max_age as f64)) * 0.05;
+
+    // 3. Length penalty applied only for significant length mismatches
+    let length_penalty = if candidate_len > query_len * 3 {
+        // Only penalize when candidate is 3x longer than query
+        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.1
+    } else {
+        1.0 // No penalty for reasonable length differences
+    };
+
+    // 4. Apply multiplicative combination with bounds checking
+    let final_score = weighted_score * frequency_factor * age_factor * length_penalty;
+
+    // Ensure score doesn't exceed reasonable bounds
+    final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
+}
+
+// Query length categories for dynamic weighting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryLengthCategory {
+    VeryShort,  // 1-2 characters
+    Short,      // 3-4 characters
+    Medium,     // 5-6 characters
+    Long,       // 7+ characters
+}
+
+impl QueryLengthCategory {
+    fn from_query(query: &str) -> Self {
+        match query.len() {
+            1..=2 => QueryLengthCategory::VeryShort,
+            3..=4 => QueryLengthCategory::Short,
+            5..=6 => QueryLengthCategory::Medium,
+            _ => QueryLengthCategory::Long,
+        }
+    }
+}
+
+// Dynamic weight tables for each query length category
+struct AlgorithmWeights {
+    prefix: f64,
+    fuzzy_subseq: f64,
+    jaro_winkler: f64,
+    substring: f64,
+}
+
+impl AlgorithmWeights {
+    fn for_category(category: QueryLengthCategory) -> Self {
+        match category {
+            QueryLengthCategory::VeryShort => AlgorithmWeights {
+                prefix: 0.45,      // Highest weight for very short queries
+                fuzzy_subseq: 0.35, // High weight for abbreviation matching
+                jaro_winkler: 0.15, // Lower weight (less useful for very short)
+                substring: 0.05,   // Minimal weight
+            },
+            QueryLengthCategory::Short => AlgorithmWeights {
+                prefix: 0.40,      // High weight
+                fuzzy_subseq: 0.30, // Good weight
+                jaro_winkler: 0.20, // Medium weight
+                substring: 0.10,   // Low weight
+            },
+            QueryLengthCategory::Medium => AlgorithmWeights {
+                prefix: 0.35,      // Balanced weight
+                fuzzy_subseq: 0.25, // Balanced weight
+                jaro_winkler: 0.25, // Balanced weight
+                substring: 0.15,   // Slightly higher weight
+            },
+            QueryLengthCategory::Long => AlgorithmWeights {
+                prefix: 0.25,      // Lower weight (prefix less useful for long queries)
+                fuzzy_subseq: 0.20, // Lower weight
+                jaro_winkler: 0.35, // Highest weight (good for typo correction)
+                substring: 0.20,   // Higher weight (more relevant for long queries)
+            },
+        }
+    }
+}
+
+/// Get dynamic weights based on query length
+fn get_dynamic_weights(query: &str) -> AlgorithmWeights {
+    let category = QueryLengthCategory::from_query(query);
+    AlgorithmWeights::for_category(category)
+}
+
+/// Calculate weighted score combining all algorithm contributions
+fn calculate_weighted_score(
+    prefix_score: f64,
+    fuzzy_score: f64,
+    jaro_score: f64,
+    substring_score: f64,
+    query: &str
+) -> f64 {
+    let weights = get_dynamic_weights(query);
+
+    weights.prefix * prefix_score +
+    weights.fuzzy_subseq * fuzzy_score +
+    weights.jaro_winkler * jaro_score +
+    weights.substring * substring_score
+}
+
+/// Calculate final score for a candidate with metadata adjustments
+fn calculate_final_score(
+    candidate: &mut ScoreCandidate,
+    query: &str,
+    string_space: &StringSpaceInner
+) -> f64 {
+    // Get all algorithm scores for this candidate
+    let mut prefix_score = 0.0;
+    let mut fuzzy_score = 0.0;
+    let mut jaro_score = 0.0;
+    let mut substring_score = 0.0;
+
+    // Extract scores from primary and alternative algorithms
+    match candidate.algorithm {
+        AlgorithmType::Prefix => prefix_score = candidate.normalized_score,
+        AlgorithmType::FuzzySubseq => fuzzy_score = candidate.normalized_score,
+        AlgorithmType::JaroWinkler => jaro_score = candidate.normalized_score,
+        AlgorithmType::Substring => substring_score = candidate.normalized_score,
+    }
+
+    // Add alternative scores
+    for alt in &candidate.alternative_scores {
+        match alt.algorithm {
+            AlgorithmType::Prefix => prefix_score = prefix_score.max(alt.normalized_score),
+            AlgorithmType::FuzzySubseq => fuzzy_score = fuzzy_score.max(alt.normalized_score),
+            AlgorithmType::JaroWinkler => jaro_score = jaro_score.max(alt.normalized_score),
+            AlgorithmType::Substring => substring_score = substring_score.max(alt.normalized_score),
+        }
+    }
+
+    // Calculate weighted algorithm score
+    let weighted_score = calculate_weighted_score(
+        prefix_score, fuzzy_score, jaro_score, substring_score, query
+    );
+
+    // Apply metadata adjustments
+    let (frequency, age_days, candidate_len) = get_string_metadata(&candidate.string_ref);
+    let query_len = query.len();
+    let max_len = string_space.get_max_string_length();
+
+    let final_score = apply_metadata_adjustments(
+        weighted_score,
+        frequency,
+        age_days,
+        candidate_len,
+        query_len,
+        max_len
+    );
+
+    candidate.final_score = final_score;
+    final_score
+}
+
+/// Merge candidates from different algorithms and calculate final scores
+fn merge_and_score_candidates(
+    candidates: Vec<ScoreCandidate>,
+    query: &str,
+    string_space: &StringSpaceInner
+) -> Vec<ScoreCandidate> {
+    let mut merged: HashMap<String, ScoreCandidate> = HashMap::new();
+
+    // Merge candidates by string reference
+    for candidate in candidates {
+        let string_key = candidate.string_ref.string.clone();
+        if let Some(existing) = merged.get_mut(&string_key) {
+            // Add as alternative score if this algorithm provides a better score
+            if candidate.normalized_score > existing.normalized_score {
+                existing.add_alternative_score(existing.algorithm, existing.normalized_score);
+                existing.algorithm = candidate.algorithm;
+                existing.raw_score = candidate.raw_score;
+                existing.normalized_score = candidate.normalized_score;
+            } else {
+                existing.add_alternative_score(candidate.algorithm, candidate.normalized_score);
+            }
+        } else {
+            merged.insert(string_key, candidate);
+        }
+    }
+
+    // Calculate final scores for all merged candidates
+    let mut scored_candidates: Vec<ScoreCandidate> = merged.into_values().collect();
+    for candidate in &mut scored_candidates {
+        calculate_final_score(candidate, query, string_space);
+    }
+
+    scored_candidates
+}
+
+/// Sort candidates by final score in descending order
+fn rank_candidates_by_score(candidates: &mut [ScoreCandidate]) {
+    candidates.sort_by(|a, b| {
+        b.final_score.partial_cmp(&a.final_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
+/// Apply result limiting and convert to StringRef output
+fn limit_and_convert_results(candidates: Vec<ScoreCandidate>, limit: usize) -> Vec<StringRef> {
+    candidates
+        .into_iter()
+        .take(limit)
+        .map(|candidate| candidate.string_ref)
+        .collect()
+}
+
+/// Get maximum string length in the database
+fn get_max_string_length(&self) -> usize {
+    self.get_all_strings()
+        .iter()
+        .map(|s| s.string.len())
+        .max()
+        .unwrap_or(0)
+}
+
+// Score normalization functions
+
+/// For substring search (earlier matches are better)
+fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
+    1.0 - (position as f64 / max_position as f64)
+}
+
+/// Get metadata for a string reference
+fn get_string_metadata(string_ref: &StringRef) -> (TFreq, TAgeDays, usize) {
+    // Use the metadata directly from StringRef
+    (string_ref.meta.frequency, string_ref.meta.age_days, string_ref.string.len())
 }
 
 fn days_since_epoch() -> TAgeDays {
@@ -1612,6 +1932,368 @@ mod tests {
             let results = ss.jaro_winkler_full_database("abc", 10, 0.1);
             // Should have very few or no matches since character sets are completely different
             assert!(results.len() <= 1);
+        }
+    }
+
+    mod score_candidate {
+        use super::*;
+
+        #[test]
+        fn test_score_candidate_creation() {
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 1, age_days: 0 },
+            };
+            let candidate = ScoreCandidate::new(
+                string_ref.clone(),
+                AlgorithmType::Prefix,
+                0.8,
+                0.9,
+            );
+
+            assert_eq!(candidate.string_ref.string, "hello");
+            assert_eq!(candidate.algorithm, AlgorithmType::Prefix);
+            assert_eq!(candidate.raw_score, 0.8);
+            assert_eq!(candidate.normalized_score, 0.9);
+            assert_eq!(candidate.final_score, 0.0);
+            assert!(candidate.alternative_scores.is_empty());
+        }
+
+        #[test]
+        fn test_add_alternative_score() {
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 1, age_days: 0 },
+            };
+            let mut candidate = ScoreCandidate::new(
+                string_ref,
+                AlgorithmType::Prefix,
+                0.8,
+                0.9,
+            );
+
+            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
+            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
+
+            assert_eq!(candidate.alternative_scores.len(), 2);
+            assert_eq!(candidate.alternative_scores[0].algorithm, AlgorithmType::FuzzySubseq);
+            assert_eq!(candidate.alternative_scores[0].normalized_score, 0.7);
+            assert_eq!(candidate.alternative_scores[1].algorithm, AlgorithmType::JaroWinkler);
+            assert_eq!(candidate.alternative_scores[1].normalized_score, 0.95);
+        }
+
+        #[test]
+        fn test_get_best_score_primary() {
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 1, age_days: 0 },
+            };
+            let candidate = ScoreCandidate::new(
+                string_ref,
+                AlgorithmType::Prefix,
+                0.8,
+                0.9,
+            );
+
+            assert_eq!(candidate.get_best_score(), 0.9);
+        }
+
+        #[test]
+        fn test_get_best_score_alternative() {
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 1, age_days: 0 },
+            };
+            let mut candidate = ScoreCandidate::new(
+                string_ref,
+                AlgorithmType::Prefix,
+                0.8,
+                0.9,
+            );
+
+            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
+            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
+
+            assert_eq!(candidate.get_best_score(), 0.95);
+        }
+
+        #[test]
+        fn test_get_best_score_mixed() {
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 1, age_days: 0 },
+            };
+            let mut candidate = ScoreCandidate::new(
+                string_ref,
+                AlgorithmType::Prefix,
+                0.8,
+                0.9,
+            );
+
+            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.85);
+            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.92);
+
+            assert_eq!(candidate.get_best_score(), 0.92);
+        }
+
+        #[test]
+        fn test_alternative_score_creation() {
+            let alt_score = AlternativeScore {
+                algorithm: AlgorithmType::Substring,
+                normalized_score: 0.75,
+            };
+
+            assert_eq!(alt_score.algorithm, AlgorithmType::Substring);
+            assert_eq!(alt_score.normalized_score, 0.75);
+        }
+
+        #[test]
+        fn test_algorithm_type_variants() {
+            // Test that all algorithm variants are properly defined
+            let prefix = AlgorithmType::Prefix;
+            let fuzzy_subseq = AlgorithmType::FuzzySubseq;
+            let jaro_winkler = AlgorithmType::JaroWinkler;
+            let substring = AlgorithmType::Substring;
+
+            // Test equality
+            assert_eq!(prefix, AlgorithmType::Prefix);
+            assert_eq!(fuzzy_subseq, AlgorithmType::FuzzySubseq);
+            assert_eq!(jaro_winkler, AlgorithmType::JaroWinkler);
+            assert_eq!(substring, AlgorithmType::Substring);
+
+            // Test inequality
+            assert_ne!(prefix, AlgorithmType::FuzzySubseq);
+            assert_ne!(jaro_winkler, AlgorithmType::Substring);
+        }
+    }
+
+    mod metadata_integration {
+        use super::*;
+
+        #[test]
+        fn test_apply_metadata_adjustments_basic() {
+            // Test basic metadata adjustments
+            let weighted_score = 1.0;
+            let frequency = 10;
+            let age_days = 30;
+            let candidate_len = 5;
+            let query_len = 3;
+            let max_len = 50;
+
+            let result = apply_metadata_adjustments(
+                weighted_score, frequency, age_days, candidate_len, query_len, max_len
+            );
+
+            // Should be slightly above 1.0 due to frequency and age factors
+            assert!(result > 1.0);
+            assert!(result <= 2.0); // Should be within bounds
+        }
+
+        #[test]
+        fn test_apply_metadata_adjustments_frequency_effect() {
+            // Test frequency factor effect
+            let weighted_score = 1.0;
+            let high_frequency = 100;
+            let low_frequency = 1;
+            let age_days = 30;
+            let candidate_len = 5;
+            let query_len = 3;
+            let max_len = 50;
+
+            let high_freq_result = apply_metadata_adjustments(
+                weighted_score, high_frequency, age_days, candidate_len, query_len, max_len
+            );
+            let low_freq_result = apply_metadata_adjustments(
+                weighted_score, low_frequency, age_days, candidate_len, query_len, max_len
+            );
+
+            // Higher frequency should result in higher score
+            assert!(high_freq_result > low_freq_result);
+        }
+
+        #[test]
+        fn test_apply_metadata_adjustments_age_effect() {
+            // Test age factor effect
+            let weighted_score = 1.0;
+            let frequency = 10;
+            let older_age = 365; // Maximum age
+            let newer_age = 1;   // Very new
+            let candidate_len = 5;
+            let query_len = 3;
+            let max_len = 50;
+
+            let older_result = apply_metadata_adjustments(
+                weighted_score, frequency, older_age, candidate_len, query_len, max_len
+            );
+            let newer_result = apply_metadata_adjustments(
+                weighted_score, frequency, newer_age, candidate_len, query_len, max_len
+            );
+
+            // Newer items should have slightly higher scores
+            assert!(newer_result > older_result);
+        }
+
+        #[test]
+        fn test_apply_metadata_adjustments_length_penalty() {
+            // Test length penalty for very long candidates
+            let weighted_score = 1.0;
+            let frequency = 10;
+            let age_days = 30;
+            let short_candidate_len = 5;
+            let long_candidate_len = 50; // 10x longer than query
+            let query_len = 5;
+            let max_len = 50;
+
+            let short_result = apply_metadata_adjustments(
+                weighted_score, frequency, age_days, short_candidate_len, query_len, max_len
+            );
+            let long_result = apply_metadata_adjustments(
+                weighted_score, frequency, age_days, long_candidate_len, query_len, max_len
+            );
+
+            // Longer candidate should have lower score due to penalty
+            assert!(short_result > long_result);
+        }
+
+        #[test]
+        fn test_apply_metadata_adjustments_no_length_penalty() {
+            // Test no length penalty for reasonable length differences
+            let weighted_score = 1.0;
+            let frequency = 10;
+            let age_days = 30;
+            let candidate_len = 10;
+            let query_len = 5;
+            let max_len = 50;
+
+            let result = apply_metadata_adjustments(
+                weighted_score, frequency, age_days, candidate_len, query_len, max_len
+            );
+
+            // Should not have significant penalty for 2x length difference
+            assert!(result > 1.0);
+        }
+
+        #[test]
+        fn test_apply_metadata_adjustments_bounds() {
+            // Test that scores are properly bounded
+            let high_weighted_score = 10.0; // Unrealistically high
+            let frequency = 1000;
+            let age_days = 0;
+            let candidate_len = 5;
+            let query_len = 3;
+            let max_len = 50;
+
+            let result = apply_metadata_adjustments(
+                high_weighted_score, frequency, age_days, candidate_len, query_len, max_len
+            );
+
+            // Should be clamped to maximum of 2.0
+            assert!(result <= 2.0);
+            assert!(result >= 0.0);
+        }
+
+        #[test]
+        fn test_normalize_substring_score() {
+            // Test substring score normalization
+            let position = 2;
+            let max_position = 10;
+
+            let result = normalize_substring_score(position, max_position);
+
+            // Earlier positions should have higher scores
+            assert_eq!(result, 1.0 - (2.0 / 10.0)); // 0.8
+        }
+
+        #[test]
+        fn test_normalize_substring_score_start_position() {
+            // Test substring at start position
+            let position = 0;
+            let max_position = 10;
+
+            let result = normalize_substring_score(position, max_position);
+
+            // Start position should have highest score
+            assert_eq!(result, 1.0);
+        }
+
+        #[test]
+        fn test_normalize_substring_score_end_position() {
+            // Test substring at end position
+            let position = 9;
+            let max_position = 10;
+
+            let result = normalize_substring_score(position, max_position);
+
+            // End position should have lowest score
+            assert_eq!(result, 1.0 - (9.0 / 10.0)); // 0.1
+        }
+
+        #[test]
+        fn test_get_string_metadata() {
+            // Test metadata extraction from StringRef
+            let string_ref = StringRef {
+                string: "hello".to_string(),
+                meta: StringMeta { frequency: 5, age_days: 10 },
+            };
+
+            let (frequency, age_days, length) = get_string_metadata(&string_ref);
+
+            assert_eq!(frequency, 5);
+            assert_eq!(age_days, 10);
+            assert_eq!(length, 5); // "hello" has 5 characters
+        }
+
+        #[test]
+        fn test_normalize_fuzzy_score() {
+            // Test fuzzy score normalization
+            let raw_score = 5.0;
+            let min_score = 0.0;
+            let max_score = 10.0;
+
+            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+            // Lower raw scores should result in higher normalized scores
+            assert_eq!(result, 1.0 - (5.0 / 10.0)); // 0.5
+        }
+
+        #[test]
+        fn test_normalize_fuzzy_score_best_case() {
+            // Test best possible fuzzy score
+            let raw_score = 0.0;
+            let min_score = 0.0;
+            let max_score = 10.0;
+
+            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+            // Best raw score should give normalized score of 1.0
+            assert_eq!(result, 1.0);
+        }
+
+        #[test]
+        fn test_normalize_fuzzy_score_worst_case() {
+            // Test worst possible fuzzy score
+            let raw_score = 10.0;
+            let min_score = 0.0;
+            let max_score = 10.0;
+
+            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+            // Worst raw score should give normalized score of 0.0
+            assert_eq!(result, 0.0);
+        }
+
+        #[test]
+        fn test_normalize_fuzzy_score_clamping() {
+            // Test that scores are properly clamped
+            let raw_score = -5.0; // Below min
+            let min_score = 0.0;
+            let max_score = 10.0;
+
+            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+            // Should be clamped to 0.0-1.0 range
+            assert!(result >= 0.0);
+            assert!(result <= 1.0);
         }
     }
 
