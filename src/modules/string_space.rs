@@ -750,7 +750,8 @@ impl StringSpaceInner {
         let candidate = string_ref.string.as_str();
 
         // Apply smart filtering to skip unpromising candidates
-        if should_skip_candidate(candidate.len(), query.len()) {
+        // For fuzzy subsequence, be more lenient with length filtering to allow abbreviation matching
+        if should_skip_candidate_fuzzy(candidate.len(), query.len()) {
             return None;
         }
 
@@ -984,7 +985,8 @@ impl StringSpaceInner {
         let candidate = string_ref.string.as_str();
 
         // Apply smart filtering to skip unpromising candidates
-        if should_skip_candidate(candidate.len(), query.len()) {
+        // Use fuzzy-specific filtering for abbreviation matching
+        if should_skip_candidate_fuzzy(candidate.len(), query.len()) {
             println!("Skipping candidate {} due to length filtering", candidate);
             return None;
         }
@@ -1508,6 +1510,24 @@ fn should_skip_candidate(candidate_len: usize, query_len: usize) -> bool {
     if query_len <= 2 && candidate_len > query_len * 10 {
         return true;
     } else if query_len <= 3 && candidate_len > query_len * 6 {
+        return true;
+    }
+
+    false
+}
+
+// More lenient filtering for fuzzy subsequence search to allow abbreviation matching
+fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
+    // Skip strings that are too short to contain the query
+    if candidate_len < query_len {
+        return true;
+    }
+
+    // For fuzzy subsequence, be much more lenient with length filtering
+    // since it's designed for abbreviation matching
+    if query_len <= 2 && candidate_len > query_len * 20 {
+        return true;
+    } else if query_len <= 3 && candidate_len > query_len * 15 {
         return true;
     }
 
