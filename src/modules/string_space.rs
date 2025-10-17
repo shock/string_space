@@ -677,6 +677,203 @@ impl StringSpaceInner {
             .unwrap_or(0)
     }
 
+    /// Collect detailed scores for candidates from all algorithms
+    fn collect_detailed_scores(&self, query: &str, candidates: &[StringRef]) -> Vec<ScoreCandidate> {
+        let mut scored_candidates = Vec::new();
+
+        for string_ref in candidates {
+            // Calculate scores from all algorithms for this candidate
+            let prefix_score = self.calculate_prefix_score(string_ref, query);
+            let fuzzy_score = self.calculate_fuzzy_subsequence_score(string_ref, query);
+            let jaro_score = self.calculate_jaro_winkler_score(string_ref, query);
+            let substring_score = self.calculate_substring_score(string_ref, query);
+
+            // Create candidate with the best algorithm score
+            let (best_algorithm, best_score) = self.select_best_algorithm_score(
+                prefix_score.clone(), fuzzy_score.clone(), jaro_score.clone(), substring_score.clone()
+            );
+
+            let mut candidate = ScoreCandidate::new(
+                string_ref.clone(),
+                best_algorithm,
+                best_score.raw_score,
+                best_score.normalized_score
+            );
+
+            // Add alternative scores from other algorithms
+            if let Some(score) = prefix_score {
+                if score.algorithm != best_algorithm {
+                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
+                }
+            }
+            if let Some(score) = fuzzy_score {
+                if score.algorithm != best_algorithm {
+                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
+                }
+            }
+            if let Some(score) = jaro_score {
+                if score.algorithm != best_algorithm {
+                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
+                }
+            }
+            if let Some(score) = substring_score {
+                if score.algorithm != best_algorithm {
+                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
+                }
+            }
+
+            scored_candidates.push(candidate);
+        }
+
+        scored_candidates
+    }
+
+    /// Calculate prefix match score with case-insensitive support
+    fn calculate_prefix_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+        let candidate = string_ref.string.as_str();
+
+        // Case-insensitive prefix matching
+        if candidate.to_lowercase().starts_with(&query.to_lowercase()) {
+            // Perfect prefix match gets maximum score
+            Some(AlgorithmScore::new(
+                AlgorithmType::Prefix,
+                1.0,  // raw score
+                1.0   // normalized score
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Calculate fuzzy subsequence score with normalization
+    fn calculate_fuzzy_subsequence_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+        let candidate = string_ref.string.as_str();
+
+        // Apply smart filtering to skip unpromising candidates
+        if should_skip_candidate(candidate.len(), query.len()) {
+            return None;
+        }
+
+        // Check if query is a subsequence of candidate
+        let query_chars: Vec<char> = query.chars().collect();
+        let candidate_chars: Vec<char> = candidate.chars().collect();
+
+        if is_subsequence_chars(&query_chars, &candidate_chars).is_none() {
+            return None;
+        }
+
+        // Calculate match span score (lower is better)
+        let raw_score = score_match_span_chars(&query_chars, &candidate_chars);
+
+        // For normalization, we need min/max scores across all candidates
+        // Since we don't have all candidates here, use a reasonable range
+        let min_score = 0.0;
+        let max_score = candidate.len() as f64 * 2.0; // Reasonable upper bound
+
+        let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+
+        Some(AlgorithmScore::new(
+            AlgorithmType::FuzzySubseq,
+            raw_score,
+            normalized_score
+        ))
+    }
+
+    /// Calculate Jaro-Winkler similarity score with threshold
+    fn calculate_jaro_winkler_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+        let candidate = string_ref.string.as_str();
+
+        // Apply smart filtering to skip unpromising candidates
+        if should_skip_candidate(candidate.len(), query.len()) {
+            return None;
+        }
+
+        // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
+        let similarity = jaro_winkler(query, candidate);
+
+        // Apply threshold - only include reasonable matches
+        if similarity < 0.6 {
+            return None;
+        }
+
+        Some(AlgorithmScore::new(
+            AlgorithmType::JaroWinkler,
+            similarity,  // raw score
+            similarity   // normalized score (same for Jaro-Winkler)
+        ))
+    }
+
+    /// Calculate substring match score with position normalization
+    fn calculate_substring_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
+        let candidate = string_ref.string.as_str();
+
+        // Find substring position
+        if let Some(position) = candidate.find(query) {
+            // Calculate position-based score (earlier matches are better)
+            let max_position = candidate.len().saturating_sub(query.len());
+            let normalized_score = normalize_substring_score(position, max_position);
+
+            Some(AlgorithmScore::new(
+                AlgorithmType::Substring,
+                position as f64,  // raw score (position)
+                normalized_score  // normalized score
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Select the best algorithm score for a candidate
+    fn select_best_algorithm_score(
+        &self,
+        prefix_score: Option<AlgorithmScore>,
+        fuzzy_score: Option<AlgorithmScore>,
+        jaro_score: Option<AlgorithmScore>,
+        substring_score: Option<AlgorithmScore>
+    ) -> (AlgorithmType, AlgorithmScore) {
+        let mut best_score = None;
+        let mut best_algorithm = AlgorithmType::Prefix; // Default fallback
+
+        // Compare all available scores and select the best one
+        if let Some(score) = prefix_score {
+            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
+                best_score = Some(score.normalized_score);
+                best_algorithm = score.algorithm;
+            }
+        }
+
+        if let Some(score) = fuzzy_score {
+            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
+                best_score = Some(score.normalized_score);
+                best_algorithm = score.algorithm;
+            }
+        }
+
+        if let Some(score) = jaro_score {
+            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
+                best_score = Some(score.normalized_score);
+                best_algorithm = score.algorithm;
+            }
+        }
+
+        if let Some(score) = substring_score {
+            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
+                best_score = Some(score.normalized_score);
+                best_algorithm = score.algorithm;
+            }
+        }
+
+        // Create the best score object
+        let best_score_value = best_score.unwrap_or(0.0);
+        let best_score_obj = AlgorithmScore::new(
+            best_algorithm,
+            best_score_value,  // raw score
+            best_score_value   // normalized score
+        );
+
+        (best_algorithm, best_score_obj)
+    }
+
     // Full-database fuzzy subsequence search with early termination
     fn fuzzy_subsequence_full_database(
         &self,
@@ -1116,14 +1313,6 @@ fn limit_and_convert_results(candidates: Vec<ScoreCandidate>, limit: usize) -> V
         .collect()
 }
 
-/// Get maximum string length in the database
-fn get_max_string_length(&self) -> usize {
-    self.get_all_strings()
-        .iter()
-        .map(|s| s.string.len())
-        .max()
-        .unwrap_or(0)
-}
 
 // Score normalization functions
 
