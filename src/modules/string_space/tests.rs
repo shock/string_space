@@ -1009,7 +1009,7 @@ mod tests {
             // Should find all three "hel" prefix matches
             assert!(results.len() >= 3);
 
-            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            let strings: Vec<String> = results.iter().map(|r| r.string_ref.string.clone()).collect();
             assert!(strings.contains(&"hello".to_string()));
             assert!(strings.contains(&"help".to_string()));
             assert!(strings.contains(&"helicopter".to_string()));
@@ -1028,7 +1028,7 @@ mod tests {
             let results = ss.inner.progressive_algorithm_execution("hl", 10);
             assert!(results.len() >= 3);
 
-            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            let strings: Vec<String> = results.iter().map(|r| r.string_ref.string.clone()).collect();
             assert!(strings.contains(&"hello".to_string()));
             assert!(strings.contains(&"help".to_string()));
             assert!(strings.contains(&"helicopter".to_string()));
