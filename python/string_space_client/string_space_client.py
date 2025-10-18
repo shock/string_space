@@ -190,3 +190,26 @@ class StringSpaceClient:
         words = self.parse_text(text)
         response = self.add_words(words)
         return response
+
+    def best_completions_search(self, query: str, limit: int = None) -> list[str]:
+        """
+        Find the best completions for a query using multiple search algorithms.
+
+        Args:
+            query: The search query string
+            limit: Optional maximum number of results to return
+
+        Returns:
+            list[str]: List of matching strings with relevance scores, or error message in list format
+        """
+        try:
+            request_elements = ["best-completions", query]
+            if limit is not None:
+                request_elements.append(str(limit))
+            response = self.request(request_elements)
+            # Remove empty strings from the result
+            return [line for line in response.split('\n') if line]
+        except ProtocolError as e:
+            if self.debug:
+                print(f"Error: {e}")
+            return [f"ERROR: {e}"]

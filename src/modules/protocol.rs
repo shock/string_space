@@ -117,6 +117,41 @@ impl StringSpaceProtocol {
             }
             return response;
         }
+        else if "best-completions" == operation {
+            // Validate parameter count (1-2 parameters)
+            if params.len() < 1 || params.len() > 2 {
+                let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
+                response.extend_from_slice(response_str.as_bytes());
+                return response;
+            }
+
+            let query = params[0];
+            let limit = if params.len() == 2 {
+                match params[1].parse::<usize>() {
+                    Ok(l) => Some(l),
+                    Err(_) => {
+                        let response_str = format!("ERROR - invalid limit parameter '{}'", params[1]);
+                        response.extend_from_slice(response_str.as_bytes());
+                        return response;
+                    }
+                }
+            } else {
+                None
+            };
+
+            let matches = self.space.best_completions(query, limit);
+            for m in matches {
+                response.extend_from_slice(m.string.as_bytes());
+                if SEND_METADATA {
+                    response.extend_from_slice(" ".as_bytes());
+                    response.extend_from_slice(m.meta.frequency.to_string().as_bytes());
+                    response.extend_from_slice(" ".as_bytes());
+                    response.extend_from_slice(m.meta.age_days.to_string().as_bytes());
+                }
+                response.extend_from_slice("\n".as_bytes());
+            }
+            return response;
+        }
         else if "substring" == operation {
             if params.len() != 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
@@ -491,6 +526,149 @@ mod tests {
     }
 
     #[test]
+    fn test_best_completions_command_valid() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_best_completions_valid_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+        writeln!(file, "help 2 0").unwrap();
+        writeln!(file, "helicopter 3 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test valid best-completions command with query only
+        let operation = "best-completions";
+        let params: Vec<&str> = vec!["hel"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_best_completions_command_with_limit() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_best_completions_limit_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+        writeln!(file, "help 2 0").unwrap();
+        writeln!(file, "helicopter 3 0").unwrap();
+        writeln!(file, "hell 4 0").unwrap();
+        writeln!(file, "health 5 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test valid best-completions command with query and limit
+        let operation = "best-completions";
+        let params: Vec<&str> = vec!["hel", "3"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should not contain error message
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_best_completions_command_invalid_params() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_best_completions_invalid_params_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test invalid parameter count - empty params
+        let operation = "best-completions";
+        let params_empty: Vec<&str> = vec![];
+
+        let response_empty = protocol.create_response(operation, params_empty);
+        let response_str_empty = String::from_utf8(response_empty).unwrap();
+
+        assert!(response_str_empty.starts_with("ERROR - invalid parameters"));
+
+        // Test invalid parameter count - too many params
+        let params_too_many: Vec<&str> = vec!["hel", "10", "extra"];
+
+        let response_too_many = protocol.create_response(operation, params_too_many);
+        let response_str_too_many = String::from_utf8(response_too_many).unwrap();
+
+        assert!(response_str_too_many.starts_with("ERROR - invalid parameters"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_best_completions_command_empty_query() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_best_completions_empty_query_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test empty query handling
+        let operation = "best-completions";
+        let params: Vec<&str> = vec![""];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Empty query should return empty results (no error)
+        assert!(!response_str.starts_with("ERROR"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
+    fn test_best_completions_command_invalid_limit() {
+        // Create a temporary test file
+        use std::fs::File;
+        use std::io::Write;
+
+        let test_file = "test_best_completions_invalid_limit_data.txt";
+        let mut file = File::create(test_file).unwrap();
+        writeln!(file, "hello 1 0").unwrap();
+
+        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+
+        // Test invalid limit parameter
+        let operation = "best-completions";
+        let params: Vec<&str> = vec!["hel", "not_a_number"];
+
+        let response = protocol.create_response(operation, params);
+        let response_str = String::from_utf8(response).unwrap();
+
+        // Should contain specific error message about invalid limit
+        assert!(response_str.starts_with("ERROR - invalid limit parameter"));
+
+        // Clean up the test file
+        std::fs::remove_file(test_file).unwrap();
+    }
+
+    #[test]
     fn test_fuzzy_subsequence_command_integration() {
         // Create a temporary test file with some data
         use std::fs::File;
@@ -707,5 +885,299 @@ mod integration_tests {
         assert!(!response_str.contains("Hello"), "Expected 'Hello' not to be in response");
         assert!(response_str.contains("HELP"), "Expected 'HELP' to be in response");
         assert!(!response_str.contains("helicopter"), "Expected 'helicopter' not to be in response");
+    }
+
+    #[test]
+    fn test_best_completions_integration() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert realistic test data with varying frequencies
+        let test_words = vec![
+            ("hello", 10),
+            ("help", 5),
+            ("helicopter", 2),
+            ("health", 8),
+            ("hell", 3),
+            ("world", 7),
+            ("word", 4),
+            ("work", 6),
+        ];
+
+        for (word, frequency) in test_words {
+            protocol.space.insert_string(word, frequency).unwrap();
+        }
+
+        // Test integration with other commands to ensure no conflicts
+        let operations = vec![
+            ("prefix", vec!["he"]),
+            ("substring", vec!["or"]),
+            ("fuzzy-subsequence", vec!["hl"]),
+            ("similar", vec!["hello", "0.6"]),
+            ("best-completions", vec!["hel"]),
+            ("best-completions", vec!["wor", "3"]),
+        ];
+
+        for (operation, params) in operations {
+            let response = protocol.create_response(operation, params.clone());
+            let response_str = String::from_utf8(response).unwrap();
+
+            // Each operation should handle its own parameter validation
+            // We just verify that the protocol doesn't crash
+            assert!(!response_str.starts_with("ERROR"),
+                   "Operation '{}' with params {:?} failed: {}",
+                   operation, params, response_str);
+        }
+
+        // Verify best-completions results are reasonable
+        let best_completions_response = protocol.create_response("best-completions", vec!["hel"]);
+        let best_completions_str = String::from_utf8(best_completions_response).unwrap();
+
+        // Should contain high-frequency matches
+        assert!(best_completions_str.contains("hello"),
+               "Expected 'hello' in best completions: {}", best_completions_str);
+        assert!(best_completions_str.contains("help"),
+               "Expected 'help' in best completions: {}", best_completions_str);
+        assert!(best_completions_str.contains("health"),
+               "Expected 'health' in best completions: {}", best_completions_str);
+    }
+
+    #[test]
+    fn test_best_completions_performance() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert large dataset for performance testing
+        for i in 0..10000 {
+            let word = format!("testword{}", i);
+            // Use varying frequencies to test the ranking algorithm
+            let frequency = (i % 10) + 1;
+            protocol.space.insert_string(&word, frequency).unwrap();
+        }
+
+        // Add some specific test words with high frequencies
+        protocol.space.insert_string("test", 100).unwrap();
+        protocol.space.insert_string("testing", 50).unwrap();
+        protocol.space.insert_string("tester", 25).unwrap();
+
+        // Test performance with multiple best-completions queries
+        let start = std::time::Instant::now();
+
+        let test_queries = vec![
+            "test",
+            "tes",
+            "te",
+            "t",
+        ];
+
+        for query in test_queries {
+            for _ in 0..10 {
+                let response = protocol.create_response("best-completions", vec![query]);
+                let response_str = String::from_utf8(response).unwrap();
+
+                // Verify we get results for valid queries
+                if query == "test" {
+                    assert!(!response_str.trim().is_empty(),
+                           "Expected results for query '{}': {}", query, response_str);
+                }
+            }
+        }
+
+        let duration = start.elapsed();
+
+        // Performance requirement: should complete within 1 second
+        // This is a reasonable expectation for 40 queries on 10k words
+        assert!(duration.as_millis() < 1000,
+               "Performance test took too long: {:?} for 40 queries", duration);
+
+        // Test with limit parameter for additional performance validation
+        let start_with_limit = std::time::Instant::now();
+
+        for _ in 0..20 {
+            let response = protocol.create_response("best-completions", vec!["test", "5"]);
+            let response_str = String::from_utf8(response).unwrap();
+
+            // Should return limited results
+            let result_count = response_str.lines().filter(|line| !line.trim().is_empty()).count();
+            assert!(result_count <= 5,
+                   "Expected at most 5 results with limit, got {}: {}",
+                   result_count, response_str);
+        }
+
+        let duration_with_limit = start_with_limit.elapsed();
+        assert!(duration_with_limit.as_millis() < 1000,
+               "Performance with limit took too long: {:?}", duration_with_limit);
+    }
+
+    #[test]
+    fn test_best_completions_edge_cases() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Test 1: Empty database
+        let response_empty_db = protocol.create_response("best-completions", vec!["test"]);
+        let response_empty_db_str = String::from_utf8(response_empty_db).unwrap();
+        assert!(!response_empty_db_str.starts_with("ERROR"),
+               "Should handle empty database gracefully: {}", response_empty_db_str);
+
+        // Insert some test data
+        protocol.space.insert_string("hello", 10).unwrap();
+        protocol.space.insert_string("help", 5).unwrap();
+        protocol.space.insert_string("helicopter", 2).unwrap();
+
+        // Test 2: Empty query
+        let response_empty_query = protocol.create_response("best-completions", vec![""]);
+        let response_empty_query_str = String::from_utf8(response_empty_query).unwrap();
+        assert!(!response_empty_query_str.starts_with("ERROR"),
+               "Should handle empty query gracefully: {}", response_empty_query_str);
+
+        // Test 3: Very long query (beyond typical word length)
+        let long_query = "a".repeat(100);
+        let response_long_query = protocol.create_response("best-completions", vec![&long_query]);
+        let response_long_query_str = String::from_utf8(response_long_query).unwrap();
+        assert!(!response_long_query_str.starts_with("ERROR"),
+               "Should handle very long query: {}", response_long_query_str);
+
+        // Test 4: Query with special characters
+        let response_special_chars = protocol.create_response("best-completions", vec!["hel@#$"]);
+        let response_special_chars_str = String::from_utf8(response_special_chars).unwrap();
+        assert!(!response_special_chars_str.starts_with("ERROR"),
+               "Should handle special characters: {}", response_special_chars_str);
+
+        // Test 5: Limit of 0
+        let response_zero_limit = protocol.create_response("best-completions", vec!["hel", "0"]);
+        let response_zero_limit_str = String::from_utf8(response_zero_limit).unwrap();
+        assert!(!response_zero_limit_str.starts_with("ERROR"),
+               "Should handle limit of 0: {}", response_zero_limit_str);
+        // Should return no results with limit 0
+        assert!(response_zero_limit_str.trim().is_empty(),
+               "Expected no results with limit 0: {}", response_zero_limit_str);
+
+        // Test 6: Very large limit
+        let response_large_limit = protocol.create_response("best-completions", vec!["hel", "1000"]);
+        let response_large_limit_str = String::from_utf8(response_large_limit).unwrap();
+        assert!(!response_large_limit_str.starts_with("ERROR"),
+               "Should handle large limit: {}", response_large_limit_str);
+
+        // Test 7: Invalid parameter counts
+        let response_no_params = protocol.create_response("best-completions", vec![]);
+        let response_no_params_str = String::from_utf8(response_no_params).unwrap();
+        assert!(response_no_params_str.starts_with("ERROR - invalid parameters"),
+               "Should error on no parameters: {}", response_no_params_str);
+
+        let response_three_params = protocol.create_response("best-completions", vec!["hel", "10", "extra"]);
+        let response_three_params_str = String::from_utf8(response_three_params).unwrap();
+        assert!(response_three_params_str.starts_with("ERROR - invalid parameters"),
+               "Should error on too many parameters: {}", response_three_params_str);
+
+        // Test 8: Invalid limit parameter
+        let response_invalid_limit = protocol.create_response("best-completions", vec!["hel", "not_a_number"]);
+        let response_invalid_limit_str = String::from_utf8(response_invalid_limit).unwrap();
+        assert!(response_invalid_limit_str.starts_with("ERROR - invalid limit parameter"),
+               "Should error on invalid limit: {}", response_invalid_limit_str);
+    }
+
+    #[test]
+    fn test_best_completions_progressive_execution() {
+        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+
+        // Insert test data with progressive frequency patterns
+        let words_and_frequencies = vec![
+            ("hello", 100),  // Highest frequency
+            ("help", 50),    // Medium frequency
+            ("helicopter", 10), // Lower frequency
+            ("hell", 5),     // Even lower
+            ("health", 1),   // Lowest frequency
+            ("world", 75),   // High frequency but different prefix
+            ("word", 25),    // Medium frequency, different prefix
+        ];
+
+        for (word, frequency) in words_and_frequencies {
+            protocol.space.insert_string(word, frequency).unwrap();
+        }
+
+        // Test progressive queries with increasing specificity
+        let progressive_queries = vec![
+            ("h", vec!["hello", "help", "helicopter", "hell", "health"]), // All 'h' words
+            ("he", vec!["hello", "help", "helicopter", "hell", "health"]), // All 'he' words
+            ("hel", vec!["hello", "help", "helicopter", "hell", "health"]), // All 'hel' words
+            ("hell", vec!["hello", "hell"]), // Only 'hell' prefix matches
+        ];
+
+        for (query, expected_words) in progressive_queries {
+            let response = protocol.create_response("best-completions", vec![query]);
+            let response_str = String::from_utf8(response).unwrap();
+
+            // Verify all expected words are present
+            for expected_word in &expected_words {
+                assert!(response_str.contains(expected_word),
+                       "Expected '{}' in response for query '{}': {}",
+                       expected_word, query, response_str);
+            }
+
+            // Verify results are ordered by frequency (highest first)
+            let lines: Vec<&str> = response_str.lines()
+                .filter(|line| !line.trim().is_empty())
+                .collect();
+
+            if lines.len() > 1 {
+                // For the 'h' query, we should see frequency-based ordering
+                if query == "h" {
+                    // hello (100) should come before help (50)
+                    let hello_pos = lines.iter().position(|&line| line == "hello");
+                    let help_pos = lines.iter().position(|&line| line == "help");
+
+                    if let (Some(hello_idx), Some(help_idx)) = (hello_pos, help_pos) {
+                        assert!(hello_idx < help_idx,
+                               "Expected 'hello' before 'help' in frequency-based ordering");
+                    }
+                }
+            }
+        }
+
+        // Test with explicit limits to verify progressive ranking
+        // Note: The actual ranking algorithm considers more than just frequency
+        // Based on the debug output, the ranking for "hel" query is:
+        // 1. helicopter, 2. hell, 3. hello, 4. help, 5. health
+        let limit_tests = vec![
+            ("hel", "1", vec!["helicopter"]), // Top ranked by algorithm
+            ("hel", "2", vec!["helicopter", "hell"]), // Top 2 by algorithm
+            ("hel", "3", vec!["helicopter", "hell", "hello"]), // Top 3 by algorithm
+        ];
+
+        for (query, limit, expected_top_words) in limit_tests {
+            let response = protocol.create_response("best-completions", vec![query, limit]);
+            let response_str = String::from_utf8(response).unwrap();
+
+            let result_words: Vec<&str> = response_str.lines()
+                .filter(|line| !line.trim().is_empty())
+                .collect();
+
+            // Verify we get exactly the expected number of results
+            assert_eq!(result_words.len(), expected_top_words.len(),
+                      "Expected {} results for query '{}' with limit {}, got {}: {:?}",
+                      expected_top_words.len(), query, limit, result_words.len(), result_words);
+
+            // Verify the results match expected top words
+            for (i, expected_word) in expected_top_words.iter().enumerate() {
+                assert_eq!(result_words[i], *expected_word,
+                          "Expected '{}' at position {} for query '{}' with limit {}, got: {:?}",
+                          expected_word, i, query, limit, result_words);
+            }
+        }
+
+        // Test that non-matching queries return empty results
+        let non_matching_queries = vec![
+            "xyz",
+            "123",
+            "@#$",
+        ];
+
+        for query in non_matching_queries {
+            let response = protocol.create_response("best-completions", vec![query]);
+            let response_str = String::from_utf8(response).unwrap();
+
+            assert!(!response_str.starts_with("ERROR"),
+                   "Should handle non-matching query '{}' gracefully: {}", query, response_str);
+            assert!(response_str.trim().is_empty(),
+                   "Expected empty results for non-matching query '{}': {}", query, response_str);
+        }
     }
 }

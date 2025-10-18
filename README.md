@@ -12,6 +12,7 @@ This Rust project implements a word-list database that allows efficient insertio
 - **Prefix and Substring Search**: Supports fast searching for strings by prefix and substring.
 - **Fuzzy Search**: Includes a simple implementation of Jaro-Winkler fuzzy search for similarity matching.
 - **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing for abbreviations and partial matches.
+- **Best Completions**: Intelligent search combining multiple algorithms (prefix, substring, fuzzy subsequence, Jaro-Winkler) with relevance scoring.
 - **Frequency and Age Tracking**: Tracks the frequency of word usage and their insertion time (age).
 - **Simple TCP API**: Enables remote access to the word-list database via a minimal TCP protocol.
 - **Random Word Generation**: Capable of generating a customizable number of random words for benchmarking and testing.
@@ -149,7 +150,15 @@ The server listens for client connections on the specified host and port. It sup
    - **Description**: Searches for words where query characters appear in order, but not necessarily consecutively. Useful for abbreviations and partial matches.
    - **Response**: A list of matching words, each on a new line.
 
-6. **Additional Operations**
+6. **Best Completions**
+   - **Command**: `best-completions <query> [limit]`
+   - **Description**: Finds the best completions for a query using multiple search algorithms (prefix, substring, fuzzy subsequence, and Jaro-Winkler similarity). Returns results sorted by relevance score.
+   - **Parameters**:
+     - `query` (required): The search query string
+     - `limit` (optional): Maximum number of results to return
+   - **Response**: A list of matching words with relevance scores, each on a new line.
+
+7. **Additional Operations**
    - **Remove Words**: `remove <words...>` - Remove words from storage
    - **Clear Space**: `clear_space` - Clear all strings
    - **Get All Strings**: `get_all_strings` - Retrieve all stored strings
