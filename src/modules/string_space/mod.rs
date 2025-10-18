@@ -117,6 +117,26 @@ pub struct AlternativeScore {
     pub normalized_score: f64,
 }
 
+// Query length categories for dynamic weighting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryLengthCategory {
+    VeryShort,  // 1-2 characters
+    Short,      // 3-4 characters
+    Medium,     // 5-6 characters
+    Long,       // 7+ characters
+}
+
+impl QueryLengthCategory {
+    fn from_query(query: &str) -> Self {
+        match query.len() {
+            1..=2 => QueryLengthCategory::VeryShort,
+            3..=4 => QueryLengthCategory::Short,
+            5..=6 => QueryLengthCategory::Medium,
+            _ => QueryLengthCategory::Long,
+        }
+    }
+}
+
 /// Helper struct for storing algorithm scores
 #[derive(Debug, Clone)]
 pub struct AlgorithmScore {
@@ -1586,26 +1606,6 @@ fn apply_metadata_adjustments(
 
     // Ensure score doesn't exceed reasonable bounds
     final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
-}
-
-// Query length categories for dynamic weighting
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum QueryLengthCategory {
-    VeryShort,  // 1-2 characters
-    Short,      // 3-4 characters
-    Medium,     // 5-6 characters
-    Long,       // 7+ characters
-}
-
-impl QueryLengthCategory {
-    fn from_query(query: &str) -> Self {
-        match query.len() {
-            1..=2 => QueryLengthCategory::VeryShort,
-            3..=4 => QueryLengthCategory::Short,
-            5..=6 => QueryLengthCategory::Medium,
-            _ => QueryLengthCategory::Long,
-        }
-    }
 }
 
 /// Get dynamic weights based on query length

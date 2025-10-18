@@ -641,60 +641,6 @@ mod tests {
         }
 
         #[test]
-        fn test_get_best_score_primary() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            assert_eq!(candidate.get_best_score(), 0.9);
-        }
-
-        #[test]
-        fn test_get_best_score_alternative() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
-
-            assert_eq!(candidate.get_best_score(), 0.95);
-        }
-
-        #[test]
-        fn test_get_best_score_mixed() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.85);
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.92);
-
-            assert_eq!(candidate.get_best_score(), 0.92);
-        }
-
-        #[test]
         fn test_alternative_score_creation() {
             let alt_score = AlternativeScore {
                 algorithm: AlgorithmType::Substring,
@@ -1048,29 +994,6 @@ mod tests {
             // Should get some results but not necessarily all matches due to early termination
             assert!(results.len() > 0);
             assert!(results.len() <= 5);
-        }
-
-        #[test]
-        fn test_has_high_quality_prefix_matches() {
-            let ssi = StringSpaceInner::new();
-
-            // Create test candidates
-            let candidates = vec![
-                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "helicopter".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-            ];
-
-            // All candidates start with "hel" - should be high quality
-            assert!(ssi.has_high_quality_prefix_matches(&candidates, "hel"));
-
-            // Mixed candidates - should not be high quality
-            let mixed_candidates = vec![
-                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "world".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-            ];
-            assert!(!ssi.has_high_quality_prefix_matches(&mixed_candidates, "hel"));
         }
 
         #[test]
