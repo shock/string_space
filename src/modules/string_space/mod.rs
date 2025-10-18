@@ -264,16 +264,6 @@ impl ScoreCandidate {
         });
     }
 
-    /// Get the best available score for this candidate (primary or alternative)
-    pub fn get_best_score(&self) -> f64 {
-        let mut best_score = self.normalized_score;
-        for alt in &self.alternative_scores {
-            if alt.normalized_score > best_score {
-                best_score = alt.normalized_score;
-            }
-        }
-        best_score
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -333,6 +323,7 @@ impl StringSpace {
     ///
     /// This is primarily for testing purposes to reproduce specific scenarios
     /// with known metadata values.
+    #[allow(unused)]
     pub fn insert_string_with_age(&mut self, string: &str, frequency: TFreq, age_days: TAgeDays) -> Result<(), &'static str> {
         if string.len() < MIN_CHARS || string.len() > MAX_CHARS {
             return Err("String length out of bounds");
@@ -758,12 +749,6 @@ impl StringSpaceInner {
         results
     }
 
-    fn find_by_prefix_alpha_sort(&self, search_prefix: &str) -> Vec<StringRef> {
-        let mut results = self.find_by_prefix_no_sort(search_prefix);
-        results.sort_by(|a, b| a.string.cmp(&b.string));
-        results
-    }
-
     fn find_by_prefix_no_sort(&self, search_prefix: &str) -> Vec<StringRef> {
         let search_bytes = search_prefix.as_bytes();
         let search_len = search_bytes.len();
@@ -883,11 +868,6 @@ impl StringSpaceInner {
     // Wrapper method for prefix search - returns unsorted results for best_completions system
     fn prefix_search(&self, query: &str) -> Vec<StringRef> {
         self.find_by_prefix_no_sort(query)
-    }
-
-    // Wrapper method for substring search - returns unsorted results for best_completions system
-    fn substring_search(&self, query: &str) -> Vec<StringRef> {
-        self.find_with_substring(query)
     }
 
     fn print_strings(&self) {
@@ -1016,12 +996,6 @@ impl StringSpaceInner {
         // Use progressive algorithm execution to get initial candidates
         let all_candidates = self.progressive_algorithm_execution(query, limit);
 
-        // If we have enough high-quality prefix matches, return them directly
-        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
-            // println!("Returning high-quality prefix matches directly");
-            // return all_candidates.into_iter().take(limit).collect();
-        }
-
         // Otherwise, collect detailed scores from all algorithms
         println!("Collecting detailed scores for candidates...");
         let scored_candidates = self.collect_detailed_scores(query, &all_candidates);
@@ -1055,12 +1029,6 @@ impl StringSpaceInner {
         ranked_candidates.truncate(limit);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
-    }
-
-    fn collect_results(&self) -> Vec<ScoreCandidate> {
-        // Placeholder implementation
-        // Will be replaced with actual algorithm execution in subsequent phases
-        Vec::new()
     }
 
     /// Handle single character queries with special logic
@@ -1497,8 +1465,7 @@ impl StringSpaceInner {
     ) -> Vec<StringRef> {
         let mut all_candidates = Vec::new();
         let mut seen_strings = std::collections::HashSet::new();
-        let orig_limit = limit;
-        let mut limit = limit.max(10); // Ensure minimum limit of 10 for internal processing
+
         // Helper function to add unique candidates
         fn add_unique_candidates(
             candidates: Vec<StringRef>,
@@ -1512,79 +1479,35 @@ impl StringSpaceInner {
             }
         }
 
-        // return all_candidates.into_iter().take(limit).collect();
-
         // 1. Fast prefix search first (O(log n))
-        let prefix_candidates = self.prefix_search(query);
-        // add_unique_candidates(prefix_candidates, &mut all_candidates, &mut seen_strings);
+        // Only get 'limit' candidates
+        let prefix_candidates = self.prefix_search(query).into_iter()
+            .take(limit)
+            .collect::<Vec<_>>();
 
-        // Early termination if we have enough high-quality prefix matches
-        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
-            // return all_candidates.into_iter().take(limit).collect();
-        }
+        add_unique_candidates(prefix_candidates, &mut all_candidates, &mut seen_strings);
 
         // 2. Fuzzy subsequence with early termination (O(n) with early exit)
-        let remaining_needed = limit.saturating_sub(all_candidates.len()) + 10;
-        if remaining_needed > 0 {
-            // Use fallback threshold for fuzzy search to ensure we get some results
-            let fuzzy_candidates = self.fuzzy_subsequence_full_database(
-                query,
-                remaining_needed,
-                0.0 // score threshold - include all matches for progressive execution
-            );
-            // add_unique_candidates(fuzzy_candidates, &mut all_candidates, &mut seen_strings);
-        }
+        // Use fallback threshold for fuzzy search to ensure we get some results
+        let fuzzy_candidates = self.fuzzy_subsequence_full_database(
+            query,
+            limit   ,
+            0.0 // score threshold - include all matches for progressive execution
+        );
+        add_unique_candidates(fuzzy_candidates, &mut all_candidates, &mut seen_strings);
 
         // 3. Jaro-Winkler only if still needed (O(n) with early exit)
-        let remaining_needed = limit.saturating_sub(all_candidates.len()) + 10;
-        if remaining_needed > 0 && false {
-            // Use adaptive threshold for Jaro-Winkler based on query length
-            let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.7 };
-            let jaro_candidates = self.jaro_winkler_full_database(
-                query,
-                remaining_needed,
-                jaro_threshold // adaptive similarity threshold
-            );
-            // add_unique_candidates(jaro_candidates, &mut all_candidates, &mut seen_strings);
-        }
+        // Use adaptive threshold for Jaro-Winkler based on query length
+        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.7 };
+        let jaro_candidates = self.jaro_winkler_full_database(
+            query,
+            limit,
+            jaro_threshold // adaptive similarity threshold
+        );
+        add_unique_candidates(jaro_candidates, &mut all_candidates, &mut seen_strings);
 
-        // 4. Substring only as last resort for longer queries
-        let remaining_needed = limit.saturating_sub(all_candidates.len()) + 10;
-        if remaining_needed > 0 && query.len() >= 2 { // Lowered from 3 to 2 for better fallback
-            let substring_candidates = self.substring_search(query)
-                .into_iter()
-                .take(remaining_needed)
-                .collect::<Vec<_>>();
-            add_unique_candidates(substring_candidates, &mut all_candidates, &mut seen_strings);
-        }
-
-        // 5. Final fallback: if we still don't have enough results and query is very short,
-        // use first character prefix search as last resort
-        let remaining_needed = limit.saturating_sub(all_candidates.len()) + 10;
-        if remaining_needed > 0 && query.len() >= 1 {
-            // Handle Unicode characters properly by using chars() iterator
-            if let Some(first_char) = query.chars().next() {
-                let first_char_str = first_char.to_string();
-                let fallback_candidates = self.prefix_search(&first_char_str)
-                    .into_iter()
-                    .take(remaining_needed)
-                    .collect::<Vec<_>>();
-                // add_unique_candidates(fallback_candidates, &mut all_candidates, &mut seen_strings);
-            }
-        }
 
         all_candidates.into_iter().take(limit).collect()
-    }
-
-    // Helper to check for high-quality prefix matches
-    fn has_high_quality_prefix_matches(&self, candidates: &[StringRef], query: &str) -> bool {
-        // Optimized: Consider it high quality if more than 2/3 of candidates are exact prefix matches
-        // This maintains the original behavior while allowing for future optimizations
-        let prefix_match_count = candidates.iter()
-            .filter(|c| c.string.starts_with(query))
-            .count();
-        let threshold = (candidates.len() * 2) / 3;
-        prefix_match_count > threshold
     }
 
 }
@@ -2036,11 +1959,6 @@ fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
     false
 }
 
-// Character set filtering for fuzzy algorithms
-fn contains_required_chars(candidate: &str, query: &str) -> bool {
-    let candidate_chars: std::collections::HashSet<char> = candidate.chars().collect();
-    query.chars().all(|c| candidate_chars.contains(&c))
-}
 
 // For fuzzy subsequence (lower raw scores are better)
 fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
