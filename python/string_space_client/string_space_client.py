@@ -191,21 +191,61 @@ class StringSpaceClient:
         response = self.add_words(words)
         return response
 
-    def best_completions_search(self, query: str, limit: int = None) -> list[str]:
+    def best_completions_search(self, query: str, limit: int = 10) -> list[str]:
         """
-        Find the best completions for a query using multiple search algorithms.
+        Perform best completions search using progressive algorithm execution.
+
+        This method uses the advanced multi-algorithm completion system that
+        progressively executes prefix, fuzzy subsequence, Jaro-Winkler, and
+        substring searches with unified scoring and metadata integration.
+
+        The algorithm executes in phases:
+        1. **Prefix Search**: Exact prefix matches (highest priority)
+        2. **Fuzzy Subsequence Search**: Character order-preserving matches
+        3. **Jaro-Winkler Similarity**: Fuzzy similarity matches
+        4. **Substring Search**: General substring matches
+
+        Results are deduplicated and scored based on:
+        - Match type (prefix > fuzzy subsequence > similarity > substring)
+        - Word frequency and age
+        - Query length and match quality
 
         Args:
-            query: The search query string
-            limit: Optional maximum number of results to return
+            query: The search query string (1-50 characters). Must be non-empty.
+            limit: Maximum number of results to return (default: 10). Range: 1-100.
 
         Returns:
-            list[str]: List of matching strings with relevance scores, or error message in list format
+            list[str]: List of matching strings sorted by relevance score, highest first.
+                     Returns empty list if no matches found.
+                     Returns error message in list format if connection fails.
+
+        Raises:
+            ProtocolError: If the server returns an error or connection fails
+
+        Examples:
+            >>> client = StringSpaceClient('127.0.0.1', 7878)
+            >>> results = client.best_completions_search("hel")
+            >>> print(results)
+            ['help', 'hello', 'helicopter', 'world']
+
+            >>> # With custom limit
+            >>> results = client.best_completions_search("app", limit=5)
+            >>> print(results)
+            ['apple', 'application', 'apply', 'applesauce', 'apparatus']
+
+            >>> # Empty query handling
+            >>> results = client.best_completions_search("")
+            >>> print(results)
+            []
+
+        Note:
+            - Query must be 1-50 characters in length
+            - Results are deduplicated across search algorithms
+            - Empty queries return empty results
+            - Connection errors return error messages in list format
         """
         try:
-            request_elements = ["best-completions", query]
-            if limit is not None:
-                request_elements.append(str(limit))
+            request_elements = ["best-completions", query, str(limit)]
             response = self.request(request_elements)
             # Remove empty strings from the result
             return [line for line in response.split('\n') if line]

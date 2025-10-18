@@ -117,6 +117,44 @@ else
     echo "Import test ran successfully"
 fi
 
+# Start server again for the new integration tests
+SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
+if [ $? -ne 0 ]; then
+    echo "$EXECUTABLE start test/word_list.txt -p 9898 -d failed"
+    exit 1
+else
+    echo "Daemon server started successfully for integration tests"
+fi
+
+# Run the best-completions integration test
+uv run tests/test_best_completions_integration.py
+if [ $? -ne 0 ]; then
+    echo "uv run tests/test_best_completions_integration.py failed"
+    SS_TEST=true $EXECUTABLE stop
+    exit 1
+else
+    echo "Best-completions integration test ran successfully"
+fi
+
+# Run the protocol validation test
+uv run tests/test_protocol_validation.py
+if [ $? -ne 0 ]; then
+    echo "uv run tests/test_protocol_validation.py failed"
+    SS_TEST=true $EXECUTABLE stop
+    exit 1
+else
+    echo "Protocol validation test ran successfully"
+fi
+
+# Stop the server after all tests
+SS_TEST=true $EXECUTABLE stop
+if [ $? -ne 0 ]; then
+    echo "$EXECUTABLE stop failed"
+    exit 1
+else
+    echo "Daemon server stopped successfully after all tests"
+fi
+
 echo
 echo "ALL TESTS PASSED !!!"
 echo

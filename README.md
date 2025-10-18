@@ -51,7 +51,7 @@ The project is organized as follows:
   - `benchmark.rs`: Performance testing utilities.
   - `utils.rs`: Utility functions for generating random words, timing code execution, and PID management.
   - `word_struct.rs`: Word structure definitions.
-- `python/string_space_client/`: Python client package for easy integration into python projects.
+- `python/string_space_client/`: Python client package for easy integration into python projects. Provides methods for all server commands including `prefix_search`, `substring_search`, `similar_search`, `fuzzy_subsequence_search`, and `best_completions_search`.
 - `python/string_space_completer/`: Python [prompt_toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) completer package for word completion in command line tools using `prompt_toolkit`.  Used by [llm_chat_cli](https://github.com/shock/llm_chat_cli).
 - `tests/`: Integration tests and test runner scripts.
 
@@ -173,6 +173,53 @@ Responses from the server are text-based and end with an EOT byte (`0x04`).
 
 - **Success**: Returns the requested data or an `OK` message.
 - **Error**: Returns an error message starting with `ERROR -`.
+
+## Python Client Usage
+
+The Python client package provides easy access to all server commands. Here's how to use the `best_completions_search` method:
+
+```python
+from string_space_client import StringSpaceClient
+
+# Create client instance
+client = StringSpaceClient('127.0.0.1', 7878)
+
+# Basic best completions search
+results = client.best_completions_search("hel")
+print(results)
+# Output: ['help', 'hello', 'helicopter', 'world']
+
+# With custom limit
+results = client.best_completions_search("app", limit=5)
+print(results)
+# Output: ['apple', 'application', 'apply', 'applesauce', 'apparatus']
+
+# Other available methods
+prefix_results = client.prefix_search("hel")
+substring_results = client.substring_search("world")
+fuzzy_results = client.fuzzy_subsequence_search("hl")
+similar_results = client.similar_search("hello", 0.8)
+
+# Insert words
+client.insert(["hello", "world", "test"])
+
+# Get data file path
+data_file = client.data_file()
+```
+
+### Key Features of `best_completions_search`:
+
+- **Progressive Algorithm Execution**: Uses multiple search algorithms in priority order
+- **Intelligent Scoring**: Combines match type, frequency, and age for relevance ranking
+- **Deduplication**: Removes duplicate results across algorithms
+- **Configurable Limits**: Customizable result count (1-100)
+- **Error Handling**: Graceful handling of connection issues and server errors
+
+### Algorithm Execution Order:
+1. **Prefix Search** - Exact prefix matches (highest priority)
+2. **Fuzzy Subsequence Search** - Character order-preserving matches
+3. **Jaro-Winkler Similarity** - Fuzzy similarity matches
+4. **Substring Search** - General substring matches
 
 ## Benchmarks
 
