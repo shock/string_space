@@ -1061,8 +1061,12 @@ impl StringSpaceInner {
             }
         });
 
-        // Limit to top 10 results
-        ranked_candidates.truncate(limit);
+        // // Limit to top 10 results
+        // ranked_candidates.truncate(limit);
+
+        // get the limit number of ScoreCandidates from ranked_candidates
+        let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
+        print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
@@ -1576,6 +1580,23 @@ impl Drop for StringSpaceInner {
 }
 
 // MARK: Private Functions
+
+fn print_debug_score_candidates(candidates: &[ScoreCandidate]) {
+    println!("Debugging Score Candidates:");
+    for candidate in candidates {
+        println!(
+            "String: {}, Final Score: {:.6}, Algorithm: {:?}, Raw Score: {:.6}, Normalized Score: {:.6}, Alt Scores: {:?}",
+            candidate.string_ref.string,
+            candidate.final_score,
+            candidate.algorithm,
+            candidate.raw_score,
+            candidate.normalized_score,
+            candidate.alternative_scores.iter()
+                .map(|alt| format!("{:?}: {:.6}", alt.algorithm, alt.normalized_score))
+                .collect::<Vec<_>>()
+        );
+    }
+}
 
 fn validate_query(query: &str) -> Result<(), &'static str> {
     if query.is_empty() {
