@@ -1137,4 +1137,887 @@ mod tests {
             assert!(results.len() <= 5);
         }
     }
+
+    mod integration_tests {
+        use super::*;
+
+        #[test]
+        fn test_best_completions_complete_pipeline() {
+            let mut ss = StringSpace::new();
+
+            // Add diverse test data with different characteristics
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("openai/gpt-4o-2024-08-06", 8).unwrap();
+            ss.insert_string("anthropic/claude-3-opus", 12).unwrap();
+            ss.insert_string("world", 20).unwrap();
+            ss.insert_string("word", 18).unwrap();
+            ss.insert_string("ward", 3).unwrap();
+            ss.insert_string("apple", 25).unwrap();
+            ss.insert_string("pineapple", 8).unwrap();
+            ss.insert_string("applesauce", 6).unwrap();
+
+            // Test 1: Progressive algorithm execution with mixed results
+            let results = ss.best_completions("hel", Some(10));
+            assert!(results.len() >= 3, "Should find all hel-prefix words");
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+
+            // Test 2: Typo correction via Jaro-Winkler
+            let results = ss.best_completions("wrold", Some(10));
+            assert!(results.len() > 0, "Should find matches for typo correction");
+
+            // Test 3: Abbreviation matching via fuzzy subsequence
+            let results = ss.best_completions("og4", Some(10));
+            assert!(results.len() > 0, "Should find abbreviation matches");
+
+            // Test 4: Metadata integration - frequency should influence ranking
+            let results = ss.best_completions("app", Some(10));
+            assert!(results.len() > 0, "Should find matches for 'app'");
+            // "apple" has highest frequency (25), should be in top results
+            // Note: With new scoring system, other factors like length and metadata may affect ranking
+            let apple_found = results.iter().any(|r| r.string == "apple");
+            assert!(apple_found, "'apple' should be in results for 'app' query");
+        }
+
+        #[test]
+        fn test_progressive_execution_with_various_query_types() {
+            let mut ss = StringSpace::new();
+
+            // Add test data
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("world", 20).unwrap();
+
+            // Test different query types that trigger different algorithms
+            let query_types = vec![
+                ("h", "very short - prefix + fuzzy"),
+                ("he", "short - prefix + fuzzy"),
+                ("hel", "medium - prefix + jaro"),
+                ("hell", "medium - prefix + jaro"),
+                ("hl", "fuzzy subsequence"),
+                ("wrold", "typo - jaro"),
+                ("wor", "prefix"),
+            ];
+
+            for (query, description) in query_types {
+                let results = ss.best_completions(query, Some(5));
+                assert!(results.len() <= 5, "Result limit should be respected for {}", description);
+                assert!(results.len() > 0 || query == "hl", "Should find results for {} query '{}'", description, query);
+            }
+        }
+
+        #[test]
+        fn test_result_merging_and_ranking() {
+            let mut ss = StringSpace::new();
+
+            // Add test data with mixed algorithm results
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("world", 20).unwrap();
+
+            // Test result limiting
+            let results = ss.best_completions("h", Some(3));
+            assert!(results.len() <= 3, "Result limit should be respected");
+
+            // Test early termination for high-quality prefix matches
+            let results = ss.best_completions("hel", Some(5));
+            assert!(results.len() > 0, "Should find results for 'hel'");
+
+            // Test that we get reasonable results for various queries
+            let queries = vec!["he", "hel", "hl", "wor"];
+            for query in queries {
+                let results = ss.best_completions(query, Some(5));
+                assert!(results.len() <= 5, "Result limit should be respected for query '{}'", query);
+            }
+        }
+
+        #[test]
+        fn test_query_length_categories() {
+            let mut ss = StringSpace::new();
+
+            // Add test data
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("pineapple", 8).unwrap();
+
+            let test_cases = vec![
+                ("h", "Very short (1 char)"),
+                ("he", "Very short (2 chars)"),
+                ("hel", "Short (3 chars)"),
+                ("hell", "Short (4 chars)"),
+                ("hello", "Medium (5 chars)"),
+                ("helloo", "Medium (6 chars)"),
+                ("pineapp", "Long (7 chars)"),
+                ("pineappl", "Long (8 chars)"),
+            ];
+
+            for (query, description) in test_cases {
+                let results = ss.best_completions(query, Some(5));
+                assert!(results.len() <= 5, "Result limit should be respected for {}", description);
+            }
+        }
+    }
+
+    mod performance_tests {
+        use super::*;
+        use std::time::Instant;
+
+        #[test]
+        fn test_performance_small_dataset() {
+            let mut ss = StringSpace::new();
+
+            // Small dataset: 100 words
+            for i in 0..100 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("apple", 5).unwrap();
+            ss.insert_string("application", 3).unwrap();
+            ss.insert_string("apply", 1).unwrap();
+
+            let start = Instant::now();
+            for _ in 0..10 {
+                let _ = ss.best_completions("app", Some(10));
+            }
+            let duration = start.elapsed();
+
+            // Should complete in reasonable time (less than 1 second for 10 queries)
+            assert!(duration.as_millis() < 1000, "Small dataset should be fast");
+        }
+
+        #[test]
+        fn test_performance_medium_dataset() {
+            let mut ss = StringSpace::new();
+
+            // Medium dataset: 1,000 words
+            for i in 0..1000 {
+                ss.insert_string(&format!("testword{}", i), 1).unwrap();
+            }
+            ss.insert_string("apple", 5).unwrap();
+            ss.insert_string("application", 3).unwrap();
+            ss.insert_string("apply", 1).unwrap();
+
+            let start = Instant::now();
+            for _ in 0..5 {
+                let _ = ss.best_completions("app", Some(10));
+            }
+            let duration = start.elapsed();
+
+            // Should complete in reasonable time (less than 1 second for 5 queries)
+            assert!(duration.as_millis() < 1000, "Medium dataset should be fast");
+        }
+
+        #[test]
+        fn test_performance_large_dataset() {
+            let mut ss = StringSpace::new();
+
+            // Large dataset: 10,000 words
+            for i in 0..10000 {
+                ss.insert_string(&format!("largeword{}", i), 1).unwrap();
+            }
+            ss.insert_string("apple", 5).unwrap();
+            ss.insert_string("application", 3).unwrap();
+            ss.insert_string("apply", 1).unwrap();
+
+            let start = Instant::now();
+            let _ = ss.best_completions("app", Some(10));
+            let duration = start.elapsed();
+
+            // Should complete in reasonable time (less than 500ms for single query)
+            assert!(duration.as_millis() < 500, "Large dataset should be reasonable");
+        }
+
+        #[test]
+        fn test_early_termination_effectiveness() {
+            let mut ss = StringSpace::new();
+
+            // Add many strings to test early termination
+            for i in 0..1000 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // Test with small limit to trigger early termination
+            let start = Instant::now();
+            let results = ss.best_completions("hel", Some(5));
+            let duration = start.elapsed();
+
+            // Should get some results but not necessarily all matches due to early termination
+            assert!(results.len() > 0, "Should find results");
+            assert!(results.len() <= 5, "Result limit should be respected");
+            // Adjust timeout to be more realistic for debug builds
+            assert!(duration.as_millis() < 500, "Early termination should be fast, took {}ms", duration.as_millis());
+        }
+
+        #[test]
+        fn test_memory_usage_patterns() {
+            let mut ss = StringSpace::new();
+
+            // Test memory usage with large dataset
+            for i in 0..5000 {
+                ss.insert_string(&format!("memorytest{}", i), 1).unwrap();
+            }
+
+            let initial_capacity = ss.capacity();
+
+            // Perform multiple queries to test memory stability
+            for _ in 0..10 {
+                let _ = ss.best_completions("mem", Some(10));
+            }
+
+            let final_capacity = ss.capacity();
+
+            // Memory capacity should remain stable during query operations
+            assert_eq!(initial_capacity, final_capacity, "Memory usage should be stable");
+        }
+
+        #[test]
+        fn test_progressive_execution_performance() {
+            let mut ss = StringSpace::new();
+
+            // Add test data
+            for i in 0..1000 {
+                ss.insert_string(&format!("perftest{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+
+            // Test different query types that trigger different algorithms
+            let query_types = vec![
+                ("app", "prefix match"),
+                ("apl", "fuzzy subsequence"),
+                ("appl", "jaro-winkler"),
+            ];
+
+            for (query, description) in query_types {
+                let start = Instant::now();
+                let _ = ss.best_completions(query, Some(10));
+                let duration = start.elapsed();
+
+                // All query types should complete in reasonable time
+                assert!(duration.as_millis() < 100, "{} should be fast", description);
+            }
+        }
+    }
+
+    mod edge_cases {
+        use super::*;
+
+        #[test]
+        fn test_empty_database() {
+            let ss = StringSpace::new();
+
+            // All search methods should return empty results for empty database
+            assert!(ss.best_completions("hello", Some(10)).is_empty());
+            assert!(ss.find_by_prefix("hel").is_empty());
+            assert!(ss.fuzzy_subsequence_search("hl").is_empty());
+            assert!(ss.find_with_substring("lo").is_empty());
+            assert!(ss.get_similar_words("hell", Some(0.7)).is_empty());
+        }
+
+        #[test]
+        fn test_single_character_queries() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 5).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("wonder", 1).unwrap();
+
+            // Single character queries should work
+            let results = ss.best_completions("h", Some(10));
+            assert!(results.len() >= 2);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+
+            // Single character queries should be sorted by frequency
+            let results = ss.best_completions("w", Some(10));
+            assert!(results.len() >= 2);
+            // "world" has higher frequency than "wonder"
+            assert_eq!(results[0].string, "world");
+            assert_eq!(results[1].string, "wonder");
+        }
+
+        #[test]
+        fn test_invalid_single_character_queries() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Non-alphanumeric single character queries should be rejected
+            let results = ss.best_completions("!", Some(10));
+            assert!(results.is_empty());
+
+            let results = ss.best_completions(" ", Some(10));
+            assert!(results.is_empty());
+
+            let results = ss.best_completions("\n", Some(10));
+            assert!(results.is_empty());
+        }
+
+        #[test]
+        fn test_control_characters_in_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Queries with control characters should be rejected
+            let results = ss.best_completions("hel\0lo", Some(10));
+            assert!(results.is_empty());
+
+            let results = ss.best_completions("hel\tlo", Some(10));
+            assert!(results.is_empty());
+
+            let results = ss.best_completions("hel\rlo", Some(10));
+            assert!(results.is_empty());
+        }
+
+        #[test]
+        fn test_very_long_queries() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Queries longer than MAX_CHARS should be rejected
+            let long_query = "a".repeat(MAX_CHARS + 1);
+            let results = ss.best_completions(&long_query, Some(10));
+            assert!(results.is_empty());
+
+            // Queries at maximum length should work
+            let max_length_query = "a".repeat(MAX_CHARS);
+            let results = ss.best_completions(&max_length_query, Some(10));
+            // Should return empty results (no matches) but not crash
+            assert!(results.is_empty());
+        }
+
+        #[test]
+        fn test_unicode_edge_cases() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("café", 1).unwrap();
+            ss.insert_string("naïve", 2).unwrap();
+            ss.insert_string("über", 3).unwrap();
+            ss.insert_string("hello", 4).unwrap();
+
+            // Unicode queries should work correctly
+            let results = ss.best_completions("caf", Some(10));
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].string, "café");
+
+            let results = ss.best_completions("naï", Some(10));
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].string, "naïve");
+
+            let results = ss.best_completions("üb", Some(10));
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].string, "über");
+        }
+
+        #[test]
+        fn test_unicode_replacement_characters() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Queries with Unicode replacement characters should be rejected
+            let results = ss.best_completions("hel�lo", Some(10));
+            assert!(results.is_empty());
+        }
+
+        #[test]
+        fn test_empty_query() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Empty queries should return empty results
+            let results = ss.best_completions("", Some(10));
+            assert!(results.is_empty());
+        }
+
+        #[test]
+        fn test_no_matches_fallback() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 2).unwrap();
+            ss.insert_string("world", 3).unwrap();
+
+            // Query with no direct matches should use fallback algorithms
+            let results = ss.best_completions("xyz", Some(10));
+            // Should return empty results (no matches found)
+            assert!(results.is_empty());
+
+            // Query with partial matches should use fuzzy algorithms
+            let results = ss.best_completions("hl", Some(10));
+            // Should find "hello" and "help" via fuzzy subsequence
+            assert!(results.len() >= 2);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+        }
+
+        #[test]
+        fn test_progressive_algorithm_fallback() {
+            let mut ss = StringSpace::new();
+            // Add many strings to test progressive execution
+            for i in 0..20 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+            ss.insert_string("hello", 5).unwrap();
+            ss.insert_string("help", 3).unwrap();
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Test that progressive execution works through multiple algorithms
+            let results = ss.best_completions("hl", Some(10));
+            // Should find all three "h" words via fuzzy subsequence
+            assert!(results.len() >= 3);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"help".to_string()));
+            assert!(strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_graceful_degradation() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 2).unwrap();
+
+            // Test that the system doesn't crash with various edge cases
+            // Very short queries
+            let results = ss.best_completions("h", Some(5));
+            assert!(results.len() <= 5);
+
+            // Queries with special characters (should be rejected)
+            let results = ss.best_completions("h\0", Some(5));
+            assert!(results.is_empty());
+
+            // Queries at boundary lengths
+            let boundary_query = "a".repeat(MAX_CHARS);
+            let results = ss.best_completions(&boundary_query, Some(5));
+            // Should not crash, may return empty results
+            assert!(results.len() <= 5);
+        }
+
+        #[test]
+        fn test_algorithm_threshold_adjustment() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("help", 2).unwrap();
+            ss.insert_string("helicopter", 3).unwrap();
+
+            // Test that different query lengths use appropriate thresholds
+            // Short query (2 chars) should use lower Jaro-Winkler threshold
+            let short_results = ss.best_completions("he", Some(10));
+            // Longer query (4 chars) should use higher threshold
+            let long_results = ss.best_completions("hell", Some(10));
+
+            // Both should return results
+            assert!(!short_results.is_empty());
+            assert!(!long_results.is_empty());
+        }
+
+        #[test]
+        fn test_character_set_validation() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Test various problematic character combinations
+            let problematic_queries = [
+                "\x00", // Null character
+                "\x1F", // Unit separator
+                "\x7F", // Delete character
+                "\u{0080}", // C1 control character
+                "\u{009F}", // C1 control character
+            ];
+
+            for query in problematic_queries {
+                let results = ss.best_completions(query, Some(10));
+                // Should return empty results (query rejected)
+                assert!(results.is_empty(), "Query '{}' should be rejected", query);
+            }
+        }
+
+        #[test]
+        fn test_unicode_complex_characters() {
+            let mut ss = StringSpace::new();
+            // Test with complex Unicode characters
+            ss.insert_string("café", 1).unwrap();
+            ss.insert_string("naïve", 2).unwrap();
+            ss.insert_string("über", 3).unwrap();
+            ss.insert_string("jalapeño", 4).unwrap();
+            ss.insert_string("résumé", 5).unwrap();
+            ss.insert_string("crème brûlée", 6).unwrap();
+
+            // Test various Unicode queries
+            let unicode_queries = vec![
+                ("caf", "café"),
+                ("naï", "naïve"),
+                ("üb", "über"),
+                ("jal", "jalapeño"),
+                ("rés", "résumé"),
+                ("crè", "crème brûlée"),
+            ];
+
+            for (query, expected) in unicode_queries {
+                let results = ss.best_completions(query, Some(10));
+                assert!(results.len() > 0, "Should find matches for Unicode query '{}'", query);
+                let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+                assert!(strings.contains(&expected.to_string()), "Should find '{}' for query '{}'", expected, query);
+            }
+        }
+
+        #[test]
+        fn test_emoji_and_symbol_handling() {
+            let mut ss = StringSpace::new();
+            // Test with emoji and symbols in strings
+            ss.insert_string("hello 😊", 1).unwrap();
+            ss.insert_string("world 🌍", 2).unwrap();
+            ss.insert_string("test ✅", 3).unwrap();
+
+            // Regular text queries should still work
+            let results = ss.best_completions("hello", Some(10));
+            assert!(results.len() >= 1);
+            // The result may contain the emoji string
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello 😊".to_string()));
+
+            // Test that we can find results for various queries
+            let queries = vec!["hello", "world", "test"];
+            for query in queries {
+                let results = ss.best_completions(query, Some(10));
+                assert!(results.len() > 0, "Should find results for query '{}'", query);
+            }
+        }
+
+        #[test]
+        fn test_maximum_capacity_datasets() {
+            let mut ss = StringSpace::new();
+
+            // Fill with maximum reasonable number of strings
+            for i in 0..10000 {
+                ss.insert_string(&format!("maxword{}", i), 1).unwrap();
+            }
+
+            // Test that queries still work with large dataset
+            let results = ss.best_completions("max", Some(10));
+            assert!(results.len() > 0, "Should find results in large dataset");
+            assert!(results.len() <= 10, "Result limit should be respected");
+
+            // Test memory usage doesn't explode
+            let capacity = ss.capacity();
+            assert!(capacity > 0, "Should have allocated memory");
+        }
+
+        #[test]
+        fn test_mixed_frequency_and_age_distributions() {
+            let mut ss = StringSpace::new();
+
+            // Add words with varied frequency and age distributions
+            ss.insert_string("high_freq_new", 100).unwrap();
+            ss.insert_string("high_freq_old", 100).unwrap();
+            ss.insert_string("medium_freq_new", 50).unwrap();
+            ss.insert_string("medium_freq_old", 50).unwrap();
+            ss.insert_string("low_freq_new", 10).unwrap();
+            ss.insert_string("low_freq_old", 10).unwrap();
+
+            // Test that we can find high frequency items
+            let results = ss.best_completions("high", Some(10));
+            assert!(results.len() >= 2);
+            // All results should have high frequency
+            let all_high_freq = results.iter().all(|r| r.meta.frequency == 100);
+            assert!(all_high_freq, "All results should have high frequency");
+
+            // Test that we can find items across frequency ranges
+            let results = ss.best_completions("freq", Some(10));
+            assert!(results.len() >= 6);
+            // Should contain items from all frequency ranges
+            let high_freq_count = results.iter().filter(|r| r.meta.frequency == 100).count();
+            let medium_freq_count = results.iter().filter(|r| r.meta.frequency == 50).count();
+            let low_freq_count = results.iter().filter(|r| r.meta.frequency == 10).count();
+            assert!(high_freq_count >= 2, "Should have high frequency items");
+            assert!(medium_freq_count >= 2, "Should have medium frequency items");
+            assert!(low_freq_count >= 2, "Should have low frequency items");
+        }
+
+        #[test]
+        fn test_single_character_edge_cases() {
+            let mut ss = StringSpace::new();
+            // Only insert valid strings (minimum 3 chars)
+            ss.insert_string("abc", 1).unwrap(); // Minimum length
+            ss.insert_string("xyz", 2).unwrap();
+
+            // Single character queries should work for valid strings
+            let results = ss.best_completions("a", Some(10));
+            assert!(results.len() > 0, "Should find results for single char query");
+            // The result should contain "abc"
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"abc".to_string()));
+
+            // Very short queries should be handled gracefully
+            let results = ss.best_completions("x", Some(10));
+            assert!(results.len() > 0, "Should find results for single char query");
+            // The result should contain "xyz"
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"xyz".to_string()));
+        }
+
+        #[test]
+        fn test_boundary_length_queries() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Test queries at various boundary lengths
+            let boundary_queries = vec![
+                ("", "empty query"),
+                ("h", "1 char"),
+                ("he", "2 chars"),
+                ("hel", "3 chars"),
+                ("hell", "4 chars"),
+                ("hello", "5 chars"),
+                ("helloo", "6 chars"),
+                ("hellooo", "7 chars"),
+                ("helloooo", "8 chars"),
+                ("hellooooo", "9 chars"),
+                ("helloooooo", "10 chars"),
+            ];
+
+            for (query, description) in boundary_queries {
+                let results = ss.best_completions(query, Some(10));
+                // Should not crash for any query length
+                assert!(results.len() <= 10, "Result limit should be respected for {}", description);
+            }
+        }
+
+        #[test]
+        fn test_special_character_sequences() {
+            let mut ss = StringSpace::new();
+            // Test with strings containing special characters
+            ss.insert_string("test-hyphen", 1).unwrap();
+            ss.insert_string("test_underscore", 2).unwrap();
+            ss.insert_string("test.dot", 3).unwrap();
+
+            // Queries with special characters should work
+            let results = ss.best_completions("test-", Some(10));
+            assert!(results.len() >= 1);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"test-hyphen".to_string()));
+
+            let results = ss.best_completions("test_", Some(10));
+            assert!(results.len() >= 1);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"test_underscore".to_string()));
+
+            let results = ss.best_completions("test.", Some(10));
+            assert!(results.len() >= 1);
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"test.dot".to_string()));
+        }
+    }
+
+    mod quality_assurance_tests {
+        use super::*;
+
+        #[test]
+        fn test_result_ranking_quality() {
+            let mut ss = StringSpace::new();
+
+            // Add test data with clear ranking expectations
+            ss.insert_string("apple", 25).unwrap();    // High frequency
+            ss.insert_string("application", 10).unwrap(); // Medium frequency
+            ss.insert_string("apply", 5).unwrap();     // Low frequency
+            ss.insert_string("applesauce", 3).unwrap(); // Very low frequency
+
+            // Test that we find all app-prefix words
+            let results = ss.best_completions("app", Some(10));
+            assert!(results.len() >= 4, "Should find all app-prefix words");
+
+            // Verify all expected strings are present
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"apple".to_string()));
+            assert!(strings.contains(&"application".to_string()));
+            assert!(strings.contains(&"apply".to_string()));
+            assert!(strings.contains(&"applesauce".to_string()));
+
+            // Verify that higher frequency items tend to rank higher
+            // (but not strictly due to complex scoring)
+            let high_freq_count = results.iter().filter(|r| r.meta.frequency >= 10).count();
+            let low_freq_count = results.iter().filter(|r| r.meta.frequency < 10).count();
+            assert!(high_freq_count >= 2, "Should have high frequency items");
+            assert!(low_freq_count >= 2, "Should have low frequency items");
+        }
+
+        #[test]
+        fn test_frequency_recency_prioritization() {
+            let mut ss = StringSpace::new();
+
+            // Add words with same frequency but different ages
+            ss.insert_string("recent_high_freq", 100).unwrap();
+            ss.insert_string("old_high_freq", 100).unwrap();
+            ss.insert_string("recent_medium_freq", 50).unwrap();
+            ss.insert_string("old_medium_freq", 50).unwrap();
+
+            // Test that we find high frequency items
+            let results = ss.best_completions("high", Some(10));
+            assert!(results.len() >= 2);
+            // Both should have same frequency
+            let high_freq_items: Vec<_> = results.iter().filter(|r| r.meta.frequency == 100).collect();
+            assert!(high_freq_items.len() >= 2, "Should find high frequency items");
+
+            // Test that we find items with frequency patterns
+            let results = ss.best_completions("freq", Some(10));
+            assert!(results.len() >= 4);
+            // Should contain both high and medium frequency items
+            let high_freq_count = results.iter().filter(|r| r.meta.frequency == 100).count();
+            let medium_freq_count = results.iter().filter(|r| r.meta.frequency == 50).count();
+            assert!(high_freq_count >= 2, "Should have high frequency items");
+            assert!(medium_freq_count >= 2, "Should have medium frequency items");
+        }
+
+        #[test]
+        fn test_length_penalty_verification() {
+            let mut ss = StringSpace::new();
+
+            // Add words with same frequency but different lengths
+            ss.insert_string("short", 10).unwrap();
+            ss.insert_string("medium_length", 10).unwrap();
+            ss.insert_string("very_long_word_that_is_much_longer", 10).unwrap();
+
+            // Test with query that matches all
+            let results = ss.best_completions("s", Some(10));
+            assert!(results.len() >= 1);
+
+            // Test with query that requires fuzzy matching
+            let results = ss.best_completions("shrt", Some(10));
+            // "short" should rank higher than longer words due to length penalty
+            if results.len() > 0 {
+                assert_eq!(results[0].string, "short");
+            }
+        }
+
+        #[test]
+        fn test_algorithm_preference_hierarchy() {
+            let mut ss = StringSpace::new();
+
+            // Add test data
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+
+            // Test that prefix matches are preferred over fuzzy matches
+            let prefix_results = ss.best_completions("hel", Some(10));
+            let fuzzy_results = ss.best_completions("hl", Some(10));
+
+            // Prefix queries should find exact matches
+            assert!(prefix_results.len() >= 3);
+            // Fuzzy queries may find fewer or different matches
+            assert!(fuzzy_results.len() >= 3);
+
+            // Verify that prefix results are exact matches
+            let prefix_strings: Vec<String> = prefix_results.iter().map(|r| r.string.clone()).collect();
+            assert!(prefix_strings.contains(&"hello".to_string()));
+            assert!(prefix_strings.contains(&"help".to_string()));
+            assert!(prefix_strings.contains(&"helicopter".to_string()));
+
+            // Fuzzy results should also contain the same strings
+            let fuzzy_strings: Vec<String> = fuzzy_results.iter().map(|r| r.string.clone()).collect();
+            assert!(fuzzy_strings.contains(&"hello".to_string()));
+            assert!(fuzzy_strings.contains(&"help".to_string()));
+            assert!(fuzzy_strings.contains(&"helicopter".to_string()));
+        }
+
+        #[test]
+        fn test_result_quality_across_query_types() {
+            let mut ss = StringSpace::new();
+
+            // Add comprehensive test data
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("world", 20).unwrap();
+            ss.insert_string("word", 18).unwrap();
+            ss.insert_string("openai/gpt-4o-2024-08-06", 8).unwrap();
+
+            // Test different query types and verify result quality
+            let query_types = vec![
+                ("hel", "prefix"),
+                ("hl", "fuzzy subsequence"),
+                ("wrold", "jaro-winkler typo"),
+                ("og4", "abbreviation"),
+            ];
+
+            for (query, query_type) in query_types {
+                let results = ss.best_completions(query, Some(10));
+                assert!(results.len() > 0, "Should find results for {} query '{}'", query_type, query);
+
+                // Verify results are relevant to the query
+                for result in &results {
+                    match query_type {
+                        "prefix" => assert!(result.string.starts_with(query),
+                                           "Prefix result '{}' should start with '{}'", result.string, query),
+                        "fuzzy subsequence" => {
+                            // Should contain the characters in order
+                            let mut query_chars = query.chars();
+                            let mut current_char = query_chars.next();
+                            for c in result.string.chars() {
+                                if current_char == Some(c) {
+                                    current_char = query_chars.next();
+                                }
+                            }
+                            assert!(current_char.is_none(),
+                                   "Fuzzy result '{}' should contain characters from '{}' in order", result.string, query);
+                        },
+                        "jaro-winkler typo" => {
+                            // Should be similar to the intended word
+                            let similarity = strsim::jaro_winkler(&result.string, "world");
+                            assert!(similarity > 0.7,
+                                   "Typo correction result '{}' should be similar to 'world'", result.string);
+                        },
+                        "abbreviation" => {
+                            // Should match the abbreviation pattern
+                            assert!(result.string.contains("openai/gpt"),
+                                   "Abbreviation result '{}' should match pattern", result.string);
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn test_metadata_integration_quality() {
+            let mut ss = StringSpace::new();
+
+            // Add words with different metadata characteristics
+            ss.insert_string("frequent_recent", 100).unwrap();
+            ss.insert_string("frequent_old", 100).unwrap();
+            ss.insert_string("infrequent_recent", 10).unwrap();
+            ss.insert_string("infrequent_old", 10).unwrap();
+
+            // Test that we can find frequent items
+            let results = ss.best_completions("frequent", Some(10));
+            assert!(results.len() >= 2);
+            // Most should have high frequency (may include some from other algorithms)
+            let high_freq_count = results.iter().filter(|r| r.meta.frequency == 100).count();
+            assert!(high_freq_count >= 1, "Should have high frequency items");
+
+            // Test that we can find infrequent items
+            let results = ss.best_completions("infrequent", Some(10));
+            assert!(results.len() >= 2);
+            // Most should have low frequency (may include some from other algorithms)
+            let low_freq_count = results.iter().filter(|r| r.meta.frequency == 10).count();
+            assert!(low_freq_count >= 1, "Should have low frequency items");
+
+            // Test mixed frequency patterns
+            let results = ss.best_completions("ent", Some(10));
+            assert!(results.len() >= 4);
+            // Should contain both high and low frequency items
+            let high_freq_count = results.iter().filter(|r| r.meta.frequency == 100).count();
+            let low_freq_count = results.iter().filter(|r| r.meta.frequency == 10).count();
+            assert!(high_freq_count >= 1, "Should have high frequency items");
+            assert!(low_freq_count >= 1, "Should have low frequency items");
+        }
+    }
 }

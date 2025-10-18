@@ -23,7 +23,7 @@ Phase 2 focuses on implementing the individual search algorithms that will power
 - If tests fail and status shows they were failing: Make note and continue
 
 ### Step 4: Codebase Review
-- Review existing search methods in `src/modules/string_space.rs`
+- Review existing search methods in `src/modules/string_space/mod.rs`
 - Understand current fuzzy subsequence, prefix, and substring search implementations
 - Identify existing Jaro-Winkler implementation or determine if it needs to be added
 - Review memory management and performance characteristics of existing algorithms

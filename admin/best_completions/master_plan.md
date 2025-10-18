@@ -17,7 +17,7 @@ Implement a multi-algorithm completion method that intelligently combines prefix
 **1. Add `best_completions` method signature to `StringSpaceInner`**
 
 ```rust
-// In src/modules/string_space.rs, within the StringSpaceInner impl block
+// In src/modules/string_space/mod.rs, within the StringSpaceInner impl block
 fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
     let limit = limit.unwrap_or(15);
 
@@ -35,7 +35,7 @@ fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> 
 **2. Add public `best_completions` method to `StringSpace` struct**
 
 ```rust
-// In src/modules/string_space.rs, within the StringSpace impl block
+// In src/modules/string_space/mod.rs, within the StringSpace impl block
 #[allow(unused)]
 pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
     self.inner.best_completions(query, limit)
@@ -330,7 +330,7 @@ fn has_high_quality_prefix_matches(candidates: &[StringRef], query: &str) -> boo
 **1. Create `ScoreCandidate` struct and related types**
 
 ```rust
-// In src/modules/string_space.rs
+// In src/modules/string_space/mod.rs
 
 /// Represents a candidate string with scoring information from multiple algorithms
 #[derive(Debug, Clone)]

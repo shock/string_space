@@ -26,7 +26,7 @@ Phase 3 implements the comprehensive scoring system for the `best_completions` m
 - Document current test failure state for comparison after implementation
 
 ### Step 4: Codebase Review
-- Review `src/modules/string_space.rs` to understand current implementation state
+- Review `src/modules/string_space/mod.rs` to understand current implementation state
 - Identify missing methods that need to be implemented
 - Understand existing data structures and algorithm implementations
 

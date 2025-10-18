@@ -5,6 +5,8 @@ mod modules {
     pub mod benchmark;
 }
 
+mod performance_test;
+
 mod integration_test;
 
 use modules::protocol::Protocol;
@@ -77,6 +79,8 @@ enum Command {
     },
     /// Run integration tests for best_completions Phase 4
     IntegrationTest,
+    /// Run performance tests for best_completions optimization
+    PerformanceTest,
 }
 
 fn main() {
@@ -102,6 +106,10 @@ fn main() {
         }
         Command::IntegrationTest => {
             integration_test::run_all_integration_tests();
+            std::process::exit(0);
+        }
+        Command::PerformanceTest => {
+            performance_test::run_performance_tests();
             std::process::exit(0);
         }
     }
