@@ -70,6 +70,8 @@ class StringSpaceCompleter(Completer):
                 yield Completion(suggestion, start_position=-len(word_before_cursor))
 
     def stop(self):
+        if self.disabled:
+            return
         self.client.disconnect()
 
     def parse_text(self, text: str) -> list[str]:
@@ -82,8 +84,12 @@ class StringSpaceCompleter(Completer):
         return words
 
     def add_words_from_text(self, text):
+        if self.disabled:
+            return
         words = self.parse_text(text)
         self.client.add_words(words)
 
     def add_words(self, words):
+        if self.disabled:
+            return
         self.client.add_words(words)

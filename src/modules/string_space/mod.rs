@@ -567,7 +567,8 @@ impl StringSpace {
         target_count: usize,
         score_threshold: f64
     ) -> Vec<StringRef> {
-        self.inner.fuzzy_subsequence_full_database(query, target_count, score_threshold)
+        let results = self.inner.fuzzy_subsequence_full_database(query, target_count, score_threshold);
+        results.into_iter().map(|result| result.string_ref).collect()
     }
 
     /// Performs Jaro-Winkler similarity search across the entire database.
@@ -602,7 +603,8 @@ impl StringSpace {
         target_count: usize,
         similarity_threshold: f64
     ) -> Vec<StringRef> {
-        self.inner.jaro_winkler_full_database(query, target_count, similarity_threshold)
+        let results = self.inner.jaro_winkler_full_database(query, target_count, similarity_threshold);
+        results.into_iter().map(|result| result.string_ref).collect()
     }
 
 }
@@ -890,6 +892,20 @@ impl StringSpaceInner {
         self.find_by_prefix_no_sort(query)
     }
 
+    fn scored_prefix_search(&self, query: &str) -> Vec<ScoreCandidate> {
+        let mut results = Vec::new();
+        let matches = self.find_by_prefix(query);
+        for string_ref in matches {
+            let score = self.calculate_prefix_score(&string_ref, &query);
+            if score.is_none() {
+                continue;
+            }
+            let score = score.unwrap();
+            results.push(ScoreCandidate::new(string_ref, AlgorithmType::Prefix, score.raw_score, score.normalized_score));
+        }
+        results
+    }
+
     fn print_strings(&self) {
         for string_ref_info in &self.string_refs {
             let string_bytes = unsafe {
@@ -1018,7 +1034,7 @@ impl StringSpaceInner {
 
         // Otherwise, collect detailed scores from all algorithms
         println!("Collecting detailed scores for candidates...");
-        let scored_candidates = self.collect_detailed_scores(query, &all_candidates);
+        let scored_candidates = all_candidates;
 
         // Handle case where no candidates were found
         if scored_candidates.is_empty() {
@@ -1347,7 +1363,7 @@ impl StringSpaceInner {
         query: &str,
         target_count: usize,
         score_threshold: f64
-    ) -> Vec<StringRef> {
+    ) -> Vec<ScoreCandidate> {
         // Empty query handling: return empty vector for empty queries
         if query.is_empty() {
             return Vec::new();
@@ -1399,7 +1415,16 @@ impl StringSpaceInner {
             // So we want to keep candidates with normalized scores ABOVE the threshold
             // (since better matches have higher normalized scores)
             if normalized_score >= score_threshold {
-                results.push(string_ref);
+                let score_candidate = ScoreCandidate {
+                    string_ref: string_ref.clone(),
+                    algorithm: AlgorithmType::FuzzySubseq,
+                    raw_score,
+                    normalized_score,
+                    alternative_scores: Vec::new(),
+                    final_score: 0.0,
+                };
+
+                results.push(score_candidate);
                 // println!("Added {} to results", string_copy);
 
                 // Early termination: stop if we have enough high-quality candidates
@@ -1418,8 +1443,8 @@ impl StringSpaceInner {
         query: &str,
         target_count: usize,
         similarity_threshold: f64
-    ) -> Vec<StringRef> {
-        let mut results = Vec::new();
+    ) -> Vec<ScoreCandidate> {
+        let mut results: Vec<ScoreCandidate> = Vec::new();
         let all_strings = self.get_all_strings();
 
         for string_ref in all_strings {
@@ -1434,7 +1459,15 @@ impl StringSpaceInner {
             let similarity = jaro_winkler(query, candidate);
 
             if similarity >= similarity_threshold {
-                results.push(string_ref);
+                let score_candidate = ScoreCandidate {
+                    string_ref: string_ref.clone(),
+                    algorithm: AlgorithmType::JaroWinkler,
+                    raw_score: similarity,
+                    normalized_score: similarity,
+                    alternative_scores: Vec::new(),
+                    final_score: 0.0,
+                };
+                results.push(score_candidate);
 
                 // Early termination: stop if we have enough high-quality candidates
                 if results.len() >= target_count * 2 {
@@ -1443,6 +1476,8 @@ impl StringSpaceInner {
             }
         }
 
+        // sort results by similarity descending
+        results.sort_by(|a, b| b.normalized_score.partial_cmp(&a.normalized_score).unwrap());
         results
     }
 
@@ -1482,18 +1517,18 @@ impl StringSpaceInner {
         &self,
         query: &str,
         limit: usize
-    ) -> Vec<StringRef> {
+    ) -> Vec<ScoreCandidate> {
         let mut all_candidates = Vec::new();
         let mut seen_strings = std::collections::HashSet::new();
 
         // Helper function to add unique candidates
         fn add_unique_candidates(
-            candidates: Vec<StringRef>,
-            all_candidates: &mut Vec<StringRef>,
+            candidates: Vec<ScoreCandidate>,
+            all_candidates: &mut Vec<ScoreCandidate>,
             seen_strings: &mut std::collections::HashSet<String>
         ) {
             for candidate in candidates {
-                if seen_strings.insert(candidate.string.clone()) {
+                if seen_strings.insert(candidate.string_ref.string.clone()) {
                     all_candidates.push(candidate);
                 }
             }
@@ -1501,7 +1536,7 @@ impl StringSpaceInner {
 
         // 1. Fast prefix search first (O(log n))
         // Only get 'limit' candidates
-        let prefix_candidates = self.prefix_search(query).into_iter()
+        let prefix_candidates = self.scored_prefix_search(query).into_iter()
             .take(limit)
             .collect::<Vec<_>>();
 
@@ -1511,7 +1546,7 @@ impl StringSpaceInner {
         // Use fallback threshold for fuzzy search to ensure we get some results
         let fuzzy_candidates = self.fuzzy_subsequence_full_database(
             query,
-            limit   ,
+            limit,
             0.0 // score threshold - include all matches for progressive execution
         );
         add_unique_candidates(fuzzy_candidates, &mut all_candidates, &mut seen_strings);
