@@ -165,8 +165,8 @@ struct AlgorithmWeights {
 
 impl AlgorithmWeights {
     fn for_category(category: QueryLengthCategory) -> Self {
-        let fuzzy_multiplier = 1.;      // Adjust this to boost fuzzy_subseq
-        let jaro_multiplier = 0.0;       // Adjust this to boost jaro_winkler
+        let fuzzy_multiplier = 1.5;      // Adjust this to boost fuzzy_subseq
+        let jaro_multiplier = 0.5;       // Adjust this to boost jaro_winkler
 
         match category {
             QueryLengthCategory::VeryShort => {
@@ -1821,7 +1821,6 @@ fn days_since_epoch() -> TAgeDays {
     (since_epoch.as_secs() / (60 * 60 * 24)).try_into().unwrap()
 }
 
-use libc::CLOCK_UPTIME_RAW;
 use strsim::levenshtein;
 
 #[allow(unused)]
@@ -1994,7 +1993,7 @@ fn score_match_span_chars(query_chars: &[char], candidate_chars: &[char]) -> f64
 
         let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
         let candidate_length = candidate_chars.len() as f64;
-        (candidate_length - span_length) / candidate_length
+        (candidate_length - span_length - match_indices.len() as f64) / candidate_length
     } else {
         0.0
     }
