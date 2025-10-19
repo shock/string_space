@@ -1136,6 +1136,106 @@ mod tests {
             assert!(results.len() > 0);
             assert!(results.len() <= 5);
         }
+
+        #[test]
+        fn test_prefix_priority_over_other_algorithms() {
+            let mut ss = StringSpace::new();
+
+            // Insert test data with clear prefix matches and fuzzy matches
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("world", 20).unwrap();
+
+            // Query that should return prefix matches
+            let query = "hel";
+            let results = ss.best_completions(query, Some(10));
+
+            // All prefix matches should be in results
+            assert!(results.len() >= 3, "Should find all prefix matches for 'hel'");
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()), "'hello' should be in results");
+            assert!(strings.contains(&"help".to_string()), "'help' should be in results");
+            assert!(strings.contains(&"helicopter".to_string()), "'helicopter' should be in results");
+
+            // Prefix matches should appear before non-prefix matches
+            // "world" should not appear in results since it doesn't match "hel"
+            assert!(!strings.contains(&"world".to_string()), "'world' should not be in results for 'hel' query");
+
+            // Test with a query that has both prefix and fuzzy matches
+            let mut ss2 = StringSpace::new();
+            ss2.insert_string("hello", 10).unwrap();
+            ss2.insert_string("help", 15).unwrap();
+            ss2.insert_string("helicopter", 5).unwrap();
+            ss2.insert_string("hallelujah", 8).unwrap();
+            ss2.insert_string("world", 20).unwrap();
+
+            let query2 = "hl";
+            let results2 = ss2.best_completions(query2, Some(10));
+
+            // Should find fuzzy matches for "hl"
+            assert!(results2.len() >= 4, "Should find fuzzy matches for 'hl'");
+
+            let strings2: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings2.contains(&"hello".to_string()), "'hello' should be in fuzzy results");
+            assert!(strings2.contains(&"help".to_string()), "'help' should be in fuzzy results");
+            assert!(strings2.contains(&"helicopter".to_string()), "'helicopter' should be in fuzzy results");
+            assert!(strings2.contains(&"hallelujah".to_string()), "'hallelujah' should be in fuzzy results");
+        }
+
+        #[test]
+        fn test_implement_prefix_priority() {
+            let mut ss = StringSpace::new();
+
+            // Insert the exact test data with metadata (frequency, age_days)
+            let test_data = vec![
+                ("-implementing", 2, 20046),
+                ("Change_in_valuation_multiple", 1, 20369),
+                ("implement", 117, 20378),
+                ("implementation", 67, 20378),
+                ("implementations", 23, 20046),
+                ("implementatoin", 1, 19990),
+                ("implemented", 21, 20378),
+                ("implementers", 1, 20016),
+                ("implementing", 18, 20378),
+                ("implements", 31, 20231),
+            ];
+
+            // Insert all strings with their actual metadata
+            for (string, frequency, age_days) in test_data {
+                ss.insert_string_with_age(string, frequency, age_days).unwrap();
+            }
+
+            // Query that should prioritize prefix matches
+            let query = "imple";
+            let results = ss.best_completions(query, Some(10));
+
+            println!("Query: '{}'", query);
+            println!("Results:");
+            for (i, result) in results.iter().enumerate() {
+                println!("  {}: {} (freq: {}, age: {})", i + 1, result.string, result.meta.frequency, result.meta.age_days);
+            }
+
+            // "implement" should be the highest ranked result because:
+            // 1. It's a direct prefix match
+            // 2. It's the shortest prefix match
+            // 3. It has the highest frequency (117)
+            // 4. It should have highest priority over other algorithms
+            assert!(results.len() > 0, "Should find matches for 'imple'");
+
+            // Check that "implement" is in the results
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"implement".to_string()), "'implement' should be in results");
+
+            // The top result should be "implement" since it's the shortest prefix match with highest frequency
+            if results.len() > 0 {
+                println!("Top result: '{}' (freq: {}, age: {})", results[0].string, results[0].meta.frequency, results[0].meta.age_days);
+                // This assertion will likely fail with the current implementation
+                // because metadata and scoring may not properly prioritize prefix matches
+                assert_eq!(results[0].string, "implement", "'implement' should be the top result for 'imple' query");
+            }
+        }
     }
 
     mod integration_tests {

@@ -925,7 +925,7 @@ mod integration_tests {
             // We just verify that the protocol doesn't crash
             assert!(!response_str.starts_with("ERROR"),
                    "Operation '{}' with params {:?} failed: {}",
-                   operation, params, response_str);
+                   operation, &params, response_str);
         }
 
         // Verify best-completions results are reasonable
