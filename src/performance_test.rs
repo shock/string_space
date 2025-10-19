@@ -1,4 +1,4 @@
-use std::time::{Instant, Duration};
+use std::time::Instant;
 use crate::modules::string_space::StringSpace;
 
 pub fn run_performance_tests() {

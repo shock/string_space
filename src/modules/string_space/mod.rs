@@ -31,6 +31,7 @@ use std::alloc::{alloc, dealloc, Layout};
 use std::ptr;
 use std::str;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::cmp::Ordering;
 
 mod tests;
 
@@ -75,6 +76,7 @@ struct StringSpaceInner {
     capacity: usize,
     used_bytes: usize,
     string_refs: Vec<StringRefInfo>,
+    all_strings_cache: Option<Vec<StringRef>>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +90,7 @@ type TFreq = u16;
 type TAgeDays = u32;
 
 #[derive(Debug, Clone)]
+#[derive(PartialEq)]
 pub struct StringMeta {
     pub frequency: TFreq,
     pub age_days: TAgeDays,
@@ -104,32 +107,122 @@ pub enum AlgorithmType {
     /// Fuzzy subsequence - character order-preserving search (O(n))
     FuzzySubseq,
     /// Jaro-Winkler similarity - typo correction and similarity (O(n))
-    JaroWinkler,
-    /// Substring matching - fallback for longer queries (O(n))
-    Substring,
+    JaroWinkler
 }
 
-/// Alternative score from other algorithms for the same string
-#[derive(Debug, Clone)]
-pub struct AlternativeScore {
-    pub algorithm: AlgorithmType,
-    pub normalized_score: f64,
+// Query length categories for dynamic weighting
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryLengthCategory {
+    VeryShort,  // 1-2 characters
+    Short,      // 3-4 characters
+    Medium,     // 5-6 characters
+    Long,       // 7+ characters
+}
+
+impl QueryLengthCategory {
+    fn from_query(query: &str) -> Self {
+        match query.len() {
+            1..=2 => QueryLengthCategory::VeryShort,
+            3..=4 => QueryLengthCategory::Short,
+            5..=10 => QueryLengthCategory::Medium,
+            _ => QueryLengthCategory::Long,
+        }
+    }
 }
 
 /// Helper struct for storing algorithm scores
 #[derive(Debug, Clone)]
 pub struct AlgorithmScore {
-    pub algorithm: AlgorithmType,
     pub raw_score: f64,
     pub normalized_score: f64,
 }
 
 impl AlgorithmScore {
-    pub fn new(algorithm: AlgorithmType, raw_score: f64, normalized_score: f64) -> Self {
+    pub fn new(raw_score: f64, normalized_score: f64) -> Self {
         Self {
-            algorithm,
             raw_score,
             normalized_score,
+        }
+    }
+}
+
+// Dynamic weight tables for each query length category
+struct AlgorithmWeights {
+    prefix: f64,
+    fuzzy_subseq: f64,
+    jaro_winkler: f64,
+}
+
+impl AlgorithmWeights {
+    fn for_category(category: QueryLengthCategory) -> Self {
+        let fuzzy_multiplier = 1.5;      // Adjust this to boost fuzzy_subseq
+        let jaro_multiplier = 0.5;       // Adjust this to boost jaro_winkler
+
+        match category {
+            QueryLengthCategory::VeryShort => {
+                let orig_prefix = 0.50;  // Increased since substring is removed
+                let orig_fuzzy = 0.35;
+                let orig_jaro = 0.15;
+
+                let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
+                let jaro_winkler = orig_jaro * jaro_multiplier;
+                let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
+                let prefix = orig_prefix * (remaining / orig_prefix);
+
+                AlgorithmWeights {
+                    prefix,
+                    fuzzy_subseq,
+                    jaro_winkler,
+                }
+            }
+            QueryLengthCategory::Short => {
+                let orig_prefix = 0.50;  // Increased since substring is removed
+                let orig_fuzzy = 0.30;
+                let orig_jaro = 0.20;
+
+                let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
+                let jaro_winkler = orig_jaro * jaro_multiplier;
+                let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
+                let prefix = orig_prefix * (remaining / orig_prefix);
+
+                AlgorithmWeights {
+                    prefix,
+                    fuzzy_subseq,
+                    jaro_winkler,
+                }
+            }
+            QueryLengthCategory::Medium => {
+                let orig_prefix = 0.50;  // Increased since substring is removed
+                let orig_fuzzy = 0.25;
+                let orig_jaro = 0.25;
+
+                let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
+                let jaro_winkler = orig_jaro * jaro_multiplier;
+                let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
+                let prefix = orig_prefix * (remaining / orig_prefix);
+
+                AlgorithmWeights {
+                    prefix,
+                    fuzzy_subseq,
+                    jaro_winkler,
+                }
+            }
+            QueryLengthCategory::Long => {
+                let orig_prefix = 0.45;  // Increased since substring is removed
+                let orig_fuzzy = 0.20;
+                let orig_jaro = 0.35;
+
+                let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
+                let jaro_winkler = orig_jaro * jaro_multiplier;
+                let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
+                let prefix = orig_prefix * (remaining / orig_prefix);
+
+                AlgorithmWeights {
+                    prefix,
+                    fuzzy_subseq,
+                    jaro_winkler,
+                }
+            }
         }
     }
 }
@@ -142,7 +235,6 @@ pub struct ScoreCandidate {
     pub raw_score: f64,
     pub normalized_score: f64,
     pub final_score: f64,
-    pub alternative_scores: Vec<AlternativeScore>,
 }
 
 impl ScoreCandidate {
@@ -153,32 +245,13 @@ impl ScoreCandidate {
             raw_score,
             normalized_score,
             final_score: 0.0,
-            alternative_scores: Vec::new(),
         }
-    }
-
-    /// Add an alternative score from another algorithm
-    pub fn add_alternative_score(&mut self, algorithm: AlgorithmType, normalized_score: f64) {
-        self.alternative_scores.push(AlternativeScore {
-            algorithm,
-            normalized_score,
-        });
-    }
-
-    /// Get the best available score for this candidate (primary or alternative)
-    pub fn get_best_score(&self) -> f64 {
-        let mut best_score = self.normalized_score;
-        for alt in &self.alternative_scores {
-            if alt.normalized_score > best_score {
-                best_score = alt.normalized_score;
-            }
-        }
-        best_score
     }
 }
 
 #[derive(Debug, Clone)]
 #[allow(unused)]
+#[derive(PartialEq)]
 pub struct StringRef {
     pub string: String,
     pub meta: StringMeta,
@@ -228,6 +301,18 @@ impl StringSpace {
             return Err("String length out of bounds");
         }
         self.inner.insert_string(string, frequency, None)
+    }
+
+    /// Insert a string with specific frequency and age metadata
+    ///
+    /// This is primarily for testing purposes to reproduce specific scenarios
+    /// with known metadata values.
+    #[allow(unused)]
+    pub fn insert_string_with_age(&mut self, string: &str, frequency: TFreq, age_days: TAgeDays) -> Result<(), &'static str> {
+        if string.len() < MIN_CHARS || string.len() > MAX_CHARS {
+            return Err("String length out of bounds");
+        }
+        self.inner.insert_string(string, frequency, Some(age_days))
     }
 
     /// Finds strings that start with the given prefix, sorted by frequency.
@@ -346,7 +431,7 @@ impl StringSpace {
     }
 
     #[allow(unused)]
-    pub fn get_all_strings(&self) -> Vec<StringRef> {
+    pub fn get_all_strings(&mut self) -> Vec<StringRef> {
         self.inner.get_all_strings()
     }
 
@@ -409,7 +494,7 @@ impl StringSpace {
     /// - Control characters are rejected
     /// - Empty queries return empty results
     #[allow(unused)]
-    pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    pub fn best_completions(&mut self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
         self.inner.best_completions(query, limit)
     }
 
@@ -441,12 +526,13 @@ impl StringSpace {
     /// ```
     #[allow(unused)]
     pub fn fuzzy_subsequence_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         score_threshold: f64
     ) -> Vec<StringRef> {
-        self.inner.fuzzy_subsequence_full_database(query, target_count, score_threshold)
+        let results = self.inner.fuzzy_subsequence_full_database(query, target_count, score_threshold);
+        results.into_iter().map(|result| result.string_ref).collect()
     }
 
     /// Performs Jaro-Winkler similarity search across the entire database.
@@ -476,12 +562,13 @@ impl StringSpace {
     /// ```
     #[allow(unused)]
     pub fn jaro_winkler_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         similarity_threshold: f64
     ) -> Vec<StringRef> {
-        self.inner.jaro_winkler_full_database(query, target_count, similarity_threshold)
+        let results = self.inner.jaro_winkler_full_database(query, target_count, similarity_threshold);
+        results.into_iter().map(|result| result.string_ref).collect()
     }
 
 }
@@ -509,6 +596,7 @@ impl StringSpaceInner {
             capacity: INITIAL_HEAP_SIZE,
             used_bytes: 0,
             string_refs: Vec::new(),
+            all_strings_cache: None,
         }
     }
 
@@ -529,6 +617,7 @@ impl StringSpaceInner {
             };
             a_str.cmp(b_str)
         });
+        self.all_strings_cache = None;
     }
 
     fn empty(&self) -> bool {
@@ -546,6 +635,7 @@ impl StringSpaceInner {
     fn clear_space(&mut self) {
         self.string_refs.clear();
         self.used_bytes = 0;
+        self.all_strings_cache = None;
     }
 
     fn binary_search<F>(&self, target: &[u8], compare: F) -> usize
@@ -578,6 +668,8 @@ impl StringSpaceInner {
         let string_bytes = string.as_bytes();
 
         let index = self.binary_search(string_bytes, |a, b| a.cmp(b));
+
+        self.all_strings_cache = None;
 
         if index < self.string_refs.len() {
             let existing_ref = &self.string_refs[index];
@@ -623,7 +715,11 @@ impl StringSpaceInner {
         Ok(())
     }
 
-    fn get_all_strings(&self) -> Vec<StringRef> {
+    fn get_all_strings(&mut self) -> Vec<StringRef> {
+        if let Some(cached) = &self.all_strings_cache {
+            return cached.clone();
+        }
+
         let mut results = Vec::new();
         for ref_info in &self.string_refs {
             let string_bytes = unsafe {
@@ -638,6 +734,7 @@ impl StringSpaceInner {
                 meta: ref_info.meta.clone(),
             });
         }
+        self.all_strings_cache = Some(results.clone()); // Cannot assign to self.all_strings_cache here because self is &self
         results
     }
 
@@ -645,12 +742,6 @@ impl StringSpaceInner {
         let mut results = self.find_by_prefix_no_sort(search_prefix);
         // reverse sort the results by frequency
         results.sort_by(|a, b| b.meta.frequency.cmp(&a.meta.frequency));
-        results
-    }
-
-    fn find_by_prefix_alpha_sort(&self, search_prefix: &str) -> Vec<StringRef> {
-        let mut results = self.find_by_prefix_no_sort(search_prefix);
-        results.sort_by(|a, b| a.string.cmp(&b.string));
         results
     }
 
@@ -737,6 +828,7 @@ impl StringSpaceInner {
         self.buffer = new_buffer;
         self.capacity = new_capacity;
         self.used_bytes = new_used_bytes;
+        self.all_strings_cache = None; // Invalidate cache after buffer reallocation
     }
 
     fn find_with_substring(&self, substring: &str) -> Vec<StringRef> {
@@ -775,9 +867,26 @@ impl StringSpaceInner {
         self.find_by_prefix_no_sort(query)
     }
 
-    // Wrapper method for substring search - returns unsorted results for best_completions system
-    fn substring_search(&self, query: &str) -> Vec<StringRef> {
-        self.find_with_substring(query)
+    fn scored_prefix_search(&self, query: &str) -> Vec<ScoreCandidate> {
+        let mut results = Vec::new();
+        let mut max_len = 0;
+        let matches = self.find_by_prefix(query);
+        for string_ref in matches {
+            let score = self.calculate_prefix_score(&string_ref, &query);
+            if score.is_none() {
+                continue;
+            }
+            max_len = max_len.max(string_ref.string.len());
+            let score = score.unwrap();
+            results.push(ScoreCandidate::new(string_ref, AlgorithmType::Prefix, score.raw_score, score.normalized_score));
+        }
+        // make another pass to update normalized scores based length of result string vs max_len
+        for result in &mut results {
+            let length_factor = (max_len - result.string_ref.string.len()) as f64 / max_len as f64;
+            result.normalized_score = scale_to_min(length_factor, 0.7);
+            result.raw_score = result.normalized_score; // will be weighted later
+        }
+        results
     }
 
     fn print_strings(&self) {
@@ -875,15 +984,15 @@ impl StringSpaceInner {
         matches.truncate(10);
 
         // print the matches for debugging
-        println!("Matches post-sorting:");
-        for (string_ref, score) in &matches {
-            println!("String: {}, Score: {}, TFreq: {}, AgeDays: {}", string_ref.string, score, string_ref.meta.frequency, string_ref.meta.age_days);
-        }
+        // println!("Matches post-sorting:");
+        // for (string_ref, score) in &matches {
+        //     println!("String: {}, Score: {}, TFreq: {}, AgeDays: {}", string_ref.string, score, string_ref.meta.frequency, string_ref.meta.age_days);
+        // }
 
         matches.into_iter().map(|(string_ref, _)| string_ref).collect()
     }
 
-    fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    fn best_completions(&mut self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
         let limit = limit.unwrap_or(15);
 
         // Early return for empty database
@@ -906,13 +1015,9 @@ impl StringSpaceInner {
         // Use progressive algorithm execution to get initial candidates
         let all_candidates = self.progressive_algorithm_execution(query, limit);
 
-        // If we have enough high-quality prefix matches, return them directly
-        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
-            return all_candidates.into_iter().take(limit).collect();
-        }
-
         // Otherwise, collect detailed scores from all algorithms
-        let scored_candidates = self.collect_detailed_scores(query, &all_candidates);
+        // println!("Collecting detailed scores for candidates...");
+        let scored_candidates = all_candidates;
 
         // Handle case where no candidates were found
         if scored_candidates.is_empty() {
@@ -926,14 +1031,36 @@ impl StringSpaceInner {
         let mut ranked_candidates = merged_candidates;
         rank_candidates_by_score(&mut ranked_candidates);
 
+        // bubble prefix matches to the top, primary sort case-insensitive, secondary sort case-sensitive
+        ranked_candidates.sort_by(|a, b| {
+            let lower_query = query.to_lowercase();
+            let a_is_prefix = a.string_ref.string.to_lowercase().starts_with(&lower_query);
+            let b_is_prefix = b.string_ref.string.to_lowercase().starts_with(&lower_query);
+            if a_is_prefix && !b_is_prefix {
+                Ordering::Less
+            } else if !a_is_prefix && b_is_prefix {
+                Ordering::Greater
+            } else {
+                let a_is_prefix = a.string_ref.string.starts_with(&query);
+                let b_is_prefix = b.string_ref.string.starts_with(&query);
+                if a_is_prefix && !b_is_prefix {
+                    Ordering::Less
+                } else if !a_is_prefix && b_is_prefix {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            }
+        });
+
+        // // Limit to top 10 results
+        // ranked_candidates.truncate(limit);
+
+        // get the limit number of ScoreCandidates from ranked_candidates
+        let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
+        print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
-    }
-
-    fn collect_results(&self) -> Vec<ScoreCandidate> {
-        // Placeholder implementation
-        // Will be replaced with actual algorithm execution in subsequent phases
-        Vec::new()
     }
 
     /// Handle single character queries with special logic
@@ -950,7 +1077,7 @@ impl StringSpaceInner {
     }
 
     /// Get maximum string length in the database
-    fn get_max_string_length(&self) -> usize {
+    fn get_max_string_length(&mut self) -> usize {
         self.get_all_strings()
             .iter()
             .map(|s| s.string.len())
@@ -958,212 +1085,40 @@ impl StringSpaceInner {
             .unwrap_or(0)
     }
 
-    /// Collect detailed scores for candidates from all algorithms
-    fn collect_detailed_scores(&self, query: &str, candidates: &[StringRef]) -> Vec<ScoreCandidate> {
-        let mut scored_candidates = Vec::new();
 
-        for string_ref in candidates {
-            // Calculate scores from all algorithms for this candidate
-            let prefix_score = self.calculate_prefix_score(string_ref, query);
-            let fuzzy_score = self.calculate_fuzzy_subsequence_score(string_ref, query);
-            let jaro_score = self.calculate_jaro_winkler_score(string_ref, query);
-            let substring_score = self.calculate_substring_score(string_ref, query);
-
-            // Create candidate with the best algorithm score
-            let (best_algorithm, best_score) = self.select_best_algorithm_score(
-                prefix_score.clone(), fuzzy_score.clone(), jaro_score.clone(), substring_score.clone()
-            );
-
-            let mut candidate = ScoreCandidate::new(
-                string_ref.clone(),
-                best_algorithm,
-                best_score.raw_score,
-                best_score.normalized_score
-            );
-
-            // Add alternative scores from other algorithms
-            if let Some(score) = prefix_score {
-                if score.algorithm != best_algorithm {
-                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
-                }
-            }
-            if let Some(score) = fuzzy_score {
-                if score.algorithm != best_algorithm {
-                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
-                }
-            }
-            if let Some(score) = jaro_score {
-                if score.algorithm != best_algorithm {
-                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
-                }
-            }
-            if let Some(score) = substring_score {
-                if score.algorithm != best_algorithm {
-                    candidate.add_alternative_score(score.algorithm, score.normalized_score);
-                }
-            }
-
-            scored_candidates.push(candidate);
-        }
-
-        scored_candidates
-    }
-
-    /// Calculate prefix match score with case-insensitive support
+    /// Calculate prefix match score with case-sensitive support
     fn calculate_prefix_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
         let candidate = string_ref.string.as_str();
 
-        // Case-insensitive prefix matching
-        if candidate.to_lowercase().starts_with(&query.to_lowercase()) {
+        // Case-sensitive prefix matching
+        if candidate.starts_with(query) {
             // Perfect prefix match gets maximum score
             Some(AlgorithmScore::new(
-                AlgorithmType::Prefix,
                 1.0,  // raw score
                 1.0   // normalized score
             ))
         } else {
-            None
-        }
-    }
-
-    /// Calculate fuzzy subsequence score with normalization
-    fn calculate_fuzzy_subsequence_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
-        let candidate = string_ref.string.as_str();
-
-        // Apply smart filtering to skip unpromising candidates
-        // For fuzzy subsequence, be more lenient with length filtering to allow abbreviation matching
-        if should_skip_candidate_fuzzy(candidate.len(), query.len()) {
-            return None;
-        }
-
-        // Check if query is a subsequence of candidate
-        let query_chars: Vec<char> = query.chars().collect();
-        let candidate_chars: Vec<char> = candidate.chars().collect();
-
-        if is_subsequence_chars(&query_chars, &candidate_chars).is_none() {
-            return None;
-        }
-
-        // Calculate match span score (lower is better)
-        let raw_score = score_match_span_chars(&query_chars, &candidate_chars);
-
-        // For normalization, we need min/max scores across all candidates
-        // Since we don't have all candidates here, use a reasonable range
-        let min_score = 0.0;
-        let max_score = candidate.len() as f64 * 2.0; // Reasonable upper bound
-
-        let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-        Some(AlgorithmScore::new(
-            AlgorithmType::FuzzySubseq,
-            raw_score,
-            normalized_score
-        ))
-    }
-
-    /// Calculate Jaro-Winkler similarity score with threshold
-    fn calculate_jaro_winkler_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
-        let candidate = string_ref.string.as_str();
-
-        // Apply smart filtering to skip unpromising candidates
-        if should_skip_candidate(candidate.len(), query.len()) {
-            return None;
-        }
-
-        // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
-        let similarity = jaro_winkler(query, candidate);
-
-        // Optimized: Apply more restrictive threshold for better performance
-        // Only include high-quality matches
-        if similarity < 0.7 {
-            return None;
-        }
-
-        Some(AlgorithmScore::new(
-            AlgorithmType::JaroWinkler,
-            similarity,  // raw score
-            similarity   // normalized score (same for Jaro-Winkler)
-        ))
-    }
-
-    /// Calculate substring match score with position normalization
-    fn calculate_substring_score(&self, string_ref: &StringRef, query: &str) -> Option<AlgorithmScore> {
-        let candidate = string_ref.string.as_str();
-
-        // Find substring position
-        if let Some(position) = candidate.find(query) {
-            // Calculate position-based score (earlier matches are better)
-            let max_position = candidate.len().saturating_sub(query.len());
-            let normalized_score = normalize_substring_score(position, max_position);
-
-            Some(AlgorithmScore::new(
-                AlgorithmType::Substring,
-                position as f64,  // raw score (position)
-                normalized_score  // normalized score
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// Select the best algorithm score for a candidate
-    fn select_best_algorithm_score(
-        &self,
-        prefix_score: Option<AlgorithmScore>,
-        fuzzy_score: Option<AlgorithmScore>,
-        jaro_score: Option<AlgorithmScore>,
-        substring_score: Option<AlgorithmScore>
-    ) -> (AlgorithmType, AlgorithmScore) {
-        let mut best_score = None;
-        let mut best_algorithm = AlgorithmType::Prefix; // Default fallback
-
-        // Compare all available scores and select the best one
-        if let Some(score) = prefix_score {
-            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
-                best_score = Some(score.normalized_score);
-                best_algorithm = score.algorithm;
+            // Case-insensitive prefix matching
+            if candidate.to_lowercase().starts_with(&query.to_lowercase()) {
+                // Slightly lower score for case-insensitive match
+                Some(AlgorithmScore::new(
+                    0.9999,  // raw score
+                    0.9999   // normalized score
+                ))
+            } else {
+                None
             }
+
         }
-
-        if let Some(score) = fuzzy_score {
-            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
-                best_score = Some(score.normalized_score);
-                best_algorithm = score.algorithm;
-            }
-        }
-
-        if let Some(score) = jaro_score {
-            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
-                best_score = Some(score.normalized_score);
-                best_algorithm = score.algorithm;
-            }
-        }
-
-        if let Some(score) = substring_score {
-            if best_score.map_or(true, |best: f64| score.normalized_score > best) {
-                best_score = Some(score.normalized_score);
-                best_algorithm = score.algorithm;
-            }
-        }
-
-        // Create the best score object
-        let best_score_value = best_score.unwrap_or(0.0);
-        let best_score_obj = AlgorithmScore::new(
-            best_algorithm,
-            best_score_value,  // raw score
-            best_score_value   // normalized score
-        );
-
-        (best_algorithm, best_score_obj)
     }
 
     // Full-database fuzzy subsequence search with early termination
     fn fuzzy_subsequence_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         score_threshold: f64
-    ) -> Vec<StringRef> {
+    ) -> Vec<ScoreCandidate> {
         // Empty query handling: return empty vector for empty queries
         if query.is_empty() {
             return Vec::new();
@@ -1175,51 +1130,52 @@ impl StringSpaceInner {
         // Track min/max scores for normalization
         let mut min_score = f64::MAX;
         let mut max_score = f64::MIN;
+        let mut max_len = 0;
         let mut scores = Vec::new();
+        let score_range_min = 0.6;
 
         // First pass: collect scores for normalization
         for string_ref in &all_strings {
-            if let Some(score) = self.score_fuzzy_subsequence(string_ref, query) {
+            if let Some(score) = self.score_fuzzy_subsequence(string_ref, query, score_range_min) {
+                if score > 1.0 {
+                    println!("Raw score for {} is greater than 1.0: {}", string_ref.string, score);
+                }
                 min_score = min_score.min(score);
                 max_score = max_score.max(score);
+                max_len = max_len.max(string_ref.string.len());
                 scores.push((string_ref.clone(), score));
             }
         }
 
-        // Handle edge case where all scores are the same or very close
-        if (max_score - min_score).abs() < f64::EPSILON {
-            // If all scores are identical, treat them all as perfect matches
-            // But only if we have multiple candidates - if only one candidate, use its score as reference
-            if scores.len() > 1 {
-                min_score = 0.0;
-                max_score = 1.0;
-            } else {
-                // Single candidate: use a reasonable range around the score
-                min_score = min_score - 1.0;
-                max_score = max_score + 1.0;
-            }
-        } else if (max_score - min_score) < 0.1 {
-            // If scores are very close together, expand the range to provide better differentiation
-            let mid = (min_score + max_score) / 2.0;
-            min_score = mid - 0.5;
-            max_score = mid + 0.5;
-        }
+        assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
+        assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
 
         // Second pass: apply normalization and threshold filtering
         for (string_ref, raw_score) in scores {
-            let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
-            let string_copy = string_ref.string.clone();
-            println!("Normalized score for {}: {} (raw: {}, min: {}, max: {})", string_copy, normalized_score, raw_score, min_score, max_score);
+            // let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+            let normalized_score = raw_score;
+
+
+            // let string_copy = string_ref.string.clone();
+            // println!("Normalized score for {}: {} (raw: {}, min: {}, max: {})", string_copy, normalized_score, raw_score, min_score, max_score);
 
             // For fuzzy subsequence: lower normalized scores are better (lower raw scores are better)
             // So we want to keep candidates with normalized scores ABOVE the threshold
             // (since better matches have higher normalized scores)
             if normalized_score >= score_threshold {
-                results.push(string_ref);
-                println!("Added {} to results", string_copy);
+                let score_candidate = ScoreCandidate {
+                    string_ref: string_ref.clone(),
+                    algorithm: AlgorithmType::FuzzySubseq,
+                    raw_score,
+                    normalized_score,
+                    final_score: 0.0,
+                };
+
+                results.push(score_candidate);
+                // println!("Added {} to results", string_copy);
 
                 // Early termination: stop if we have enough high-quality candidates
-                if results.len() >= target_count * 2 {
+                if results.len() >= target_count {
                     break;
                 }
             }
@@ -1230,12 +1186,12 @@ impl StringSpaceInner {
 
     // Full-database Jaro-Winkler similarity search with early termination
     fn jaro_winkler_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         similarity_threshold: f64
-    ) -> Vec<StringRef> {
-        let mut results = Vec::new();
+    ) -> Vec<ScoreCandidate> {
+        let mut results: Vec<ScoreCandidate> = Vec::new();
         let all_strings = self.get_all_strings();
 
         for string_ref in all_strings {
@@ -1247,10 +1203,18 @@ impl StringSpaceInner {
             }
 
             // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
-            let similarity = jaro_winkler(query, candidate);
+            // let similarity = jaro_winkler(query, candidate);
+            let similarity = jaro(query, candidate);
 
             if similarity >= similarity_threshold {
-                results.push(string_ref);
+                let score_candidate = ScoreCandidate {
+                    string_ref: string_ref.clone(),
+                    algorithm: AlgorithmType::JaroWinkler,
+                    raw_score: similarity,
+                    normalized_score: similarity,
+                    final_score: 0.0,
+                };
+                results.push(score_candidate);
 
                 // Early termination: stop if we have enough high-quality candidates
                 if results.len() >= target_count * 2 {
@@ -1259,17 +1223,19 @@ impl StringSpaceInner {
             }
         }
 
+        // sort results by similarity descending
+        results.sort_by(|a, b| b.normalized_score.partial_cmp(&a.normalized_score).unwrap());
         results
     }
 
     // Helper function for fuzzy subsequence scoring
-    fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str) -> Option<f64> {
+    fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str, min_score: f64) -> Option<f64> {
         let candidate = string_ref.string.as_str();
 
         // Apply smart filtering to skip unpromising candidates
         // Use fuzzy-specific filtering for abbreviation matching
         if should_skip_candidate_fuzzy(candidate.len(), query.len()) {
-            println!("Skipping candidate {} due to length filtering", candidate);
+            // println!("Skipping candidate {} due to length filtering", candidate);
             return None;
         }
 
@@ -1282,110 +1248,70 @@ impl StringSpaceInner {
         let query_chars: Vec<char> = query.chars().collect();
         let candidate_chars: Vec<char> = candidate.chars().collect();
 
-        if is_subsequence_chars(&query_chars, &candidate_chars).is_none() {
-            println!("Skipping candidate {} due to subsequence mismatch", candidate);
-            return None;
+        if let Some(match_indices) = is_subsequence_chars(&query_chars, &candidate_chars) {
+            // Calculate match span score
+            let score = score_match_span_chars(&match_indices, &query, &candidate, min_score);
+            if candidate == "began" {
+                println!("Scoring for candidate 'began' and query {:?}: {:?}", query, score);
+            }
+            // println!("Candidate {} scored: {}", candidate, score);
+            Some(score)
+        } else {
+            None
         }
-
-        // Calculate match span score (lower is better)
-        let score = score_match_span_chars(&query_chars, &candidate_chars);
-        println!("Candidate {} scored: {}", candidate, score);
-        Some(score)
     }
 
     // Progressive algorithm execution with early termination and error recovery
     fn progressive_algorithm_execution(
-        &self,
+        &mut self,
         query: &str,
         limit: usize
-    ) -> Vec<StringRef> {
+    ) -> Vec<ScoreCandidate> {
         let mut all_candidates = Vec::new();
         let mut seen_strings = std::collections::HashSet::new();
 
         // Helper function to add unique candidates
         fn add_unique_candidates(
-            candidates: Vec<StringRef>,
-            all_candidates: &mut Vec<StringRef>,
+            candidates: Vec<ScoreCandidate>,
+            all_candidates: &mut Vec<ScoreCandidate>,
             seen_strings: &mut std::collections::HashSet<String>
         ) {
             for candidate in candidates {
-                if seen_strings.insert(candidate.string.clone()) {
+                if seen_strings.insert(candidate.string_ref.string.clone()) {
                     all_candidates.push(candidate);
                 }
             }
         }
 
         // 1. Fast prefix search first (O(log n))
-        let prefix_candidates = self.prefix_search(query);
+        // Only get 'limit' candidates
+        let prefix_candidates = self.scored_prefix_search(query).into_iter()
+            .take(limit)
+            .collect::<Vec<_>>();
+
         add_unique_candidates(prefix_candidates, &mut all_candidates, &mut seen_strings);
 
-        // Early termination if we have enough high-quality prefix matches
-        if all_candidates.len() >= limit && self.has_high_quality_prefix_matches(&all_candidates, query) {
-            return all_candidates.into_iter().take(limit).collect();
-        }
-
         // 2. Fuzzy subsequence with early termination (O(n) with early exit)
-        let remaining_needed = limit.saturating_sub(all_candidates.len());
-        if remaining_needed > 0 {
-            // Use fallback threshold for fuzzy search to ensure we get some results
-            let fuzzy_candidates = self.fuzzy_subsequence_full_database(
-                query,
-                remaining_needed,
-                0.0 // score threshold - include all matches for progressive execution
-            );
-            add_unique_candidates(fuzzy_candidates, &mut all_candidates, &mut seen_strings);
-        }
+        // Use fallback threshold for fuzzy search to ensure we get some results
+        let fuzzy_candidates = self.fuzzy_subsequence_full_database(
+            query,
+            limit,
+            0.0 // score threshold - include all matches for progressive execution
+        );
+        add_unique_candidates(fuzzy_candidates, &mut all_candidates, &mut seen_strings);
 
         // 3. Jaro-Winkler only if still needed (O(n) with early exit)
-        let remaining_needed = limit.saturating_sub(all_candidates.len());
-        if remaining_needed > 0 {
-            // Use adaptive threshold for Jaro-Winkler based on query length
-            let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.7 };
-            let jaro_candidates = self.jaro_winkler_full_database(
-                query,
-                remaining_needed,
-                jaro_threshold // adaptive similarity threshold
-            );
-            add_unique_candidates(jaro_candidates, &mut all_candidates, &mut seen_strings);
-        }
+        // Use adaptive threshold for Jaro-Winkler based on query length
+        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.78 };
+        let jaro_candidates = self.jaro_winkler_full_database(
+            query,
+            limit,
+            jaro_threshold // adaptive similarity threshold
+        );
+        add_unique_candidates(jaro_candidates, &mut all_candidates, &mut seen_strings);
 
-        // 4. Substring only as last resort for longer queries
-        let remaining_needed = limit.saturating_sub(all_candidates.len());
-        if remaining_needed > 0 && query.len() >= 2 { // Lowered from 3 to 2 for better fallback
-            let substring_candidates = self.substring_search(query)
-                .into_iter()
-                .take(remaining_needed)
-                .collect::<Vec<_>>();
-            add_unique_candidates(substring_candidates, &mut all_candidates, &mut seen_strings);
-        }
 
-        // 5. Final fallback: if we still don't have enough results and query is very short,
-        // use first character prefix search as last resort
-        let remaining_needed = limit.saturating_sub(all_candidates.len());
-        if remaining_needed > 0 && query.len() >= 1 {
-            // Handle Unicode characters properly by using chars() iterator
-            if let Some(first_char) = query.chars().next() {
-                let first_char_str = first_char.to_string();
-                let fallback_candidates = self.prefix_search(&first_char_str)
-                    .into_iter()
-                    .take(remaining_needed)
-                    .collect::<Vec<_>>();
-                add_unique_candidates(fallback_candidates, &mut all_candidates, &mut seen_strings);
-            }
-        }
-
-        all_candidates.into_iter().take(limit).collect()
-    }
-
-    // Helper to check for high-quality prefix matches
-    fn has_high_quality_prefix_matches(&self, candidates: &[StringRef], query: &str) -> bool {
-        // Optimized: Consider it high quality if more than 2/3 of candidates are exact prefix matches
-        // This maintains the original behavior while allowing for future optimizations
-        let prefix_match_count = candidates.iter()
-            .filter(|c| c.string.starts_with(query))
-            .count();
-        let threshold = (candidates.len() * 2) / 3;
-        prefix_match_count > threshold
+        all_candidates
     }
 
 }
@@ -1399,6 +1325,22 @@ impl Drop for StringSpaceInner {
 }
 
 // MARK: Private Functions
+
+
+#[allow(unused)]
+fn print_debug_score_candidates(candidates: &[ScoreCandidate]) {
+    println!("Debugging Score Candidates:");
+    for candidate in candidates {
+        println!(
+            "String: {}, Final Score: {:.6}, Algorithm: {:?}, Raw Score: {:.6}, Normalized Score: {:.6}",
+            candidate.string_ref.string,
+            candidate.final_score,
+            candidate.algorithm,
+            candidate.raw_score,
+            candidate.normalized_score,
+        );
+    }
+}
 
 fn validate_query(query: &str) -> Result<(), &'static str> {
     if query.is_empty() {
@@ -1445,84 +1387,27 @@ fn apply_metadata_adjustments(
     max_len: usize
 ) -> f64 {
     // 1. Frequency factor with logarithmic scaling to prevent dominance
-    let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.1);
+    let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.01);
 
-    // 2. Age factor with bounded influence (newer items get slight preference)
-    let max_age = 365; // Maximum age in days for normalization
-    let age_factor = 1.0 + (1.0 - (age_days as f64 / max_age as f64)) * 0.05;
+    // 2. Age factor with bounded influence - newer items (bigger age) get slight preference - I know, it's counterintuitive.  TODO: re-evaluate this.
+    // Set the max_age to the current time since epoch divided seconds in a day
+    let max_age = days_since_epoch();
+    let age_factor = scale_to_min(age_days as f64 / max_age as f64, 0.95);
 
     // 3. Length penalty applied only for significant length mismatches
     let length_penalty = if candidate_len > query_len * 3 {
         // Only penalize when candidate is 3x longer than query
-        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.1
+        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.01
     } else {
         1.0 // No penalty for reasonable length differences
     };
 
     // 4. Apply multiplicative combination with bounds checking
     let final_score = weighted_score * frequency_factor * age_factor * length_penalty;
+    // let final_score = weighted_score * frequency_factor;
 
     // Ensure score doesn't exceed reasonable bounds
     final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
-}
-
-// Query length categories for dynamic weighting
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum QueryLengthCategory {
-    VeryShort,  // 1-2 characters
-    Short,      // 3-4 characters
-    Medium,     // 5-6 characters
-    Long,       // 7+ characters
-}
-
-impl QueryLengthCategory {
-    fn from_query(query: &str) -> Self {
-        match query.len() {
-            1..=2 => QueryLengthCategory::VeryShort,
-            3..=4 => QueryLengthCategory::Short,
-            5..=6 => QueryLengthCategory::Medium,
-            _ => QueryLengthCategory::Long,
-        }
-    }
-}
-
-// Dynamic weight tables for each query length category
-struct AlgorithmWeights {
-    prefix: f64,
-    fuzzy_subseq: f64,
-    jaro_winkler: f64,
-    substring: f64,
-}
-
-impl AlgorithmWeights {
-    fn for_category(category: QueryLengthCategory) -> Self {
-        match category {
-            QueryLengthCategory::VeryShort => AlgorithmWeights {
-                prefix: 0.45,      // Highest weight for very short queries
-                fuzzy_subseq: 0.35, // High weight for abbreviation matching
-                jaro_winkler: 0.15, // Lower weight (less useful for very short)
-                substring: 0.05,   // Minimal weight
-            },
-            QueryLengthCategory::Short => AlgorithmWeights {
-                prefix: 0.40,      // High weight
-                fuzzy_subseq: 0.30, // Good weight
-                jaro_winkler: 0.20, // Medium weight
-                substring: 0.10,   // Low weight
-            },
-            QueryLengthCategory::Medium => AlgorithmWeights {
-                prefix: 0.35,      // Balanced weight
-                fuzzy_subseq: 0.25, // Balanced weight
-                jaro_winkler: 0.25, // Balanced weight
-                substring: 0.15,   // Slightly higher weight
-            },
-            QueryLengthCategory::Long => AlgorithmWeights {
-                prefix: 0.25,      // Lower weight (prefix less useful for long queries)
-                fuzzy_subseq: 0.20, // Lower weight
-                jaro_winkler: 0.35, // Highest weight (good for typo correction)
-                substring: 0.20,   // Higher weight (more relevant for long queries)
-            },
-        }
-    }
 }
 
 /// Get dynamic weights based on query length
@@ -1536,56 +1421,41 @@ fn calculate_weighted_score(
     prefix_score: f64,
     fuzzy_score: f64,
     jaro_score: f64,
-    substring_score: f64,
     query: &str
 ) -> f64 {
     let weights = get_dynamic_weights(query);
 
     weights.prefix * prefix_score +
     weights.fuzzy_subseq * fuzzy_score +
-    weights.jaro_winkler * jaro_score +
-    weights.substring * substring_score
+    weights.jaro_winkler * jaro_score
 }
 
 /// Calculate final score for a candidate with metadata adjustments
 fn calculate_final_score(
     candidate: &mut ScoreCandidate,
     query: &str,
-    string_space: &StringSpaceInner
+    max_len: usize
 ) -> f64 {
     // Get all algorithm scores for this candidate
     let mut prefix_score = 0.0;
     let mut fuzzy_score = 0.0;
     let mut jaro_score = 0.0;
-    let mut substring_score = 0.0;
 
     // Extract scores from primary and alternative algorithms
     match candidate.algorithm {
         AlgorithmType::Prefix => prefix_score = candidate.normalized_score,
         AlgorithmType::FuzzySubseq => fuzzy_score = candidate.normalized_score,
         AlgorithmType::JaroWinkler => jaro_score = candidate.normalized_score,
-        AlgorithmType::Substring => substring_score = candidate.normalized_score,
-    }
-
-    // Add alternative scores
-    for alt in &candidate.alternative_scores {
-        match alt.algorithm {
-            AlgorithmType::Prefix => prefix_score = prefix_score.max(alt.normalized_score),
-            AlgorithmType::FuzzySubseq => fuzzy_score = fuzzy_score.max(alt.normalized_score),
-            AlgorithmType::JaroWinkler => jaro_score = jaro_score.max(alt.normalized_score),
-            AlgorithmType::Substring => substring_score = substring_score.max(alt.normalized_score),
-        }
     }
 
     // Calculate weighted algorithm score
     let weighted_score = calculate_weighted_score(
-        prefix_score, fuzzy_score, jaro_score, substring_score, query
+        prefix_score, fuzzy_score, jaro_score, query
     );
 
     // Apply metadata adjustments
     let (frequency, age_days, candidate_len) = get_string_metadata(&candidate.string_ref);
     let query_len = query.len();
-    let max_len = string_space.get_max_string_length();
 
     let final_score = apply_metadata_adjustments(
         weighted_score,
@@ -1597,14 +1467,15 @@ fn calculate_final_score(
     );
 
     candidate.final_score = final_score;
-    final_score
+    // candidate.final_score = weighted_score; // for debugging, override final score with weighted score
+    candidate.final_score
 }
 
 /// Merge candidates from different algorithms and calculate final scores
 fn merge_and_score_candidates(
     candidates: Vec<ScoreCandidate>,
     query: &str,
-    string_space: &StringSpaceInner
+    string_space: &mut StringSpaceInner
 ) -> Vec<ScoreCandidate> {
     let mut merged: HashMap<String, ScoreCandidate> = HashMap::new();
 
@@ -1614,22 +1485,21 @@ fn merge_and_score_candidates(
         if let Some(existing) = merged.get_mut(&string_key) {
             // Add as alternative score if this algorithm provides a better score
             if candidate.normalized_score > existing.normalized_score {
-                existing.add_alternative_score(existing.algorithm, existing.normalized_score);
                 existing.algorithm = candidate.algorithm;
                 existing.raw_score = candidate.raw_score;
                 existing.normalized_score = candidate.normalized_score;
-            } else {
-                existing.add_alternative_score(candidate.algorithm, candidate.normalized_score);
             }
         } else {
             merged.insert(string_key, candidate);
         }
     }
 
+    let max_len = string_space.get_max_string_length();
+
     // Calculate final scores for all merged candidates
     let mut scored_candidates: Vec<ScoreCandidate> = merged.into_values().collect();
     for candidate in &mut scored_candidates {
-        calculate_final_score(candidate, query, string_space);
+        calculate_final_score(candidate, query, max_len);
     }
 
     scored_candidates
@@ -1654,11 +1524,6 @@ fn limit_and_convert_results(candidates: Vec<ScoreCandidate>, limit: usize) -> V
 
 
 // Score normalization functions
-
-/// For substring search (earlier matches are better)
-fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
-    1.0 - (position as f64 / max_position as f64)
-}
 
 /// Get metadata for a string reference
 fn get_string_metadata(string_ref: &StringRef) -> (TFreq, TAgeDays, usize) {
@@ -1734,6 +1599,7 @@ fn similar(a: &str, b: &str) -> f64 {
 }
 
 use jaro_winkler::jaro_winkler;
+use strsim::jaro;
 
 fn get_close_matches(word: &str, possibilities: &[StringRef], n: usize, cutoff: f64) -> Vec<StringRef> {
     let mut matches: Vec<(String, u32, TFreq, TAgeDays)> = Vec::new();
@@ -1743,7 +1609,7 @@ fn get_close_matches(word: &str, possibilities: &[StringRef], n: usize, cutoff: 
         // let score = similar(word, possibility) * 2.0;
         let score = jaro_winkler(word, possibility);
         if score > cutoff {
-            // println!("word: {}, possibility: {}, score: {}", word, possibility, score);
+            println!("word: {}, possibility: {}, score: {}", word, possibility, score);
             matches.push((possibility.to_string(), (score*4294967296.0) as u32, string_ref.meta.frequency, string_ref.meta.age_days));
         }
     }
@@ -1820,18 +1686,29 @@ fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Optio
 }
 
 // Character-based version for scoring
-fn score_match_span_chars(query_chars: &[char], candidate_chars: &[char]) -> f64 {
-    if let Some(match_indices) = is_subsequence_chars(query_chars, candidate_chars) {
-        if match_indices.is_empty() {
-            return f64::MAX;
-        }
-
-        let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
-        let candidate_length = candidate_chars.len() as f64;
-        span_length + (candidate_length * 0.1)
-    } else {
-        f64::MAX
+fn score_match_span_chars(match_indices: &[usize], _query: &str, candidate: &str, min_score: f64) -> f64 {
+    if match_indices.is_empty() {
+        return 0.0;
     }
+
+    if match_indices.len() == 1 {
+        return 0.0;
+    }
+
+    let num_matches = match_indices.len() as f64;
+    let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+    let quality = num_matches / span_length;
+    let candidate_length = candidate.len() as f64;
+
+    let span_score = span_length / candidate_length; // Scale to 0.0-1.0, where 1.0 means the span covers the entire candidate
+    let match_score = scale_to_min(num_matches / candidate_length,0.5); // Scale min-1.0 where 1.0 means all characters match between query and candidate
+    let quality_score = scale_to_min(quality, 0.8); // Scale min-1.0 where 1.0 means all characters in the span are matches
+    let max_proximity = candidate_length.min(50.0);
+    let first_index_f64 = *match_indices.first().unwrap() as f64;
+    let mut proximity_score = 1.0 - (max_proximity - first_index_f64.min(50.0)) / max_proximity; // Scale 0.0-1.0 where 1.0 means match starts at beginning of candidate
+    proximity_score = scale_to_min(proximity_score, 0.5); // Scale min-1.0 where 1.0 means match starts at beginning
+
+    scale_to_min(span_score * match_score * quality_score * proximity_score, min_score) // Scale min-1.0 where 1.0 means perfect match
 }
 
 // Smart filtering to skip unpromising candidates
@@ -1876,22 +1753,8 @@ fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
     false
 }
 
-// Character set filtering for fuzzy algorithms
-fn contains_required_chars(candidate: &str, query: &str) -> bool {
-    let candidate_chars: std::collections::HashSet<char> = candidate.chars().collect();
-    query.chars().all(|c| candidate_chars.contains(&c))
-}
 
-// For fuzzy subsequence (lower raw scores are better)
-fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
-    // Optimized: Avoid division by zero and use efficient calculation
-    let range = max_score - min_score;
-    if range <= f64::EPSILON {
-        // All scores are the same, return middle value
-        return 0.5;
-    }
-
-    // Invert and normalize: lower raw scores → higher normalized scores
-    let normalized = 1.0 - ((raw_score - min_score) / range);
-    normalized.clamp(0.0, 1.0)
+// Scale function to map 0.0-1.0 to min-1.0 range
+fn scale_to_min(zero_to_one: f64, min: f64) -> f64 {
+    min + (1.0 - min) * zero_to_one
 }

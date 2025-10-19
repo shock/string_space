@@ -135,35 +135,3 @@ pub fn benchmark(args: Vec<String>) {
 
 }
 
-// Performance validation function for integration testing
-pub fn validate_fuzzy_subsequence_performance(space: &StringSpace) -> bool {
-    let test_cases = vec![
-        ("he", 3, 100),  // query, min_expected_results, max_ms
-        ("lo", 1, 100),
-        ("wor", 1, 100),
-        ("", 0, 10),     // empty query should be fast
-        ("xyz", 0, 100), // no matches should be fast
-    ];
-
-    for (query, min_results, max_ms) in test_cases {
-        let start = std::time::Instant::now();
-        let results = space.fuzzy_subsequence_search(query);
-        let duration = start.elapsed();
-
-        if results.len() < min_results {
-            eprintln!("Performance validation failed for query '{}': expected at least {} results, got {}",
-                     query, min_results, results.len());
-            return false;
-        }
-
-        if duration.as_millis() > max_ms as u128 {
-            eprintln!("Performance validation failed for query '{}': took {}ms, expected < {}ms",
-                     query, duration.as_millis(), max_ms);
-            return false;
-        }
-
-        println!("Query '{}': {} results in {:?} (OK)", query, results.len(), duration);
-    }
-
-    true
-}

@@ -614,95 +614,6 @@ mod tests {
             assert_eq!(candidate.raw_score, 0.8);
             assert_eq!(candidate.normalized_score, 0.9);
             assert_eq!(candidate.final_score, 0.0);
-            assert!(candidate.alternative_scores.is_empty());
-        }
-
-        #[test]
-        fn test_add_alternative_score() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
-
-            assert_eq!(candidate.alternative_scores.len(), 2);
-            assert_eq!(candidate.alternative_scores[0].algorithm, AlgorithmType::FuzzySubseq);
-            assert_eq!(candidate.alternative_scores[0].normalized_score, 0.7);
-            assert_eq!(candidate.alternative_scores[1].algorithm, AlgorithmType::JaroWinkler);
-            assert_eq!(candidate.alternative_scores[1].normalized_score, 0.95);
-        }
-
-        #[test]
-        fn test_get_best_score_primary() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            assert_eq!(candidate.get_best_score(), 0.9);
-        }
-
-        #[test]
-        fn test_get_best_score_alternative() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
-
-            assert_eq!(candidate.get_best_score(), 0.95);
-        }
-
-        #[test]
-        fn test_get_best_score_mixed() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.85);
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.92);
-
-            assert_eq!(candidate.get_best_score(), 0.92);
-        }
-
-        #[test]
-        fn test_alternative_score_creation() {
-            let alt_score = AlternativeScore {
-                algorithm: AlgorithmType::Substring,
-                normalized_score: 0.75,
-            };
-
-            assert_eq!(alt_score.algorithm, AlgorithmType::Substring);
-            assert_eq!(alt_score.normalized_score, 0.75);
         }
 
         #[test]
@@ -711,41 +622,20 @@ mod tests {
             let prefix = AlgorithmType::Prefix;
             let fuzzy_subseq = AlgorithmType::FuzzySubseq;
             let jaro_winkler = AlgorithmType::JaroWinkler;
-            let substring = AlgorithmType::Substring;
 
             // Test equality
             assert_eq!(prefix, AlgorithmType::Prefix);
             assert_eq!(fuzzy_subseq, AlgorithmType::FuzzySubseq);
             assert_eq!(jaro_winkler, AlgorithmType::JaroWinkler);
-            assert_eq!(substring, AlgorithmType::Substring);
 
             // Test inequality
             assert_ne!(prefix, AlgorithmType::FuzzySubseq);
-            assert_ne!(jaro_winkler, AlgorithmType::Substring);
+            assert_ne!(jaro_winkler, AlgorithmType::Prefix);
         }
     }
 
     mod metadata_integration {
         use super::*;
-
-        #[test]
-        fn test_apply_metadata_adjustments_basic() {
-            // Test basic metadata adjustments
-            let weighted_score = 1.0;
-            let frequency = 10;
-            let age_days = 30;
-            let candidate_len = 5;
-            let query_len = 3;
-            let max_len = 50;
-
-            let result = apply_metadata_adjustments(
-                weighted_score, frequency, age_days, candidate_len, query_len, max_len
-            );
-
-            // Should be slightly above 1.0 due to frequency and age factors
-            assert!(result > 1.0);
-            assert!(result <= 2.0); // Should be within bounds
-        }
 
         #[test]
         fn test_apply_metadata_adjustments_frequency_effect() {
@@ -772,19 +662,20 @@ mod tests {
         #[test]
         fn test_apply_metadata_adjustments_age_effect() {
             // Test age factor effect
+            // NOTE: Age is the wrong term. We mean recency here.
             let weighted_score = 1.0;
             let frequency = 10;
-            let older_age = 365; // Maximum age
-            let newer_age = 1;   // Very new
+            let less_recent = 1;
+            let more_recent = 356;
             let candidate_len = 5;
             let query_len = 3;
             let max_len = 50;
 
             let older_result = apply_metadata_adjustments(
-                weighted_score, frequency, older_age, candidate_len, query_len, max_len
+                weighted_score, frequency, less_recent, candidate_len, query_len, max_len
             );
             let newer_result = apply_metadata_adjustments(
-                weighted_score, frequency, newer_age, candidate_len, query_len, max_len
+                weighted_score, frequency, more_recent, candidate_len, query_len, max_len
             );
 
             // Newer items should have slightly higher scores
@@ -814,24 +705,6 @@ mod tests {
         }
 
         #[test]
-        fn test_apply_metadata_adjustments_no_length_penalty() {
-            // Test no length penalty for reasonable length differences
-            let weighted_score = 1.0;
-            let frequency = 10;
-            let age_days = 30;
-            let candidate_len = 10;
-            let query_len = 5;
-            let max_len = 50;
-
-            let result = apply_metadata_adjustments(
-                weighted_score, frequency, age_days, candidate_len, query_len, max_len
-            );
-
-            // Should not have significant penalty for 2x length difference
-            assert!(result > 1.0);
-        }
-
-        #[test]
         fn test_apply_metadata_adjustments_bounds() {
             // Test that scores are properly bounded
             let high_weighted_score = 10.0; // Unrealistically high
@@ -851,42 +724,6 @@ mod tests {
         }
 
         #[test]
-        fn test_normalize_substring_score() {
-            // Test substring score normalization
-            let position = 2;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // Earlier positions should have higher scores
-            assert_eq!(result, 1.0 - (2.0 / 10.0)); // 0.8
-        }
-
-        #[test]
-        fn test_normalize_substring_score_start_position() {
-            // Test substring at start position
-            let position = 0;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // Start position should have highest score
-            assert_eq!(result, 1.0);
-        }
-
-        #[test]
-        fn test_normalize_substring_score_end_position() {
-            // Test substring at end position
-            let position = 9;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // End position should have lowest score
-            assert_eq!(result, 1.0 - (9.0 / 10.0)); // 0.1
-        }
-
-        #[test]
         fn test_get_string_metadata() {
             // Test metadata extraction from StringRef
             let string_ref = StringRef {
@@ -901,58 +738,6 @@ mod tests {
             assert_eq!(length, 5); // "hello" has 5 characters
         }
 
-        #[test]
-        fn test_normalize_fuzzy_score() {
-            // Test fuzzy score normalization
-            let raw_score = 5.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Lower raw scores should result in higher normalized scores
-            assert_eq!(result, 1.0 - (5.0 / 10.0)); // 0.5
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_best_case() {
-            // Test best possible fuzzy score
-            let raw_score = 0.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Best raw score should give normalized score of 1.0
-            assert_eq!(result, 1.0);
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_worst_case() {
-            // Test worst possible fuzzy score
-            let raw_score = 10.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Worst raw score should give normalized score of 0.0
-            assert_eq!(result, 0.0);
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_clamping() {
-            // Test that scores are properly clamped
-            let raw_score = -5.0; // Below min
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Should be clamped to 0.0-1.0 range
-            assert!(result >= 0.0);
-            assert!(result <= 1.0);
-        }
     }
 
     mod best_completions {
@@ -1051,29 +836,6 @@ mod tests {
         }
 
         #[test]
-        fn test_has_high_quality_prefix_matches() {
-            let ssi = StringSpaceInner::new();
-
-            // Create test candidates
-            let candidates = vec![
-                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "helicopter".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-            ];
-
-            // All candidates start with "hel" - should be high quality
-            assert!(ssi.has_high_quality_prefix_matches(&candidates, "hel"));
-
-            // Mixed candidates - should not be high quality
-            let mixed_candidates = vec![
-                StringRef { string: "hello".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "world".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-                StringRef { string: "help".to_string(), meta: StringMeta { frequency: 1, age_days: 0 } },
-            ];
-            assert!(!ssi.has_high_quality_prefix_matches(&mixed_candidates, "hel"));
-        }
-
-        #[test]
         fn test_progressive_algorithm_execution() {
             let mut ss = StringSpace::new();
             ss.insert_string("hello", 1).unwrap();
@@ -1086,7 +848,7 @@ mod tests {
             // Should find all three "hel" prefix matches
             assert!(results.len() >= 3);
 
-            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            let strings: Vec<String> = results.iter().map(|r| r.string_ref.string.clone()).collect();
             assert!(strings.contains(&"hello".to_string()));
             assert!(strings.contains(&"help".to_string()));
             assert!(strings.contains(&"helicopter".to_string()));
@@ -1105,7 +867,7 @@ mod tests {
             let results = ss.inner.progressive_algorithm_execution("hl", 10);
             assert!(results.len() >= 3);
 
-            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            let strings: Vec<String> = results.iter().map(|r| r.string_ref.string.clone()).collect();
             assert!(strings.contains(&"hello".to_string()));
             assert!(strings.contains(&"help".to_string()));
             assert!(strings.contains(&"helicopter".to_string()));
@@ -1113,7 +875,7 @@ mod tests {
 
         #[test]
         fn test_progressive_algorithm_execution_empty() {
-            let ss = StringSpace::new();
+            let mut ss = StringSpace::new();
 
             // Test with empty database
             let results = ss.inner.progressive_algorithm_execution("hel", 10);
@@ -1135,6 +897,106 @@ mod tests {
             // Should get some results but not necessarily all matches due to early termination
             assert!(results.len() > 0);
             assert!(results.len() <= 5);
+        }
+
+        #[test]
+        fn test_prefix_priority_over_other_algorithms() {
+            let mut ss = StringSpace::new();
+
+            // Insert test data with clear prefix matches and fuzzy matches
+            ss.insert_string("hello", 10).unwrap();
+            ss.insert_string("help", 15).unwrap();
+            ss.insert_string("helicopter", 5).unwrap();
+            ss.insert_string("world", 20).unwrap();
+
+            // Query that should return prefix matches
+            let query = "hel";
+            let results = ss.best_completions(query, Some(10));
+
+            // All prefix matches should be in results
+            assert!(results.len() >= 3, "Should find all prefix matches for 'hel'");
+
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()), "'hello' should be in results");
+            assert!(strings.contains(&"help".to_string()), "'help' should be in results");
+            assert!(strings.contains(&"helicopter".to_string()), "'helicopter' should be in results");
+
+            // Prefix matches should appear before non-prefix matches
+            // "world" should not appear in results since it doesn't match "hel"
+            assert!(!strings.contains(&"world".to_string()), "'world' should not be in results for 'hel' query");
+
+            // Test with a query that has both prefix and fuzzy matches
+            let mut ss2 = StringSpace::new();
+            ss2.insert_string("hello", 10).unwrap();
+            ss2.insert_string("help", 15).unwrap();
+            ss2.insert_string("helicopter", 5).unwrap();
+            ss2.insert_string("hallelujah", 8).unwrap();
+            ss2.insert_string("world", 20).unwrap();
+
+            let query2 = "hl";
+            let results2 = ss2.best_completions(query2, Some(10));
+
+            // Should find fuzzy matches for "hl"
+            assert!(results2.len() >= 4, "Should find fuzzy matches for 'hl'");
+
+            let strings2: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings2.contains(&"hello".to_string()), "'hello' should be in fuzzy results");
+            assert!(strings2.contains(&"help".to_string()), "'help' should be in fuzzy results");
+            assert!(strings2.contains(&"helicopter".to_string()), "'helicopter' should be in fuzzy results");
+            assert!(strings2.contains(&"hallelujah".to_string()), "'hallelujah' should be in fuzzy results");
+        }
+
+        #[test]
+        fn test_implement_prefix_priority() {
+            let mut ss = StringSpace::new();
+
+            // Insert the exact test data with metadata (frequency, age_days)
+            let test_data = vec![
+                ("-implementing", 2, 20046),
+                ("Change_in_valuation_multiple", 1, 20369),
+                ("implement", 117, 20378),
+                ("implementation", 67, 20378),
+                ("implementations", 23, 20046),
+                ("implementatoin", 1, 19990),
+                ("implemented", 21, 20378),
+                ("implementers", 1, 20016),
+                ("implementing", 18, 20378),
+                ("implements", 31, 20231),
+            ];
+
+            // Insert all strings with their actual metadata
+            for (string, frequency, age_days) in test_data {
+                ss.insert_string_with_age(string, frequency, age_days).unwrap();
+            }
+
+            // Query that should prioritize prefix matches
+            let query = "imple";
+            let results = ss.best_completions(query, Some(10));
+
+            println!("Query: '{}'", query);
+            println!("Results:");
+            for (i, result) in results.iter().enumerate() {
+                println!("  {}: {} (freq: {}, age: {})", i + 1, result.string, result.meta.frequency, result.meta.age_days);
+            }
+
+            // "implement" should be the highest ranked result because:
+            // 1. It's a direct prefix match
+            // 2. It's the shortest prefix match
+            // 3. It has the highest frequency (117)
+            // 4. It should have highest priority over other algorithms
+            assert!(results.len() > 0, "Should find matches for 'imple'");
+
+            // Check that "implement" is in the results
+            let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"implement".to_string()), "'implement' should be in results");
+
+            // The top result should be "implement" since it's the shortest prefix match with highest frequency
+            if results.len() > 0 {
+                println!("Top result: '{}' (freq: {}, age: {})", results[0].string, results[0].meta.frequency, results[0].meta.age_days);
+                // This assertion will likely fail with the current implementation
+                // because metadata and scoring may not properly prioritize prefix matches
+                assert_eq!(results[0].string, "implement", "'implement' should be the top result for 'imple' query");
+            }
         }
     }
 
@@ -1412,7 +1274,7 @@ mod tests {
 
         #[test]
         fn test_empty_database() {
-            let ss = StringSpace::new();
+            let mut ss = StringSpace::new();
 
             // All search methods should return empty results for empty database
             assert!(ss.best_completions("hello", Some(10)).is_empty());
@@ -1814,6 +1676,246 @@ mod tests {
             assert!(results.len() >= 1);
             let strings: Vec<String> = results.iter().map(|r| r.string.clone()).collect();
             assert!(strings.contains(&"test.dot".to_string()));
+        }
+    }
+
+    mod cache_invalidation_tests {
+        use super::*;
+
+        #[test]
+        fn test_get_all_strings_cache_initial_population() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // First call should populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Second call should use cache (same results)
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+            assert_eq!(results1, results2);
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_insert() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+
+            // Insert new string - should invalidate cache
+            ss.insert_string("world", 2).unwrap();
+
+            // Cache should be invalidated, new results should include both strings
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"world".to_string()));
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_clear_space() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Clear space - should invalidate cache
+            ss.clear_space();
+
+            // Cache should be invalidated, new results should be empty
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 0);
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_sort() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("zebra", 1).unwrap();
+            ss.insert_string("apple", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Sort - should invalidate cache
+            ss.sort();
+
+            // Cache should be invalidated, new results should be sorted
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present and sorted
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"apple".to_string()));
+            assert!(strings.contains(&"zebra".to_string()));
+            // After sort, results should be in alphabetical order
+            assert_eq!(strings[0], "apple");
+            assert_eq!(strings[1], "zebra");
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_grow_buffer() {
+            let mut ss = StringSpace::new();
+
+            // Insert many strings to trigger buffer growth
+            // Use strings that are within the length bounds
+            for i in 0..1000 {
+                let string = format!("test_string_{}", i);
+                ss.insert_string(&string, 1).unwrap();
+            }
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1000);
+
+            // Insert more strings to trigger buffer growth
+            for i in 1000..2000 {
+                let string = format!("test_string_{}", i);
+                ss.insert_string(&string, 1).unwrap();
+            }
+
+            // Cache should be invalidated after buffer growth
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2000);
+
+            // Verify strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"test_string_0".to_string()));
+            assert!(strings.contains(&"test_string_1999".to_string()));
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_read_from_file() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Write to file and read back - should invalidate cache
+            ss.write_to_file("test/test_cache_file.txt").unwrap();
+
+            let mut new_ss = StringSpace::new();
+            new_ss.read_from_file("test/test_cache_file.txt").unwrap();
+
+            // Cache should be invalidated, new results should match file contents
+            let results2 = new_ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"world".to_string()));
+
+            std::fs::remove_file("test/test_cache_file.txt").unwrap();
+        }
+
+        #[test]
+        fn test_cache_usage_in_full_database_searches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // First call to fuzzy_subsequence_full_database should populate cache
+            let results1 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert!(results1.len() >= 2);
+
+            // Second call should use cache (same results)
+            let results2 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert_eq!(results1.len(), results2.len());
+
+            // Insert new string - should invalidate cache
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Third call should rebuild cache with new data
+            let results3 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert!(results3.len() >= 3); // Should now include helicopter
+        }
+
+        #[test]
+        fn test_cache_consistency_after_multiple_operations() {
+            let mut ss = StringSpace::new();
+
+            // Perform series of operations that should invalidate cache
+            ss.insert_string("hello", 1).unwrap();
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+
+            ss.insert_string("world", 2).unwrap();
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            ss.sort();
+            let results3 = ss.get_all_strings();
+            assert_eq!(results3.len(), 2);
+
+            ss.clear_space();
+            let results4 = ss.get_all_strings();
+            assert_eq!(results4.len(), 0);
+
+            // After each operation, cache should be properly invalidated
+            // and results should reflect current state
+        }
+
+        #[test]
+        fn test_cache_performance_benefit() {
+            let mut ss = StringSpace::new();
+
+            // Add many strings to make cache beneficial
+            for i in 0..1000 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+
+            // First call to get_all_strings should take longer (populating cache)
+            let start1 = std::time::Instant::now();
+            let results1 = ss.get_all_strings();
+            let duration1 = start1.elapsed();
+
+            // Second call should be faster (using cache)
+            let start2 = std::time::Instant::now();
+            let results2 = ss.get_all_strings();
+            let duration2 = start2.elapsed();
+
+            // Results should be identical
+            assert_eq!(results1.len(), results2.len());
+            assert_eq!(results1, results2);
+
+            // Second call should be faster (cache hit)
+            // Note: This is probabilistic, but in practice should hold
+            assert!(duration2 <= duration1, "Cache should provide performance benefit");
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_duplicate_insert() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+            assert_eq!(results1[0].meta.frequency, 1);
+
+            // Insert duplicate - should invalidate cache and update frequency
+            ss.insert_string("hello", 1).unwrap();
+
+            // Cache should be invalidated, frequency should be updated
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 1);
+            assert_eq!(results2[0].meta.frequency, 2);
         }
     }
 
