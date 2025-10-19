@@ -1127,38 +1127,51 @@ impl StringSpaceInner {
         let mut min_score = f64::MAX;
         let mut max_score = f64::MIN;
         let mut scores = Vec::new();
+        let score_range_min = 0.6;
 
         // First pass: collect scores for normalization
         for string_ref in &all_strings {
-            if let Some(score) = self.score_fuzzy_subsequence(string_ref, query) {
+            if let Some(score) = self.score_fuzzy_subsequence(string_ref, query, score_range_min) {
+                if score > 1.0 {
+                    println!("Raw score for {} is greater than 1.0: {}", string_ref.string, score);
+                }
                 min_score = min_score.min(score);
                 max_score = max_score.max(score);
                 scores.push((string_ref.clone(), score));
             }
         }
 
-        // Handle edge case where all scores are the same or very close
-        if (max_score - min_score).abs() < f64::EPSILON {
-            // If all scores are identical, treat them all as perfect matches
-            // But only if we have multiple candidates - if only one candidate, use its score as reference
-            if scores.len() > 1 {
-                min_score = 0.0;
-                max_score = 1.0;
-            } else {
-                // Single candidate: use a reasonable range around the score
-                min_score = min_score - 1.0;
-                max_score = max_score + 1.0;
-            }
-        } else if (max_score - min_score) < 0.1 {
-            // If scores are very close together, expand the range to provide better differentiation
-            let mid = (min_score + max_score) / 2.0;
-            min_score = mid - 0.5;
-            max_score = mid + 0.5;
-        }
+        assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
+        assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
+
+        // // Handle edge case where all scores are the same or very close
+        // if (max_score - min_score).abs() < f64::EPSILON {
+        //     // If all scores are identical, treat them all as perfect matches
+        //     // But only if we have multiple candidates - if only one candidate, use its score as reference
+        //     if scores.len() > 1 {
+        //         min_score = 0.0;
+        //         max_score = 1.0;
+        //     } else {
+        //         // Single candidate: use a reasonable range around the score
+        //         min_score = min_score - 1.0;
+        //         max_score = max_score + 1.0;
+        //     }
+        // } else if (max_score - min_score) < 0.1 {
+        //     // If scores are very close together, expand the range to provide better differentiation
+        //     let mid = (min_score + max_score) / 2.0;
+        //     min_score = mid - 0.5;
+        //     max_score = mid + 0.5;
+        // }
+
+        assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
+        assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
 
         // Second pass: apply normalization and threshold filtering
         for (string_ref, raw_score) in scores {
-            let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+            // let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
+            let normalized_score = raw_score;
+
+
             // let string_copy = string_ref.string.clone();
             // println!("Normalized score for {}: {} (raw: {}, min: {}, max: {})", string_copy, normalized_score, raw_score, min_score, max_score);
 
@@ -1234,7 +1247,7 @@ impl StringSpaceInner {
     }
 
     // Helper function for fuzzy subsequence scoring
-    fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str) -> Option<f64> {
+    fn score_fuzzy_subsequence(&self, string_ref: &StringRef, query: &str, min_score: f64) -> Option<f64> {
         let candidate = string_ref.string.as_str();
 
         // Apply smart filtering to skip unpromising candidates
@@ -1255,7 +1268,7 @@ impl StringSpaceInner {
 
         if let Some(match_indices) = is_subsequence_chars(&query_chars, &candidate_chars) {
             // Calculate match span score
-            let score = score_match_span_chars(&match_indices, &query, &candidate);
+            let score = score_match_span_chars(&match_indices, &query, &candidate, min_score);
             if candidate == "began" {
                 println!("Scoring for candidate 'began' and query {:?}: {:?}", query, score);
             }
@@ -1703,7 +1716,7 @@ fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Optio
 }
 
 // Character-based version for scoring
-fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str) -> f64 {
+fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str, min_score: f64) -> f64 {
     if match_indices.is_empty() {
         return 0.0;
     }
@@ -1712,21 +1725,25 @@ fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str)
         return 0.0;
     }
 
-    // // get the average distance between matched characters
-    // let mut cumulative_distance = 0usize;
-    // for i in 1..match_indices.len() {
-    //     cumulative_distance += match_indices[i] - match_indices[i-1];
-    // }
-    // let mut avg_distance = cumulative_distance as f64 / (match_indices.len() - 1) as f64; //avg_distance /= (match_indices.len() - 1) as f64;
+    // Scale function to map 0.0-1.0 to min-1.0 range
+    fn scale_to_min(zero_to_one: f64, min: f64) -> f64 {
+        min + (1.0 - min) * zero_to_one
+    }
 
-    // // normalize the average distance based on the length of the candidate string
-    // avg_distance /= candidate_chars.len() as f64;
-    // avg_distance
-
-    let query_length = query.len() as f64;
+    let num_matches = match_indices.len() as f64;
     let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+    let quality = num_matches / span_length;
     let candidate_length = candidate.len() as f64;
-    (candidate_length - span_length - match_indices.len() as f64) / candidate_length
+
+    let span_score = span_length / candidate_length; // Scale to 0.0-1.0, where 1.0 means the span covers the entire candidate
+    let match_score = scale_to_min(num_matches / candidate_length,0.5); // Scale min-1.0 where 1.0 means all characters match between query and candidate
+    let quality_score = scale_to_min(quality, 0.8); // Scale min-1.0 where 1.0 means all characters in the span are matches
+    let max_proximity = candidate_length.min(50.0);
+    let first_index_f64 = *match_indices.first().unwrap() as f64;
+    let mut proximity_score = 1.0 - (max_proximity - first_index_f64.min(50.0)) / max_proximity; // Scale 0.0-1.0 where 1.0 means match starts at beginning of candidate
+    proximity_score = scale_to_min(proximity_score, 0.5); // Scale min-1.0 where 1.0 means match starts at beginning
+
+    scale_to_min(span_score * match_score * quality_score * proximity_score, min_score) // Scale min-1.0 where 1.0 means perfect match
 }
 
 // Smart filtering to skip unpromising candidates
@@ -1772,7 +1789,7 @@ fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
 }
 
 
-// For fuzzy subsequence (lower raw scores are better)
+// For fuzzy subsequence (higher raw scores are better)
 fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
     // Optimized: Avoid division by zero and use efficient calculation
     let range = max_score - min_score;
@@ -1781,7 +1798,7 @@ fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 
         return 0.5;
     }
 
-    // Invert and normalize: lower raw scores → higher normalized scores
-    let normalized = 1.0 - ((raw_score - min_score) / range);
+    // Normalize: higher raw scores → higher normalized scores
+    let normalized = ((raw_score - min_score) / range);
     normalized.clamp(0.0, 1.0)
 }
