@@ -4,6 +4,7 @@
 from prompt_toolkit.completion import Completer, Completion
 import re
 from string_space_client import StringSpaceClient, ProtocolError
+import sys
 
 class StringSpaceCompleter(Completer):
     def __init__(self, **kwargs):
@@ -22,7 +23,8 @@ class StringSpaceCompleter(Completer):
     def get_completions(self, document, complete_event):
         if self.disabled:
             return
-        word_before_cursor = document.get_word_before_cursor(WORD=True).lower()
+        # word_before_cursor = document.get_word_before_cursor(WORD=True).lower()
+        word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
             return
@@ -41,12 +43,13 @@ class StringSpaceCompleter(Completer):
 
         # filter only words that start with the same letter as word_before_cursor
         doc_words = [word for word in doc_words if word.lower().startswith(word_before_cursor.lower())]
-        completion_suggestions = self.client.prefix_search(word_before_cursor)
-        spell_suggestions = self.client.similar_search(word_before_cursor, threshold=0.6)
-
-        # combine doc_words and completion_suggestions and spell_suggestions into a single list
-        suggestions = doc_words + completion_suggestions + spell_suggestions
-
+        # completion_suggestions = self.client.fuzzy_subsequence_search(word_before_cursor)
+        # print("Completion suggestions:\n", completion_suggestions, file=sys.stderr, flush=True)
+        # spell_suggestions = self.client.similar_search(word_before_cursor, threshold=0.6)
+        # print("Spell suggestions:\n", spell_suggestions, file=sys.stderr, flush=True)
+        # # combine completion_suggestions and spell_suggestions into a single list
+        # suggestions = completion_suggestions + spell_suggestions
+        suggestions = self.client.best_completions_search(word_before_cursor, limit=10)
         # remove duplicates in suggestions while preserving order
         seen = set()
         result = []
@@ -58,12 +61,17 @@ class StringSpaceCompleter(Completer):
         if word_in_suggestions:
             # insert word_before_cursor at the beginning of the list
             result.insert(0, word_before_cursor)
-        suggestions = result
+        # # for any suggestions that are in doc_words, move them to the front of the list
+        # doc_sorted_suggestions = [word for word in result if word in doc_words]
+        # other_suggestions = [word for word in result if word not in doc_words]
+        # suggestions = doc_sorted_suggestions + other_suggestions
         for suggestion in suggestions:
             if suggestion.strip() != '':
                 yield Completion(suggestion, start_position=-len(word_before_cursor))
 
     def stop(self):
+        if self.disabled:
+            return
         self.client.disconnect()
 
     def parse_text(self, text: str) -> list[str]:
@@ -76,8 +84,12 @@ class StringSpaceCompleter(Completer):
         return words
 
     def add_words_from_text(self, text):
+        if self.disabled:
+            return
         words = self.parse_text(text)
         self.client.add_words(words)
 
     def add_words(self, words):
+        if self.disabled:
+            return
         self.client.add_words(words)
