@@ -32,6 +32,9 @@ clean:
 test:
 	tests/run_tests.sh
 
+auto:
+	tests/autocompleter.py
+
 install: release
 	cp $(RELEASE_DIR)/$(EXECUTABLE) $(TARGET)
 
