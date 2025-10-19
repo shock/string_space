@@ -1326,7 +1326,7 @@ impl StringSpaceInner {
 
         // 3. Jaro-Winkler only if still needed (O(n) with early exit)
         // Use adaptive threshold for Jaro-Winkler based on query length
-        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.8 };
+        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.78 };
         let jaro_candidates = self.jaro_winkler_full_database(
             query,
             limit,
