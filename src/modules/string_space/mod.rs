@@ -122,7 +122,7 @@ impl QueryLengthCategory {
         match query.len() {
             1..=2 => QueryLengthCategory::VeryShort,
             3..=4 => QueryLengthCategory::Short,
-            5..=6 => QueryLengthCategory::Medium,
+            5..=10 => QueryLengthCategory::Medium,
             _ => QueryLengthCategory::Long,
         }
     }
@@ -1108,6 +1108,7 @@ impl StringSpaceInner {
         // Track min/max scores for normalization
         let mut min_score = f64::MAX;
         let mut max_score = f64::MIN;
+        let mut max_len = 0;
         let mut scores = Vec::new();
         let score_range_min = 0.6;
 
@@ -1119,6 +1120,7 @@ impl StringSpaceInner {
                 }
                 min_score = min_score.min(score);
                 max_score = max_score.max(score);
+                max_len = max_len.max(string_ref.string.len());
                 scores.push((string_ref.clone(), score));
             }
         }
@@ -1443,6 +1445,7 @@ fn calculate_final_score(
     );
 
     candidate.final_score = final_score;
+    candidate.final_score = weighted_score; // for debugging, override final score with weighted score
     final_score
 }
 

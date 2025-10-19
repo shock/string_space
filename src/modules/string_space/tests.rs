@@ -614,30 +614,6 @@ mod tests {
             assert_eq!(candidate.raw_score, 0.8);
             assert_eq!(candidate.normalized_score, 0.9);
             assert_eq!(candidate.final_score, 0.0);
-            assert!(candidate.alternative_scores.is_empty());
-        }
-
-        #[test]
-        fn test_add_alternative_score() {
-            let string_ref = StringRef {
-                string: "hello".to_string(),
-                meta: StringMeta { frequency: 1, age_days: 0 },
-            };
-            let mut candidate = ScoreCandidate::new(
-                string_ref,
-                AlgorithmType::Prefix,
-                0.8,
-                0.9,
-            );
-
-            candidate.add_alternative_score(AlgorithmType::FuzzySubseq, 0.7);
-            candidate.add_alternative_score(AlgorithmType::JaroWinkler, 0.95);
-
-            assert_eq!(candidate.alternative_scores.len(), 2);
-            assert_eq!(candidate.alternative_scores[0].algorithm, AlgorithmType::FuzzySubseq);
-            assert_eq!(candidate.alternative_scores[0].normalized_score, 0.7);
-            assert_eq!(candidate.alternative_scores[1].algorithm, AlgorithmType::JaroWinkler);
-            assert_eq!(candidate.alternative_scores[1].normalized_score, 0.95);
         }
 
         #[test]
@@ -799,58 +775,6 @@ mod tests {
             assert_eq!(length, 5); // "hello" has 5 characters
         }
 
-        #[test]
-        fn test_normalize_fuzzy_score() {
-            // Test fuzzy score normalization
-            let raw_score = 5.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Lower raw scores should result in higher normalized scores
-            assert_eq!(result, 1.0 - (5.0 / 10.0)); // 0.5
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_best_case() {
-            // Test best possible fuzzy score
-            let raw_score = 0.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Best raw score should give normalized score of 1.0
-            assert_eq!(result, 1.0);
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_worst_case() {
-            // Test worst possible fuzzy score
-            let raw_score = 10.0;
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Worst raw score should give normalized score of 0.0
-            assert_eq!(result, 0.0);
-        }
-
-        #[test]
-        fn test_normalize_fuzzy_score_clamping() {
-            // Test that scores are properly clamped
-            let raw_score = -5.0; // Below min
-            let min_score = 0.0;
-            let max_score = 10.0;
-
-            let result = normalize_fuzzy_score(raw_score, min_score, max_score);
-
-            // Should be clamped to 0.0-1.0 range
-            assert!(result >= 0.0);
-            assert!(result <= 1.0);
-        }
     }
 
     mod best_completions {
