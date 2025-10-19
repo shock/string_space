@@ -705,19 +705,20 @@ mod tests {
         #[test]
         fn test_apply_metadata_adjustments_age_effect() {
             // Test age factor effect
+            // NOTE: Age is the wrong term. We mean recency here.
             let weighted_score = 1.0;
             let frequency = 10;
-            let older_age = 365; // Maximum age
-            let newer_age = 1;   // Very new
+            let less_recent = 1;
+            let more_recent = 356;
             let candidate_len = 5;
             let query_len = 3;
             let max_len = 50;
 
             let older_result = apply_metadata_adjustments(
-                weighted_score, frequency, older_age, candidate_len, query_len, max_len
+                weighted_score, frequency, less_recent, candidate_len, query_len, max_len
             );
             let newer_result = apply_metadata_adjustments(
-                weighted_score, frequency, newer_age, candidate_len, query_len, max_len
+                weighted_score, frequency, more_recent, candidate_len, query_len, max_len
             );
 
             // Newer items should have slightly higher scores

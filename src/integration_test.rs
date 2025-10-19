@@ -1,6 +1,6 @@
 //! Integration tests for best_completions Phase 4 validation
 
-use crate::modules::string_space::{StringSpace, AlgorithmType};
+use crate::modules::string_space::StringSpace;
 
 /// Integration test for progressive algorithm execution
 pub fn test_progressive_algorithm_execution() {

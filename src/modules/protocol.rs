@@ -1134,12 +1134,12 @@ mod integration_tests {
 
         // Test with explicit limits to verify progressive ranking
         // Note: The actual ranking algorithm considers more than just frequency
-        // Based on the debug output, the ranking for "hel" query is:
-        // 1. helicopter, 2. hell, 3. hello, 4. help, 5. health
+        // Based on the current algorithm output, the ranking for "hel" query is:
+        // 1. hello, 2. help, 3. hell, 4. helicopter, 5. health
         let limit_tests = vec![
-            ("hel", "1", vec!["helicopter"]), // Top ranked by algorithm
-            ("hel", "2", vec!["helicopter", "hell"]), // Top 2 by algorithm
-            ("hel", "3", vec!["helicopter", "hell", "hello"]), // Top 3 by algorithm
+            ("hel", "1", vec!["hello"]), // Top ranked by algorithm
+            ("hel", "2", vec!["hello", "help"]), // Top 2 by algorithm
+            ("hel", "3", vec!["hello", "help", "hell"]), // Top 3 by algorithm
         ];
 
         for (query, limit, expected_top_words) in limit_tests {

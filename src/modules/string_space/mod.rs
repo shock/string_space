@@ -156,7 +156,6 @@ struct AlgorithmWeights {
     prefix: f64,
     fuzzy_subseq: f64,
     jaro_winkler: f64,
-    substring: f64,
 }
 
 impl AlgorithmWeights {
@@ -166,83 +165,67 @@ impl AlgorithmWeights {
 
         match category {
             QueryLengthCategory::VeryShort => {
-                let orig_prefix = 0.45;
+                let orig_prefix = 0.50;  // Increased since substring is removed
                 let orig_fuzzy = 0.35;
                 let orig_jaro = 0.15;
-                let orig_substring = 0.05;
 
                 let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
                 let jaro_winkler = orig_jaro * jaro_multiplier;
                 let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
-                let sum_others = orig_prefix + orig_substring;
-                let prefix = orig_prefix * (remaining / sum_others);
-                let substring = orig_substring * (remaining / sum_others);
+                let prefix = orig_prefix * (remaining / orig_prefix);
 
                 AlgorithmWeights {
                     prefix,
                     fuzzy_subseq,
                     jaro_winkler,
-                    substring,
                 }
             }
             QueryLengthCategory::Short => {
-                let orig_prefix = 0.40;
+                let orig_prefix = 0.50;  // Increased since substring is removed
                 let orig_fuzzy = 0.30;
                 let orig_jaro = 0.20;
-                let orig_substring = 0.10;
 
                 let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
                 let jaro_winkler = orig_jaro * jaro_multiplier;
                 let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
-                let sum_others = orig_prefix + orig_substring;
-                let prefix = orig_prefix * (remaining / sum_others);
-                let substring = orig_substring * (remaining / sum_others);
+                let prefix = orig_prefix * (remaining / orig_prefix);
 
                 AlgorithmWeights {
                     prefix,
                     fuzzy_subseq,
                     jaro_winkler,
-                    substring,
                 }
             }
             QueryLengthCategory::Medium => {
-                let orig_prefix = 0.35;
+                let orig_prefix = 0.50;  // Increased since substring is removed
                 let orig_fuzzy = 0.25;
                 let orig_jaro = 0.25;
-                let orig_substring = 0.15;
 
                 let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
                 let jaro_winkler = orig_jaro * jaro_multiplier;
                 let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
-                let sum_others = orig_prefix + orig_substring;
-                let prefix = orig_prefix * (remaining / sum_others);
-                let substring = orig_substring * (remaining / sum_others);
+                let prefix = orig_prefix * (remaining / orig_prefix);
 
                 AlgorithmWeights {
                     prefix,
                     fuzzy_subseq,
                     jaro_winkler,
-                    substring,
                 }
             }
             QueryLengthCategory::Long => {
-                let orig_prefix = 0.25;
+                let orig_prefix = 0.45;  // Increased since substring is removed
                 let orig_fuzzy = 0.20;
                 let orig_jaro = 0.35;
-                let orig_substring = 0.20;
 
                 let fuzzy_subseq = orig_fuzzy * fuzzy_multiplier;
                 let jaro_winkler = orig_jaro * jaro_multiplier;
                 let remaining = 1.0 - (fuzzy_subseq + jaro_winkler);
-                let sum_others = orig_prefix + orig_substring;
-                let prefix = orig_prefix * (remaining / sum_others);
-                let substring = orig_substring * (remaining / sum_others);
+                let prefix = orig_prefix * (remaining / orig_prefix);
 
                 AlgorithmWeights {
                     prefix,
                     fuzzy_subseq,
                     jaro_winkler,
-                    substring,
                 }
             }
         }
@@ -997,10 +980,10 @@ impl StringSpaceInner {
         matches.truncate(10);
 
         // print the matches for debugging
-        println!("Matches post-sorting:");
-        for (string_ref, score) in &matches {
-            println!("String: {}, Score: {}, TFreq: {}, AgeDays: {}", string_ref.string, score, string_ref.meta.frequency, string_ref.meta.age_days);
-        }
+        // println!("Matches post-sorting:");
+        // for (string_ref, score) in &matches {
+        //     println!("String: {}, Score: {}, TFreq: {}, AgeDays: {}", string_ref.string, score, string_ref.meta.frequency, string_ref.meta.age_days);
+        // }
 
         matches.into_iter().map(|(string_ref, _)| string_ref).collect()
     }
@@ -1412,7 +1395,7 @@ fn apply_metadata_adjustments(
     // 1. Frequency factor with logarithmic scaling to prevent dominance
     let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.1);
 
-    // 2. Age factor with bounded influence - newer items (bigger age) get slight preference
+    // 2. Age factor with bounded influence - newer items (bigger age) get slight preference - I know, it's counterintuitive.  TODO: re-evaluate this.
     // Set the max_age to the current time since epoch divided seconds in a day
     let max_age = days_since_epoch();
     let age_factor = 1.0 + (age_days as f64 / max_age as f64) * 0.05;
