@@ -90,6 +90,7 @@ type TFreq = u16;
 type TAgeDays = u32;
 
 #[derive(Debug, Clone)]
+#[derive(PartialEq)]
 pub struct StringMeta {
     pub frequency: TFreq,
     pub age_days: TAgeDays,
@@ -250,6 +251,7 @@ impl ScoreCandidate {
 
 #[derive(Debug, Clone)]
 #[allow(unused)]
+#[derive(PartialEq)]
 pub struct StringRef {
     pub string: String,
     pub meta: StringMeta,
@@ -826,6 +828,7 @@ impl StringSpaceInner {
         self.buffer = new_buffer;
         self.capacity = new_capacity;
         self.used_bytes = new_used_bytes;
+        self.all_strings_cache = None; // Invalidate cache after buffer reallocation
     }
 
     fn find_with_substring(&self, substring: &str) -> Vec<StringRef> {

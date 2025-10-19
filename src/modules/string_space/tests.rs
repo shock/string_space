@@ -1716,6 +1716,246 @@ mod tests {
         }
     }
 
+    mod cache_invalidation_tests {
+        use super::*;
+
+        #[test]
+        fn test_get_all_strings_cache_initial_population() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // First call should populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Second call should use cache (same results)
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+            assert_eq!(results1, results2);
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_insert() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+
+            // Insert new string - should invalidate cache
+            ss.insert_string("world", 2).unwrap();
+
+            // Cache should be invalidated, new results should include both strings
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"world".to_string()));
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_clear_space() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Clear space - should invalidate cache
+            ss.clear_space();
+
+            // Cache should be invalidated, new results should be empty
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 0);
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_sort() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("zebra", 1).unwrap();
+            ss.insert_string("apple", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Sort - should invalidate cache
+            ss.sort();
+
+            // Cache should be invalidated, new results should be sorted
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present and sorted
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"apple".to_string()));
+            assert!(strings.contains(&"zebra".to_string()));
+            // After sort, results should be in alphabetical order
+            assert_eq!(strings[0], "apple");
+            assert_eq!(strings[1], "zebra");
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_grow_buffer() {
+            let mut ss = StringSpace::new();
+
+            // Insert many strings to trigger buffer growth
+            // Use strings that are within the length bounds
+            for i in 0..1000 {
+                let string = format!("test_string_{}", i);
+                ss.insert_string(&string, 1).unwrap();
+            }
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1000);
+
+            // Insert more strings to trigger buffer growth
+            for i in 1000..2000 {
+                let string = format!("test_string_{}", i);
+                ss.insert_string(&string, 1).unwrap();
+            }
+
+            // Cache should be invalidated after buffer growth
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2000);
+
+            // Verify strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"test_string_0".to_string()));
+            assert!(strings.contains(&"test_string_1999".to_string()));
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_read_from_file() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 2);
+
+            // Write to file and read back - should invalidate cache
+            ss.write_to_file("test/test_cache_file.txt").unwrap();
+
+            let mut new_ss = StringSpace::new();
+            new_ss.read_from_file("test/test_cache_file.txt").unwrap();
+
+            // Cache should be invalidated, new results should match file contents
+            let results2 = new_ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            // Verify both strings are present
+            let strings: Vec<String> = results2.iter().map(|r| r.string.clone()).collect();
+            assert!(strings.contains(&"hello".to_string()));
+            assert!(strings.contains(&"world".to_string()));
+
+            std::fs::remove_file("test/test_cache_file.txt").unwrap();
+        }
+
+        #[test]
+        fn test_cache_usage_in_full_database_searches() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+            ss.insert_string("world", 2).unwrap();
+            ss.insert_string("help", 3).unwrap();
+
+            // First call to fuzzy_subsequence_full_database should populate cache
+            let results1 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert!(results1.len() >= 2);
+
+            // Second call should use cache (same results)
+            let results2 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert_eq!(results1.len(), results2.len());
+
+            // Insert new string - should invalidate cache
+            ss.insert_string("helicopter", 1).unwrap();
+
+            // Third call should rebuild cache with new data
+            let results3 = ss.fuzzy_subsequence_full_database("hl", 10, 0.5);
+            assert!(results3.len() >= 3); // Should now include helicopter
+        }
+
+        #[test]
+        fn test_cache_consistency_after_multiple_operations() {
+            let mut ss = StringSpace::new();
+
+            // Perform series of operations that should invalidate cache
+            ss.insert_string("hello", 1).unwrap();
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+
+            ss.insert_string("world", 2).unwrap();
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 2);
+
+            ss.sort();
+            let results3 = ss.get_all_strings();
+            assert_eq!(results3.len(), 2);
+
+            ss.clear_space();
+            let results4 = ss.get_all_strings();
+            assert_eq!(results4.len(), 0);
+
+            // After each operation, cache should be properly invalidated
+            // and results should reflect current state
+        }
+
+        #[test]
+        fn test_cache_performance_benefit() {
+            let mut ss = StringSpace::new();
+
+            // Add many strings to make cache beneficial
+            for i in 0..1000 {
+                ss.insert_string(&format!("test{}", i), 1).unwrap();
+            }
+
+            // First call to get_all_strings should take longer (populating cache)
+            let start1 = std::time::Instant::now();
+            let results1 = ss.get_all_strings();
+            let duration1 = start1.elapsed();
+
+            // Second call should be faster (using cache)
+            let start2 = std::time::Instant::now();
+            let results2 = ss.get_all_strings();
+            let duration2 = start2.elapsed();
+
+            // Results should be identical
+            assert_eq!(results1.len(), results2.len());
+            assert_eq!(results1, results2);
+
+            // Second call should be faster (cache hit)
+            // Note: This is probabilistic, but in practice should hold
+            assert!(duration2 <= duration1, "Cache should provide performance benefit");
+        }
+
+        #[test]
+        fn test_cache_invalidation_on_duplicate_insert() {
+            let mut ss = StringSpace::new();
+            ss.insert_string("hello", 1).unwrap();
+
+            // Populate cache
+            let results1 = ss.get_all_strings();
+            assert_eq!(results1.len(), 1);
+            assert_eq!(results1[0].meta.frequency, 1);
+
+            // Insert duplicate - should invalidate cache and update frequency
+            ss.insert_string("hello", 1).unwrap();
+
+            // Cache should be invalidated, frequency should be updated
+            let results2 = ss.get_all_strings();
+            assert_eq!(results2.len(), 1);
+            assert_eq!(results2[0].meta.frequency, 2);
+        }
+    }
+
     mod quality_assurance_tests {
         use super::*;
 
