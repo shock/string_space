@@ -1050,7 +1050,7 @@ impl StringSpaceInner {
 
         // get the limit number of ScoreCandidates from ranked_candidates
         let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
-        print_debug_score_candidates(&results);
+        // print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
@@ -1379,23 +1379,24 @@ fn apply_metadata_adjustments(
     max_len: usize
 ) -> f64 {
     // 1. Frequency factor with logarithmic scaling to prevent dominance
-    let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.1);
+    let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.01);
 
     // 2. Age factor with bounded influence - newer items (bigger age) get slight preference - I know, it's counterintuitive.  TODO: re-evaluate this.
     // Set the max_age to the current time since epoch divided seconds in a day
     let max_age = days_since_epoch();
-    let age_factor = 1.0 + (age_days as f64 / max_age as f64) * 0.05;
+    let age_factor = scale_to_min(age_days as f64 / max_age as f64, 0.95);
 
     // 3. Length penalty applied only for significant length mismatches
     let length_penalty = if candidate_len > query_len * 3 {
         // Only penalize when candidate is 3x longer than query
-        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.1
+        1.0 - ((candidate_len - query_len) as f64 / max_len as f64) * 0.01
     } else {
         1.0 // No penalty for reasonable length differences
     };
 
     // 4. Apply multiplicative combination with bounds checking
     let final_score = weighted_score * frequency_factor * age_factor * length_penalty;
+    // let final_score = weighted_score * frequency_factor;
 
     // Ensure score doesn't exceed reasonable bounds
     final_score.clamp(0.0, 2.0) // Cap at 2.0 to prevent extreme values
@@ -1425,7 +1426,7 @@ fn calculate_weighted_score(
 fn calculate_final_score(
     candidate: &mut ScoreCandidate,
     query: &str,
-    string_space: &mut StringSpaceInner
+    max_len: usize
 ) -> f64 {
     // Get all algorithm scores for this candidate
     let mut prefix_score = 0.0;
@@ -1447,7 +1448,6 @@ fn calculate_final_score(
     // Apply metadata adjustments
     let (frequency, age_days, candidate_len) = get_string_metadata(&candidate.string_ref);
     let query_len = query.len();
-    let max_len = string_space.get_max_string_length();
 
     let final_score = apply_metadata_adjustments(
         weighted_score,
@@ -1459,8 +1459,8 @@ fn calculate_final_score(
     );
 
     candidate.final_score = final_score;
-    candidate.final_score = weighted_score; // for debugging, override final score with weighted score
-    final_score
+    // candidate.final_score = weighted_score; // for debugging, override final score with weighted score
+    candidate.final_score
 }
 
 /// Merge candidates from different algorithms and calculate final scores
@@ -1486,10 +1486,12 @@ fn merge_and_score_candidates(
         }
     }
 
+    let max_len = string_space.get_max_string_length();
+
     // Calculate final scores for all merged candidates
     let mut scored_candidates: Vec<ScoreCandidate> = merged.into_values().collect();
     for candidate in &mut scored_candidates {
-        calculate_final_score(candidate, query, string_space);
+        calculate_final_score(candidate, query, max_len);
     }
 
     scored_candidates
@@ -1685,11 +1687,6 @@ fn score_match_span_chars(match_indices: &[usize], _query: &str, candidate: &str
         return 0.0;
     }
 
-    // Scale function to map 0.0-1.0 to min-1.0 range
-    fn scale_to_min(zero_to_one: f64, min: f64) -> f64 {
-        min + (1.0 - min) * zero_to_one
-    }
-
     let num_matches = match_indices.len() as f64;
     let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
     let quality = num_matches / span_length;
@@ -1746,4 +1743,10 @@ fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
     }
 
     false
+}
+
+
+// Scale function to map 0.0-1.0 to min-1.0 range
+fn scale_to_min(zero_to_one: f64, min: f64) -> f64 {
+    min + (1.0 - min) * zero_to_one
 }

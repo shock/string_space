@@ -638,25 +638,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_apply_metadata_adjustments_basic() {
-            // Test basic metadata adjustments
-            let weighted_score = 1.0;
-            let frequency = 10;
-            let age_days = 30;
-            let candidate_len = 5;
-            let query_len = 3;
-            let max_len = 50;
-
-            let result = apply_metadata_adjustments(
-                weighted_score, frequency, age_days, candidate_len, query_len, max_len
-            );
-
-            // Should be slightly above 1.0 due to frequency and age factors
-            assert!(result > 1.0);
-            assert!(result <= 2.0); // Should be within bounds
-        }
-
-        #[test]
         fn test_apply_metadata_adjustments_frequency_effect() {
             // Test frequency factor effect
             let weighted_score = 1.0;
@@ -721,24 +702,6 @@ mod tests {
 
             // Longer candidate should have lower score due to penalty
             assert!(short_result > long_result);
-        }
-
-        #[test]
-        fn test_apply_metadata_adjustments_no_length_penalty() {
-            // Test no length penalty for reasonable length differences
-            let weighted_score = 1.0;
-            let frequency = 10;
-            let age_days = 30;
-            let candidate_len = 10;
-            let query_len = 5;
-            let max_len = 50;
-
-            let result = apply_metadata_adjustments(
-                weighted_score, frequency, age_days, candidate_len, query_len, max_len
-            );
-
-            // Should not have significant penalty for 2x length difference
-            assert!(result > 1.0);
         }
 
         #[test]
