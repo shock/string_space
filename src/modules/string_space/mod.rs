@@ -1284,11 +1284,12 @@ impl StringSpaceInner {
         }
 
         // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
-        let similarity = jaro_winkler(query, candidate);
+        // let similarity = jaro_winkler(query, candidate);
+        let similarity = jaro(query, candidate);
 
         // Optimized: Apply more restrictive threshold for better performance
         // Only include high-quality matches
-        if similarity < 0.7 {
+        if similarity < 0.6 {
             return None;
         }
 
@@ -1469,7 +1470,8 @@ impl StringSpaceInner {
             }
 
             // Calculate Jaro-Winkler similarity (already normalized 0.0-1.0)
-            let similarity = jaro_winkler(query, candidate);
+            // let similarity = jaro_winkler(query, candidate);
+            let similarity = jaro(query, candidate);
 
             if similarity >= similarity_threshold {
                 let score_candidate = ScoreCandidate {
@@ -1566,7 +1568,7 @@ impl StringSpaceInner {
 
         // 3. Jaro-Winkler only if still needed (O(n) with early exit)
         // Use adaptive threshold for Jaro-Winkler based on query length
-        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.7 };
+        let jaro_threshold = if query.len() <= 2 { 0.6 } else { 0.8 };
         let jaro_candidates = self.jaro_winkler_full_database(
             query,
             limit,
@@ -1883,6 +1885,7 @@ fn similar(a: &str, b: &str) -> f64 {
 }
 
 use jaro_winkler::jaro_winkler;
+use strsim::jaro;
 
 fn get_close_matches(word: &str, possibilities: &[StringRef], n: usize, cutoff: f64) -> Vec<StringRef> {
     let mut matches: Vec<(String, u32, TFreq, TAgeDays)> = Vec::new();
