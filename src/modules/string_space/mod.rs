@@ -1057,8 +1057,8 @@ impl StringSpaceInner {
         // ranked_candidates.truncate(limit);
 
         // get the limit number of ScoreCandidates from ranked_candidates
-        let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
-        print_debug_score_candidates(&results);
+        // let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
+        // print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
