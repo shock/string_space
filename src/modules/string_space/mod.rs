@@ -1976,21 +1976,25 @@ fn score_match_span_chars(query_chars: &[char], candidate_chars: &[char]) -> f64
             return 0.0;
         }
 
-        // get the average distance between matched characters
-        let mut cumulative_distance = 0usize;
-        for i in 1..match_indices.len() {
-            cumulative_distance += match_indices[i] - match_indices[i-1];
+        if match_indices.len() == 1 {
+            return 0.0;
         }
-        let mut avg_distance = cumulative_distance as f64 / (match_indices.len() - 1) as f64; //avg_distance /= (match_indices.len() - 1) as f64;
 
-        // normalize the average distance based on the length of the candidate string
-        avg_distance /= candidate_chars.len() as f64;
-        avg_distance
+        // // get the average distance between matched characters
+        // let mut cumulative_distance = 0usize;
+        // for i in 1..match_indices.len() {
+        //     cumulative_distance += match_indices[i] - match_indices[i-1];
+        // }
+        // let mut avg_distance = cumulative_distance as f64 / (match_indices.len() - 1) as f64; //avg_distance /= (match_indices.len() - 1) as f64;
+
+        // // normalize the average distance based on the length of the candidate string
+        // avg_distance /= candidate_chars.len() as f64;
+        // avg_distance
 
 
-        // let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
-        // let candidate_length = candidate_chars.len() as f64;
-        // candidate_length - span_length
+        let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+        let candidate_length = candidate_chars.len() as f64;
+        (candidate_length - span_length) / candidate_length
     } else {
         0.0
     }
