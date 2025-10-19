@@ -76,6 +76,7 @@ struct StringSpaceInner {
     capacity: usize,
     used_bytes: usize,
     string_refs: Vec<StringRefInfo>,
+    all_strings_cache: Option<Vec<StringRef>>,
 }
 
 #[derive(Debug, Clone)]
@@ -428,7 +429,7 @@ impl StringSpace {
     }
 
     #[allow(unused)]
-    pub fn get_all_strings(&self) -> Vec<StringRef> {
+    pub fn get_all_strings(&mut self) -> Vec<StringRef> {
         self.inner.get_all_strings()
     }
 
@@ -491,7 +492,7 @@ impl StringSpace {
     /// - Control characters are rejected
     /// - Empty queries return empty results
     #[allow(unused)]
-    pub fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    pub fn best_completions(&mut self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
         self.inner.best_completions(query, limit)
     }
 
@@ -523,7 +524,7 @@ impl StringSpace {
     /// ```
     #[allow(unused)]
     pub fn fuzzy_subsequence_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         score_threshold: f64
@@ -559,7 +560,7 @@ impl StringSpace {
     /// ```
     #[allow(unused)]
     pub fn jaro_winkler_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         similarity_threshold: f64
@@ -593,6 +594,7 @@ impl StringSpaceInner {
             capacity: INITIAL_HEAP_SIZE,
             used_bytes: 0,
             string_refs: Vec::new(),
+            all_strings_cache: None,
         }
     }
 
@@ -613,6 +615,7 @@ impl StringSpaceInner {
             };
             a_str.cmp(b_str)
         });
+        self.all_strings_cache = None;
     }
 
     fn empty(&self) -> bool {
@@ -630,6 +633,7 @@ impl StringSpaceInner {
     fn clear_space(&mut self) {
         self.string_refs.clear();
         self.used_bytes = 0;
+        self.all_strings_cache = None;
     }
 
     fn binary_search<F>(&self, target: &[u8], compare: F) -> usize
@@ -662,6 +666,8 @@ impl StringSpaceInner {
         let string_bytes = string.as_bytes();
 
         let index = self.binary_search(string_bytes, |a, b| a.cmp(b));
+
+        self.all_strings_cache = None;
 
         if index < self.string_refs.len() {
             let existing_ref = &self.string_refs[index];
@@ -707,7 +713,11 @@ impl StringSpaceInner {
         Ok(())
     }
 
-    fn get_all_strings(&self) -> Vec<StringRef> {
+    fn get_all_strings(&mut self) -> Vec<StringRef> {
+        if let Some(cached) = &self.all_strings_cache {
+            return cached.clone();
+        }
+
         let mut results = Vec::new();
         for ref_info in &self.string_refs {
             let string_bytes = unsafe {
@@ -722,6 +732,7 @@ impl StringSpaceInner {
                 meta: ref_info.meta.clone(),
             });
         }
+        self.all_strings_cache = Some(results.clone()); // Cannot assign to self.all_strings_cache here because self is &self
         results
     }
 
@@ -970,7 +981,7 @@ impl StringSpaceInner {
         matches.into_iter().map(|(string_ref, _)| string_ref).collect()
     }
 
-    fn best_completions(&self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
+    fn best_completions(&mut self, query: &str, limit: Option<usize>) -> Vec<StringRef> {
         let limit = limit.unwrap_or(15);
 
         // Early return for empty database
@@ -1055,7 +1066,7 @@ impl StringSpaceInner {
     }
 
     /// Get maximum string length in the database
-    fn get_max_string_length(&self) -> usize {
+    fn get_max_string_length(&mut self) -> usize {
         self.get_all_strings()
             .iter()
             .map(|s| s.string.len())
@@ -1092,7 +1103,7 @@ impl StringSpaceInner {
 
     // Full-database fuzzy subsequence search with early termination
     fn fuzzy_subsequence_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         score_threshold: f64
@@ -1153,7 +1164,7 @@ impl StringSpaceInner {
                 // println!("Added {} to results", string_copy);
 
                 // Early termination: stop if we have enough high-quality candidates
-                if results.len() >= target_count * 2{
+                if results.len() >= target_count {
                     break;
                 }
             }
@@ -1164,7 +1175,7 @@ impl StringSpaceInner {
 
     // Full-database Jaro-Winkler similarity search with early termination
     fn jaro_winkler_full_database(
-        &self,
+        &mut self,
         query: &str,
         target_count: usize,
         similarity_threshold: f64
@@ -1241,7 +1252,7 @@ impl StringSpaceInner {
 
     // Progressive algorithm execution with early termination and error recovery
     fn progressive_algorithm_execution(
-        &self,
+        &mut self,
         query: &str,
         limit: usize
     ) -> Vec<ScoreCandidate> {
@@ -1411,7 +1422,7 @@ fn calculate_weighted_score(
 fn calculate_final_score(
     candidate: &mut ScoreCandidate,
     query: &str,
-    string_space: &StringSpaceInner
+    string_space: &mut StringSpaceInner
 ) -> f64 {
     // Get all algorithm scores for this candidate
     let mut prefix_score = 0.0;
@@ -1453,7 +1464,7 @@ fn calculate_final_score(
 fn merge_and_score_candidates(
     candidates: Vec<ScoreCandidate>,
     query: &str,
-    string_space: &StringSpaceInner
+    string_space: &mut StringSpaceInner
 ) -> Vec<ScoreCandidate> {
     let mut merged: HashMap<String, ScoreCandidate> = HashMap::new();
 

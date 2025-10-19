@@ -912,7 +912,7 @@ mod tests {
 
         #[test]
         fn test_progressive_algorithm_execution_empty() {
-            let ss = StringSpace::new();
+            let mut ss = StringSpace::new();
 
             // Test with empty database
             let results = ss.inner.progressive_algorithm_execution("hel", 10);
@@ -1311,7 +1311,7 @@ mod tests {
 
         #[test]
         fn test_empty_database() {
-            let ss = StringSpace::new();
+            let mut ss = StringSpace::new();
 
             // All search methods should return empty results for empty database
             assert!(ss.best_completions("hello", Some(10)).is_empty());
