@@ -869,14 +869,22 @@ impl StringSpaceInner {
 
     fn scored_prefix_search(&self, query: &str) -> Vec<ScoreCandidate> {
         let mut results = Vec::new();
+        let mut max_len = 0;
         let matches = self.find_by_prefix(query);
         for string_ref in matches {
             let score = self.calculate_prefix_score(&string_ref, &query);
             if score.is_none() {
                 continue;
             }
+            max_len = max_len.max(string_ref.string.len());
             let score = score.unwrap();
             results.push(ScoreCandidate::new(string_ref, AlgorithmType::Prefix, score.raw_score, score.normalized_score));
+        }
+        // make another pass to update normalized scores based length of result string vs max_len
+        for result in &mut results {
+            let length_factor = (max_len - result.string_ref.string.len()) as f64 / max_len as f64;
+            result.normalized_score = scale_to_min(length_factor, 0.7);
+            result.raw_score = result.normalized_score; // will be weighted later
         }
         results
     }
@@ -1050,7 +1058,7 @@ impl StringSpaceInner {
 
         // get the limit number of ScoreCandidates from ranked_candidates
         let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
-        // print_debug_score_candidates(&results);
+        print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
