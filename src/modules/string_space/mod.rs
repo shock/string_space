@@ -1050,14 +1050,23 @@ impl StringSpaceInner {
 
         // bubble prefix matches to the top, primary sort case-insensitive, secondary sort case-sensitive
         ranked_candidates.sort_by(|a, b| {
-            let a_is_prefix = a.string_ref.string.to_lowercase().starts_with(&query.to_lowercase());
-            let b_is_prefix = b.string_ref.string.to_lowercase().starts_with(&query.to_lowercase());
+            let lower_query = query.to_lowercase();
+            let a_is_prefix = a.string_ref.string.to_lowercase().starts_with(&lower_query);
+            let b_is_prefix = b.string_ref.string.to_lowercase().starts_with(&lower_query);
             if a_is_prefix && !b_is_prefix {
                 Ordering::Less
             } else if !a_is_prefix && b_is_prefix {
                 Ordering::Greater
             } else {
-                a.string_ref.string.to_lowercase().cmp(&b.string_ref.string.to_lowercase())
+                let a_is_prefix = a.string_ref.string.starts_with(&query);
+                let b_is_prefix = b.string_ref.string.starts_with(&query);
+                if a_is_prefix && !b_is_prefix {
+                    Ordering::Less
+                } else if !a_is_prefix && b_is_prefix {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
             }
         });
 
@@ -1566,7 +1575,7 @@ impl StringSpaceInner {
         add_unique_candidates(jaro_candidates, &mut all_candidates, &mut seen_strings);
 
 
-        all_candidates.into_iter().take(limit).collect()
+        all_candidates
     }
 
 }
@@ -1645,9 +1654,10 @@ fn apply_metadata_adjustments(
     // 1. Frequency factor with logarithmic scaling to prevent dominance
     let frequency_factor = 1.0 + ((frequency as f64 + 1.0).ln() * 0.1);
 
-    // 2. Age factor with bounded influence (newer items get slight preference)
-    let max_age = 365; // Maximum age in days for normalization
-    let age_factor = 1.0 + (1.0 - (age_days as f64 / max_age as f64)) * 0.05;
+    // 2. Age factor with bounded influence - newer items (bigger age) get slight preference
+    // Set the max_age to the current time since epoch divided seconds in a day
+    let max_age = days_since_epoch();
+    let age_factor = 1.0 + (age_days as f64 / max_age as f64) * 0.05;
 
     // 3. Length penalty applied only for significant length mismatches
     let length_penalty = if candidate_len > query_len * 3 {
