@@ -108,13 +108,6 @@ pub enum AlgorithmType {
     JaroWinkler
 }
 
-/// Alternative score from other algorithms for the same string
-#[derive(Debug, Clone)]
-pub struct AlternativeScore {
-    pub algorithm: AlgorithmType,
-    pub normalized_score: f64,
-}
-
 // Query length categories for dynamic weighting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum QueryLengthCategory {
@@ -240,7 +233,6 @@ pub struct ScoreCandidate {
     pub raw_score: f64,
     pub normalized_score: f64,
     pub final_score: f64,
-    pub alternative_scores: Vec<AlternativeScore>,
 }
 
 impl ScoreCandidate {
@@ -251,18 +243,8 @@ impl ScoreCandidate {
             raw_score,
             normalized_score,
             final_score: 0.0,
-            alternative_scores: Vec::new(),
         }
     }
-
-    /// Add an alternative score from another algorithm
-    pub fn add_alternative_score(&mut self, algorithm: AlgorithmType, normalized_score: f64) {
-        self.alternative_scores.push(AlternativeScore {
-            algorithm,
-            normalized_score,
-        });
-    }
-
 }
 
 #[derive(Debug, Clone)]
@@ -1144,28 +1126,6 @@ impl StringSpaceInner {
         assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
         assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
 
-        // // Handle edge case where all scores are the same or very close
-        // if (max_score - min_score).abs() < f64::EPSILON {
-        //     // If all scores are identical, treat them all as perfect matches
-        //     // But only if we have multiple candidates - if only one candidate, use its score as reference
-        //     if scores.len() > 1 {
-        //         min_score = 0.0;
-        //         max_score = 1.0;
-        //     } else {
-        //         // Single candidate: use a reasonable range around the score
-        //         min_score = min_score - 1.0;
-        //         max_score = max_score + 1.0;
-        //     }
-        // } else if (max_score - min_score) < 0.1 {
-        //     // If scores are very close together, expand the range to provide better differentiation
-        //     let mid = (min_score + max_score) / 2.0;
-        //     min_score = mid - 0.5;
-        //     max_score = mid + 0.5;
-        // }
-
-        assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
-        assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
-
         // Second pass: apply normalization and threshold filtering
         for (string_ref, raw_score) in scores {
             // let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
@@ -1184,7 +1144,6 @@ impl StringSpaceInner {
                     algorithm: AlgorithmType::FuzzySubseq,
                     raw_score,
                     normalized_score,
-                    alternative_scores: Vec::new(),
                     final_score: 0.0,
                 };
 
@@ -1229,7 +1188,6 @@ impl StringSpaceInner {
                     algorithm: AlgorithmType::JaroWinkler,
                     raw_score: similarity,
                     normalized_score: similarity,
-                    alternative_scores: Vec::new(),
                     final_score: 0.0,
                 };
                 results.push(score_candidate);
@@ -1350,15 +1308,12 @@ fn print_debug_score_candidates(candidates: &[ScoreCandidate]) {
     println!("Debugging Score Candidates:");
     for candidate in candidates {
         println!(
-            "String: {}, Final Score: {:.6}, Algorithm: {:?}, Raw Score: {:.6}, Normalized Score: {:.6}, Alt Scores: {:?}",
+            "String: {}, Final Score: {:.6}, Algorithm: {:?}, Raw Score: {:.6}, Normalized Score: {:.6}",
             candidate.string_ref.string,
             candidate.final_score,
             candidate.algorithm,
             candidate.raw_score,
             candidate.normalized_score,
-            candidate.alternative_scores.iter()
-                .map(|alt| format!("{:?}: {:.6}", alt.algorithm, alt.normalized_score))
-                .collect::<Vec<_>>()
         );
     }
 }
@@ -1468,15 +1423,6 @@ fn calculate_final_score(
         AlgorithmType::JaroWinkler => jaro_score = candidate.normalized_score,
     }
 
-    // Add alternative scores
-    for alt in &candidate.alternative_scores {
-        match alt.algorithm {
-            AlgorithmType::Prefix => prefix_score = prefix_score.max(alt.normalized_score),
-            AlgorithmType::FuzzySubseq => fuzzy_score = fuzzy_score.max(alt.normalized_score),
-            AlgorithmType::JaroWinkler => jaro_score = jaro_score.max(alt.normalized_score),
-        }
-    }
-
     // Calculate weighted algorithm score
     let weighted_score = calculate_weighted_score(
         prefix_score, fuzzy_score, jaro_score, query
@@ -1514,12 +1460,9 @@ fn merge_and_score_candidates(
         if let Some(existing) = merged.get_mut(&string_key) {
             // Add as alternative score if this algorithm provides a better score
             if candidate.normalized_score > existing.normalized_score {
-                existing.add_alternative_score(existing.algorithm, existing.normalized_score);
                 existing.algorithm = candidate.algorithm;
                 existing.raw_score = candidate.raw_score;
                 existing.normalized_score = candidate.normalized_score;
-            } else {
-                existing.add_alternative_score(candidate.algorithm, candidate.normalized_score);
             }
         } else {
             merged.insert(string_key, candidate);
@@ -1716,7 +1659,7 @@ fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Optio
 }
 
 // Character-based version for scoring
-fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str, min_score: f64) -> f64 {
+fn score_match_span_chars(match_indices: &[usize], _query: &str, candidate: &str, min_score: f64) -> f64 {
     if match_indices.is_empty() {
         return 0.0;
     }
@@ -1786,19 +1729,4 @@ fn should_skip_candidate_fuzzy(candidate_len: usize, query_len: usize) -> bool {
     }
 
     false
-}
-
-
-// For fuzzy subsequence (higher raw scores are better)
-fn normalize_fuzzy_score(raw_score: f64, min_score: f64, max_score: f64) -> f64 {
-    // Optimized: Avoid division by zero and use efficient calculation
-    let range = max_score - min_score;
-    if range <= f64::EPSILON {
-        // All scores are the same, return middle value
-        return 0.5;
-    }
-
-    // Normalize: higher raw scores → higher normalized scores
-    let normalized = ((raw_score - min_score) / range);
-    normalized.clamp(0.0, 1.0)
 }
