@@ -1053,8 +1053,8 @@ impl StringSpaceInner {
         // ranked_candidates.truncate(limit);
 
         // get the limit number of ScoreCandidates from ranked_candidates
-        // let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
-        // print_debug_score_candidates(&results);
+        let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
+        print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
@@ -1179,7 +1179,7 @@ impl StringSpaceInner {
                 // println!("Added {} to results", string_copy);
 
                 // Early termination: stop if we have enough high-quality candidates
-                if results.len() >= target_count * 2 {
+                if results.len() >= target_count * 2{
                     break;
                 }
             }
@@ -1253,15 +1253,17 @@ impl StringSpaceInner {
         let query_chars: Vec<char> = query.chars().collect();
         let candidate_chars: Vec<char> = candidate.chars().collect();
 
-        if is_subsequence_chars(&query_chars, &candidate_chars).is_none() {
-            // println!("Skipping candidate {} due to subsequence mismatch", candidate);
-            return None;
+        if let Some(match_indices) = is_subsequence_chars(&query_chars, &candidate_chars) {
+            // Calculate match span score
+            let score = score_match_span_chars(&match_indices, &query, &candidate);
+            if candidate == "began" {
+                println!("Scoring for candidate 'began' and query {:?}: {:?}", query, score);
+            }
+            // println!("Candidate {} scored: {}", candidate, score);
+            Some(score)
+        } else {
+            None
         }
-
-        // Calculate match span score
-        let score = score_match_span_chars(&query_chars, &candidate_chars);
-        // println!("Candidate {} scored: {}", candidate, score);
-        Some(score)
     }
 
     // Progressive algorithm execution with early termination and error recovery
@@ -1701,34 +1703,30 @@ fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Optio
 }
 
 // Character-based version for scoring
-fn score_match_span_chars(query_chars: &[char], candidate_chars: &[char]) -> f64 {
-    if let Some(match_indices) = is_subsequence_chars(query_chars, candidate_chars) {
-        if match_indices.is_empty() {
-            return 0.0;
-        }
-
-        if match_indices.len() == 1 {
-            return 0.0;
-        }
-
-        // // get the average distance between matched characters
-        // let mut cumulative_distance = 0usize;
-        // for i in 1..match_indices.len() {
-        //     cumulative_distance += match_indices[i] - match_indices[i-1];
-        // }
-        // let mut avg_distance = cumulative_distance as f64 / (match_indices.len() - 1) as f64; //avg_distance /= (match_indices.len() - 1) as f64;
-
-        // // normalize the average distance based on the length of the candidate string
-        // avg_distance /= candidate_chars.len() as f64;
-        // avg_distance
-
-
-        let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
-        let candidate_length = candidate_chars.len() as f64;
-        (candidate_length - span_length - match_indices.len() as f64) / candidate_length
-    } else {
-        0.0
+fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str) -> f64 {
+    if match_indices.is_empty() {
+        return 0.0;
     }
+
+    if match_indices.len() == 1 {
+        return 0.0;
+    }
+
+    // // get the average distance between matched characters
+    // let mut cumulative_distance = 0usize;
+    // for i in 1..match_indices.len() {
+    //     cumulative_distance += match_indices[i] - match_indices[i-1];
+    // }
+    // let mut avg_distance = cumulative_distance as f64 / (match_indices.len() - 1) as f64; //avg_distance /= (match_indices.len() - 1) as f64;
+
+    // // normalize the average distance based on the length of the candidate string
+    // avg_distance /= candidate_chars.len() as f64;
+    // avg_distance
+
+    let query_length = query.len() as f64;
+    let span_length = (match_indices.last().unwrap() - match_indices.first().unwrap() + 1) as f64;
+    let candidate_length = candidate.len() as f64;
+    (candidate_length - span_length - match_indices.len() as f64) / candidate_length
 }
 
 // Smart filtering to skip unpromising candidates
