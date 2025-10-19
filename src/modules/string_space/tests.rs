@@ -641,33 +641,20 @@ mod tests {
         }
 
         #[test]
-        fn test_alternative_score_creation() {
-            let alt_score = AlternativeScore {
-                algorithm: AlgorithmType::Substring,
-                normalized_score: 0.75,
-            };
-
-            assert_eq!(alt_score.algorithm, AlgorithmType::Substring);
-            assert_eq!(alt_score.normalized_score, 0.75);
-        }
-
-        #[test]
         fn test_algorithm_type_variants() {
             // Test that all algorithm variants are properly defined
             let prefix = AlgorithmType::Prefix;
             let fuzzy_subseq = AlgorithmType::FuzzySubseq;
             let jaro_winkler = AlgorithmType::JaroWinkler;
-            let substring = AlgorithmType::Substring;
 
             // Test equality
             assert_eq!(prefix, AlgorithmType::Prefix);
             assert_eq!(fuzzy_subseq, AlgorithmType::FuzzySubseq);
             assert_eq!(jaro_winkler, AlgorithmType::JaroWinkler);
-            assert_eq!(substring, AlgorithmType::Substring);
 
             // Test inequality
             assert_ne!(prefix, AlgorithmType::FuzzySubseq);
-            assert_ne!(jaro_winkler, AlgorithmType::Substring);
+            assert_ne!(jaro_winkler, AlgorithmType::Prefix);
         }
     }
 
@@ -794,42 +781,6 @@ mod tests {
             // Should be clamped to maximum of 2.0
             assert!(result <= 2.0);
             assert!(result >= 0.0);
-        }
-
-        #[test]
-        fn test_normalize_substring_score() {
-            // Test substring score normalization
-            let position = 2;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // Earlier positions should have higher scores
-            assert_eq!(result, 1.0 - (2.0 / 10.0)); // 0.8
-        }
-
-        #[test]
-        fn test_normalize_substring_score_start_position() {
-            // Test substring at start position
-            let position = 0;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // Start position should have highest score
-            assert_eq!(result, 1.0);
-        }
-
-        #[test]
-        fn test_normalize_substring_score_end_position() {
-            // Test substring at end position
-            let position = 9;
-            let max_position = 10;
-
-            let result = normalize_substring_score(position, max_position);
-
-            // End position should have lowest score
-            assert_eq!(result, 1.0 - (9.0 / 10.0)); // 0.1
         }
 
         #[test]

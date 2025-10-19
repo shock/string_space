@@ -138,15 +138,13 @@ impl QueryLengthCategory {
 /// Helper struct for storing algorithm scores
 #[derive(Debug, Clone)]
 pub struct AlgorithmScore {
-    pub algorithm: AlgorithmType,
     pub raw_score: f64,
     pub normalized_score: f64,
 }
 
 impl AlgorithmScore {
-    pub fn new(algorithm: AlgorithmType, raw_score: f64, normalized_score: f64) -> Self {
+    pub fn new(raw_score: f64, normalized_score: f64) -> Self {
         Self {
-            algorithm,
             raw_score,
             normalized_score,
         }
@@ -1031,7 +1029,7 @@ impl StringSpaceInner {
         let all_candidates = self.progressive_algorithm_execution(query, limit);
 
         // Otherwise, collect detailed scores from all algorithms
-        println!("Collecting detailed scores for candidates...");
+        // println!("Collecting detailed scores for candidates...");
         let scored_candidates = all_candidates;
 
         // Handle case where no candidates were found
@@ -1072,8 +1070,8 @@ impl StringSpaceInner {
         // ranked_candidates.truncate(limit);
 
         // get the limit number of ScoreCandidates from ranked_candidates
-        let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
-        print_debug_score_candidates(&results);
+        // let results: Vec<ScoreCandidate> = ranked_candidates.iter().take(limit).cloned().collect();
+        // print_debug_score_candidates(&results);
         // Apply limit and return
         limit_and_convert_results(ranked_candidates, limit)
     }
@@ -1109,7 +1107,6 @@ impl StringSpaceInner {
         if candidate.starts_with(query) {
             // Perfect prefix match gets maximum score
             Some(AlgorithmScore::new(
-                AlgorithmType::Prefix,
                 1.0,  // raw score
                 1.0   // normalized score
             ))
@@ -1118,7 +1115,6 @@ impl StringSpaceInner {
             if candidate.to_lowercase().starts_with(&query.to_lowercase()) {
                 // Slightly lower score for case-insensitive match
                 Some(AlgorithmScore::new(
-                    AlgorithmType::Prefix,
                     0.9999,  // raw score
                     0.9999   // normalized score
                 ))
@@ -1350,6 +1346,8 @@ impl Drop for StringSpaceInner {
 
 // MARK: Private Functions
 
+
+#[allow(unused)]
 fn print_debug_score_candidates(candidates: &[ScoreCandidate]) {
     println!("Debugging Score Candidates:");
     for candidate in candidates {
@@ -1558,11 +1556,6 @@ fn limit_and_convert_results(candidates: Vec<ScoreCandidate>, limit: usize) -> V
 
 
 // Score normalization functions
-
-/// For substring search (earlier matches are better)
-fn normalize_substring_score(position: usize, max_position: usize) -> f64 {
-    1.0 - (position as f64 / max_position as f64)
-}
 
 /// Get metadata for a string reference
 fn get_string_metadata(string_ref: &StringRef) -> (TFreq, TAgeDays, usize) {
