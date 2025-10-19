@@ -11,7 +11,7 @@ String Space is a Rust-based word-list database server with efficient string sto
 ### Core Components
 
 - **Main Server** (`src/main.rs`): CLI interface with subcommands for server management (start, stop, status, restart, benchmark)
-- **String Space Module** (`src/modules/string_space.rs`): Core data structure using custom memory allocation for efficient string storage and retrieval
+- **String Space Module** (`src/modules/string_space/`): Core data structure using custom memory allocation for efficient string storage and retrieval
 - **Protocol Module** (`src/modules/protocol.rs`): TCP protocol implementation for client-server communication
 - **Benchmark Module** (`src/modules/benchmark.rs`): Performance testing utilities
 - **Utils Module** (`src/modules/utils.rs`): Utility functions including PID file management and path expansion
@@ -23,7 +23,7 @@ String Space is a Rust-based word-list database server with efficient string sto
 - **Efficient Search**: Binary search for prefix matching, linear scan for substring search
 - **Fuzzy Search**: Jaro-Winkler similarity matching with configurable thresholds
 - **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing
-- **Best Completions**: Intelligent search combining multiple algorithms with relevance scoring
+- **Best Completions**: Intelligent search combining multiple algorithms with progressive execution and dynamic weighting
 - **TCP Network Protocol**: ASCII RS (0x1E) as separator, EOT (0x04) as terminator
 - **Daemon Mode**: Proper UNIX daemon implementation with PID file management
 - **Frequency & Age Tracking**: Word usage frequency and insertion time tracking
@@ -98,7 +98,7 @@ cargo run -- restart <data-file>  # Restart server (daemon mode only)
 - `substring <substring>` - Search by substring
 - `similar <word> <threshold>` - Fuzzy search with Jaro-Winkler
 - `fuzzy-subsequence <query>` - Fuzzy subsequence search with character order preservation
-- `best-completions <query> [limit]` - Intelligent search combining multiple algorithms with relevance scoring
+- `best-completions <query> [limit]` - Intelligent search combining multiple algorithms with progressive execution and dynamic weighting
 - `data-file` - Get data file path
 - `remove <words...>` - Remove words from storage
 - `clear_space` - Clear all strings
