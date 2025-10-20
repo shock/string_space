@@ -30,26 +30,20 @@ class StringSpaceCompleter(Completer):
             return
 
         # if word_before_cursor ends with a non-word character, return
-        if re.search(r'[^\w_\-\s]', word_before_cursor):
+        if re.search(r'[^\w_\-\_\']', word_before_cursor):
             return
 
-        doc_words = [word.lower() for word in self.parse_text(document.text)]
-        # get unique doc_words
-        doc_words = list(set(doc_words))
+        # remove starting non-word characters from word_before_cursor
+        while re.match(r'^[^\w_\-\']', word_before_cursor):
+            word_before_cursor = word_before_cursor[1:]
 
-        # remove word_before_cursor from doc_words if it exists
-        if word_before_cursor in doc_words:
-            doc_words.remove(word_before_cursor)
-
-        # filter only words that start with the same letter as word_before_cursor
-        doc_words = [word for word in doc_words if word.lower().startswith(word_before_cursor.lower())]
-        # completion_suggestions = self.client.fuzzy_subsequence_search(word_before_cursor)
-        # print("Completion suggestions:\n", completion_suggestions, file=sys.stderr, flush=True)
-        # spell_suggestions = self.client.similar_search(word_before_cursor, threshold=0.6)
-        # print("Spell suggestions:\n", spell_suggestions, file=sys.stderr, flush=True)
-        # # combine completion_suggestions and spell_suggestions into a single list
-        # suggestions = completion_suggestions + spell_suggestions
         suggestions = self.client.best_completions_search(word_before_cursor, limit=10)
+
+        # for each suggestion in suggestions, if the first character is lower case and matches the first character of word_before_cursor, change it to upper case
+        for i in range(len(suggestions)):
+            if (suggestions[i][0].islower() and word_before_cursor[0].isupper() and
+                suggestions[i][0].lower() == word_before_cursor[0].lower()):
+                suggestions[i] = word_before_cursor[0] + suggestions[i][1:]
         # remove duplicates in suggestions while preserving order
         seen = set()
         result = []
@@ -61,10 +55,7 @@ class StringSpaceCompleter(Completer):
         if word_in_suggestions:
             # insert word_before_cursor at the beginning of the list
             result.insert(0, word_before_cursor)
-        # # for any suggestions that are in doc_words, move them to the front of the list
-        # doc_sorted_suggestions = [word for word in result if word in doc_words]
-        # other_suggestions = [word for word in result if word not in doc_words]
-        # suggestions = doc_sorted_suggestions + other_suggestions
+
         for suggestion in suggestions:
             if suggestion.strip() != '':
                 yield Completion(suggestion, start_position=-len(word_before_cursor))
@@ -76,17 +67,21 @@ class StringSpaceCompleter(Completer):
 
     def parse_text(self, text: str) -> list[str]:
         # split the text into words by regex /s+/
-        words = re.split(r'[^\w_\-s]+', text)
+        words = re.split(r'[^\w_\-\']+', text)
         # get unique words
         words = list(set(words))
         # filter out words that are too short or too long
         words = [word for word in words if len(word) >= 3]
+        #filter out words beginning with "'"
+        words = [word for word in words if not word.startswith("'")]
         return words
 
     def add_words_from_text(self, text):
         if self.disabled:
             return
         words = self.parse_text(text)
+        if len(words) == 0:
+            return
         self.client.add_words(words)
 
     def add_words(self, words):
