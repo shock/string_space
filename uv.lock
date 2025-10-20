@@ -48,7 +48,7 @@ source = { editable = "python/string_space_client" }
 
 [[package]]
 name = "string-space-completer"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "python/string_space_completer" }
 dependencies = [
     { name = "prompt-toolkit" },

@@ -115,8 +115,8 @@ pub enum AlgorithmType {
 enum QueryLengthCategory {
     VeryShort,  // 1-2 characters
     Short,      // 3-4 characters
-    Medium,     // 5-6 characters
-    Long,       // 7+ characters
+    Medium,     // 5-10 characters
+    Long,       // 11+ characters
 }
 
 impl QueryLengthCategory {
@@ -192,7 +192,7 @@ impl AlgorithmWeights {
                 }
             }
             QueryLengthCategory::Medium => {
-                let orig_prefix = 0.50;  // Increased since substring is removed
+                let orig_prefix = 0.50;
                 let orig_fuzzy = 0.25;
                 let orig_jaro = 0.25;
 
@@ -444,14 +444,10 @@ impl StringSpace {
     /// 1. **Prefix Search** (O(log n)) - Fast exact prefix matching
     /// 2. **Fuzzy Subsequence** (O(n) with early exit) - Character order-preserving search
     /// 3. **Jaro-Winkler** (O(n) with early exit) - Typo correction and similarity
-    /// 4. **Substring Search** (O(n)) - Fallback for longer queries
     ///
     /// # Dynamic Weighting
-    /// Algorithm weights are dynamically adjusted based on query length:
-    /// - **Very Short (1-2 chars)**: Prefix (45%), Fuzzy (35%), Jaro (15%), Substring (5%)
-    /// - **Short (3-4 chars)**: Prefix (40%), Fuzzy (30%), Jaro (20%), Substring (10%)
-    /// - **Medium (5-6 chars)**: Balanced weights across all algorithms
-    /// - **Long (7+ chars)**: Jaro (35%), Prefix (25%), Substring (20%), Fuzzy (20%)
+    /// Algorithm weights are dynamically adjusted based on query length
+    /// to optimize performance.  See AlAgorithmWeights for details.
     ///
     /// # Arguments
     /// * `query` - The search query (1-50 characters, alphanumeric for single char)
@@ -482,11 +478,6 @@ impl StringSpace {
     /// let results = ss.best_completions("wrold", Some(10));
     /// assert!(results.len() >= 1);
     /// ```
-    ///
-    /// # Performance
-    /// - **Small datasets** (< 1,000 words): < 1ms
-    /// - **Medium datasets** (1,000-10,000 words): < 10ms
-    /// - **Large datasets** (> 10,000 words): < 100ms
     ///
     /// # Limitations
     /// - Query must be 1-50 characters
@@ -1150,6 +1141,9 @@ impl StringSpaceInner {
         assert!(min_score >= 0.0, "Min score is negative: {}", min_score);
         assert!(max_score <= 1.0, "Max score is greater than 1: {}", max_score);
 
+        // Sort candidates by raw score descending
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
         // Second pass: apply normalization and threshold filtering
         for (string_ref, raw_score) in scores {
             // let normalized_score = normalize_fuzzy_score(raw_score, min_score, max_score);
@@ -1248,12 +1242,12 @@ impl StringSpaceInner {
         let query_chars: Vec<char> = query.chars().collect();
         let candidate_chars: Vec<char> = candidate.chars().collect();
 
-        if let Some(match_indices) = is_subsequence_chars(&query_chars, &candidate_chars) {
+        if let Some(match_indices) = is_subsequence_chars(&query_chars, &candidate_chars, Some(false)) {
             // Calculate match span score
-            let score = score_match_span_chars(&match_indices, &query, &candidate, min_score);
-            if candidate == "began" {
-                println!("Scoring for candidate 'began' and query {:?}: {:?}", query, score);
+            if candidate == "implement" && query == "imple" {
+                println!("Scoring for candidate 'implement' and query {:?}", query);
             }
+            let score = score_match_span_chars(&match_indices, &query, &candidate, min_score);
             // println!("Candidate {} scored: {}", candidate, score);
             Some(score)
         } else {
@@ -1279,12 +1273,22 @@ impl StringSpaceInner {
             for candidate in candidates {
                 if seen_strings.insert(candidate.string_ref.string.clone()) {
                     all_candidates.push(candidate);
+                } else {
+                    // // find the existing candidate and update it if the new one has a better normalized score
+                    // if let Some(existing) = all_candidates.iter_mut().find(|c| c.string_ref.string == candidate.string_ref.string) {
+                    //     if candidate.normalized_score > existing.normalized_score {
+                    //         *existing = candidate;
+                    //     }
+                    // }
                 }
             }
         }
 
         // 1. Fast prefix search first (O(log n))
         // Only get 'limit' candidates
+        if query == "imple" {
+            println!("Performing prefix search for query: {}", query);
+        }
         let prefix_candidates = self.scored_prefix_search(query).into_iter()
             .take(limit)
             .collect::<Vec<_>>();
@@ -1667,7 +1671,16 @@ fn score_match_span(match_indices: &[usize], candidate: &str) -> f64 {
 }
 
 // Character-based version for use with char vectors
-fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Option<Vec<usize>> {
+fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char], case_sensitive: Option<bool>) -> Option<Vec<usize>> {
+    let case_sensitive = case_sensitive.unwrap_or(true);
+
+    if !case_sensitive {
+        // Convert to lowercase for case-insensitive matching
+        let query_chars_lower: Vec<char> = query_chars.iter().map(|c| c.to_lowercase().next().unwrap()).collect();
+        let candidate_chars_lower: Vec<char> = candidate_chars.iter().map(|c| c.to_lowercase().next().unwrap()).collect();
+        return is_subsequence_chars(&query_chars_lower, &candidate_chars_lower, Some(true));
+    }
+
     let mut query_iter = query_chars.iter();
     let mut current_char = query_iter.next();
     let mut match_indices = Vec::new();
@@ -1686,7 +1699,7 @@ fn is_subsequence_chars(query_chars: &[char], candidate_chars: &[char]) -> Optio
 }
 
 // Character-based version for scoring
-fn score_match_span_chars(match_indices: &[usize], _query: &str, candidate: &str, min_score: f64) -> f64 {
+fn score_match_span_chars(match_indices: &[usize], query: &str, candidate: &str, min_score: f64) -> f64 {
     if match_indices.is_empty() {
         return 0.0;
     }
@@ -1705,10 +1718,35 @@ fn score_match_span_chars(match_indices: &[usize], _query: &str, candidate: &str
     let quality_score = scale_to_min(quality, 0.8); // Scale min-1.0 where 1.0 means all characters in the span are matches
     let max_proximity = candidate_length.min(50.0);
     let first_index_f64 = *match_indices.first().unwrap() as f64;
-    let mut proximity_score = 1.0 - (max_proximity - first_index_f64.min(50.0)) / max_proximity; // Scale 0.0-1.0 where 1.0 means match starts at beginning of candidate
+    let mut proximity_score = (max_proximity - first_index_f64.min(50.0)) / max_proximity; // Scale 0.0-1.0 where 1.0 means match starts at beginning of candidate
     proximity_score = scale_to_min(proximity_score, 0.5); // Scale min-1.0 where 1.0 means match starts at beginning
 
-    scale_to_min(span_score * match_score * quality_score * proximity_score, min_score) // Scale min-1.0 where 1.0 means perfect match
+    // Finally, we want to score based on each matching position, comparing if the characters are the same or different.
+    // They should only be different in case-insensitive matching scenarios.
+    let mut case_match_count = 0;
+    let mut query_index = 0;
+    let candidate_chars: Vec<char> = candidate.chars().collect();
+    let query_chars: Vec<char> = query.chars().collect();
+    for &index in match_indices {
+        let candidate_char = candidate_chars[index];
+        let query_char = query_chars[query_index];
+        if candidate_char == query_char {
+            case_match_count += 1;
+        } else {
+            // make sure they are the same character but different case
+            assert!(
+                candidate_char.to_lowercase().next().unwrap() == query_char.to_lowercase().next().unwrap(),
+                "Mismatched characters in case comparison: candidate_char: {}, query_char: {}",
+                candidate_char,
+                query_char
+            );
+        }
+        query_index += 1;
+    }
+    let case_match_ratio = case_match_count as f64 / num_matches;
+    let case_quality_score = scale_to_min(case_match_ratio, 0.975); //
+
+    scale_to_min(span_score * match_score * quality_score * proximity_score * case_quality_score, min_score) // Scale min-1.0 where 1.0 means perfect match
 }
 
 // Smart filtering to skip unpromising candidates
