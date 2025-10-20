@@ -17,7 +17,7 @@ class ChatInterface:
     """Class to provide a chat interface."""
 
     def __init__(self,):
-        self.spell_check_completer = StringSpaceCompleter(host='127.0.0.1', port=7878)
+        self.spell_check_completer = StringSpaceCompleter(host='127.0.0.1', port=7879)
         self.merged_completer = merge_completers([self.spell_check_completer])
 
         self.session = PromptSession(
