@@ -14,7 +14,7 @@ The project also includes a Python client package that provides an easy way to c
 - **Prefix and Substring Search**: Supports fast searching for strings by prefix and substring.
 - **Fuzzy Search**: Includes a simple implementation of Jaro-Winkler fuzzy search for similarity matching.
 - **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing for abbreviations and partial matches.
-- **Best Completions**: Intelligent search combining multiple algorithms (prefix, substring, fuzzy subsequence, Jaro-Winkler) with relevance scoring.
+- **Best Completions (Recommended)**: Intelligent search combining multiple algorithms (prefix, substring, fuzzy subsequence, Jaro-Winkler) with relevance scoring. **This is the most recommended method for auto completion** as it provides the highest quality results by intelligently combining multiple search strategies.
 - **Frequency and Age Tracking**: Tracks the frequency of word usage and their insertion time (age).
 - **Simple TCP API**: Enables remote access to the word-list database via a minimal TCP protocol.
 - **Random Word Generation**: Capable of generating a customizable number of random words for benchmarking and testing.
@@ -32,6 +32,8 @@ The project also includes a Python client package that provides an easy way to c
   - execute `string_space start -d ~/.llm_chat_cli/word_list.txt`
   - run the `llm_chat_cli` program (see https://github.com/shock/llm_chat_cli). It should silently connect to the server. You will see a warning message if it cannot connect.
   - execute `string_space stop` to stop the server
+
+**Note**: The `llm_chat_cli` program uses the **best completions** method by default, which is the recommended approach for auto completion as it provides the highest quality results by intelligently combining multiple search strategies.
 
 ### Starting the Server Automatically using crond
 To run the string_space server in in the background automatically when your machine boots, add the following to your crontab (`crontab -e`):
@@ -178,7 +180,7 @@ Responses from the server are text-based and end with an EOT byte (`0x04`).
 
 ## Python Client Usage
 
-The Python client package provides easy access to all server commands. Here's how to use the `best_completions_search` method:
+The Python client package provides easy access to all server commands. **For auto completion, we recommend using `best_completions_search` as it provides the highest quality results.** Here's how to use the `best_completions_search` method:
 
 ```python
 from string_space_client import StringSpaceClient
@@ -209,13 +211,14 @@ client.insert(["hello", "world", "test"])
 data_file = client.data_file()
 ```
 
-### Key Features of `best_completions_search`:
+### Key Features of `best_completions_search` (Recommended for Auto Completion):
 
 - **Progressive Algorithm Execution**: Uses multiple search algorithms in priority order
 - **Intelligent Scoring**: Combines match type, frequency, and age for relevance ranking
 - **Deduplication**: Removes duplicate results across algorithms
 - **Configurable Limits**: Customizable result count (1-100)
 - **Error Handling**: Graceful handling of connection issues and server errors
+- **Highest Quality Results**: **Recommended as the primary method for auto completion** - provides the most relevant completions by intelligently combining multiple search strategies
 
 ### Algorithm Execution Order:
 1. **Prefix Search** - Exact prefix matches (highest priority)
