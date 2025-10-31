@@ -241,7 +241,15 @@ uv sync
 make auto-client
 ```
 
- The word database will be initialized in test/auto_words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
+The word database will be initialized in test/auto_words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
+
+## Benchmarks
+
+You can run benchmarks to measure the performance of word insertion and lookup:
+
+```bash
+cargo run -- <data-file> --benchmark <COUNT>
+```
 
 - **COUNT**: Number of random words to generate and insert.
 
