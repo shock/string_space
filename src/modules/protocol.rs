@@ -306,15 +306,16 @@ mod tests {
     #[test]
     fn test_fuzzy_subsequence_command_valid() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_valid_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
         writeln!(file, "help 2 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test valid fuzzy-subsequence command
         let operation = "fuzzy-subsequence";
@@ -326,21 +327,21 @@ mod tests {
         // Should not contain error message
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_invalid_params() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_invalid_params_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test invalid parameter count - empty params
         let operation = "fuzzy-subsequence";
@@ -351,21 +352,21 @@ mod tests {
 
         assert!(response_str.starts_with("ERROR - invalid parameters"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_empty_query() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_empty_query_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test empty query handling
         let operation = "fuzzy-subsequence";
@@ -377,21 +378,21 @@ mod tests {
         // Empty query should return empty results (no error)
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_too_many_params() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_too_many_params_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test too many parameters
         let operation = "fuzzy-subsequence";
@@ -402,22 +403,22 @@ mod tests {
 
         assert!(response_str.starts_with("ERROR - invalid parameters"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_with_utf8() {
         // Create a temporary test file with UTF-8 data
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_utf8_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "café 1 0").unwrap();
         writeln!(file, "naïve 2 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test UTF-8 character handling
         let operation = "fuzzy-subsequence";
@@ -429,22 +430,22 @@ mod tests {
         // Should not contain error message
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_response_format() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_response_format_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
         writeln!(file, "help 2 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test response format consistency
         let operation = "fuzzy-subsequence";
@@ -459,21 +460,21 @@ mod tests {
             assert!(response_str.contains('\n') || !response_str.contains("ERROR"));
         }
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_unknown_operation() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_unknown_op_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test unknown operation
         let operation = "unknown-operation";
@@ -484,21 +485,21 @@ mod tests {
 
         assert!(response_str.starts_with("ERROR - unknown operation"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_parameter_validation() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_param_validation_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test various parameter validation scenarios
         let operation = "fuzzy-subsequence";
@@ -521,23 +522,23 @@ mod tests {
         let response_str_invalid = String::from_utf8(response_invalid).unwrap();
         assert!(response_str_invalid.starts_with("ERROR - invalid parameters"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_best_completions_command_valid() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_best_completions_valid_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
         writeln!(file, "help 2 0").unwrap();
         writeln!(file, "helicopter 3 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test valid best-completions command with query only
         let operation = "best-completions";
@@ -549,25 +550,25 @@ mod tests {
         // Should not contain error message
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_best_completions_command_with_limit() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_best_completions_limit_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
         writeln!(file, "help 2 0").unwrap();
         writeln!(file, "helicopter 3 0").unwrap();
         writeln!(file, "hell 4 0").unwrap();
         writeln!(file, "health 5 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test valid best-completions command with query and limit
         let operation = "best-completions";
@@ -579,21 +580,21 @@ mod tests {
         // Should not contain error message
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_best_completions_command_invalid_params() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_best_completions_invalid_params_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test invalid parameter count - empty params
         let operation = "best-completions";
@@ -612,21 +613,21 @@ mod tests {
 
         assert!(response_str_too_many.starts_with("ERROR - invalid parameters"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_best_completions_command_empty_query() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_best_completions_empty_query_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test empty query handling
         let operation = "best-completions";
@@ -638,21 +639,21 @@ mod tests {
         // Empty query should return empty results (no error)
         assert!(!response_str.starts_with("ERROR"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_best_completions_command_invalid_limit() {
         // Create a temporary test file
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_best_completions_invalid_limit_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test invalid limit parameter
         let operation = "best-completions";
@@ -664,24 +665,24 @@ mod tests {
         // Should contain specific error message about invalid limit
         assert!(response_str.starts_with("ERROR - invalid limit parameter"));
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 
     #[test]
     fn test_fuzzy_subsequence_command_integration() {
         // Create a temporary test file with some data
-        use std::fs::File;
         use std::io::Write;
 
-        let test_file = "test_integration_data.txt";
-        let mut file = File::create(test_file).unwrap();
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+
+        let mut file = std::fs::File::create(&test_file_path).unwrap();
         writeln!(file, "hello 1 0").unwrap();
         writeln!(file, "world 2 0").unwrap();
         writeln!(file, "help 3 0").unwrap();
         writeln!(file, "helicopter 1 0").unwrap();
 
-        let mut protocol = StringSpaceProtocol::new(test_file.to_string());
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test integration with other commands to ensure no conflicts
         let operations = vec![
@@ -700,8 +701,7 @@ mod tests {
             assert!(!response_str.starts_with("ERROR"));
         }
 
-        // Clean up the test file
-        std::fs::remove_file(test_file).unwrap();
+        // File will be automatically cleaned up when test_file goes out of scope
     }
 }
 
@@ -713,7 +713,9 @@ mod integration_tests {
     #[test]
     fn test_end_to_end_fuzzy_subsequence() {
         // Use a simpler approach - test the protocol directly without network
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert test data directly into the protocol's space
         protocol.space.insert_string("hello", 1).unwrap();
@@ -737,7 +739,9 @@ mod integration_tests {
     #[test]
     fn test_protocol_error_handling() {
         // Test invalid parameter count
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Simulate invalid request with missing query parameter
         let operation = "fuzzy-subsequence";
@@ -751,7 +755,9 @@ mod integration_tests {
 
     #[test]
     fn test_protocol_command_integration() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test valid fuzzy-subsequence command
         let operation = "fuzzy-subsequence";
@@ -781,7 +787,9 @@ mod integration_tests {
 
     #[test]
     fn test_performance_under_load() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert large dataset
         for i in 0..10000 {
@@ -792,8 +800,10 @@ mod integration_tests {
         let start = std::time::Instant::now();
         let handles: Vec<_> = (0..10)
             .map(|_| {
+                let thread_test_file = tempfile::NamedTempFile::new().unwrap();
+                let thread_test_file_path = thread_test_file.path().to_str().unwrap().to_string();
                 thread::spawn(move || {
-                    let mut local_protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+                    let mut local_protocol = StringSpaceProtocol::new(thread_test_file_path);
                     // Each thread gets its own data to avoid sharing mutable state
                     for i in 0..10000 {
                         local_protocol.space.insert_string(&format!("testword{}", i), 1).unwrap();
@@ -815,7 +825,9 @@ mod integration_tests {
 
     #[test]
     fn test_fuzzy_subsequence_with_actual_results() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert test data directly into the space
         protocol.space.insert_string("hello", 1).unwrap();
@@ -839,7 +851,9 @@ mod integration_tests {
 
     #[test]
     fn test_fuzzy_subsequence_no_results() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert test data that won't match our query
         protocol.space.insert_string("apple", 1).unwrap();
@@ -859,7 +873,9 @@ mod integration_tests {
 
     #[test]
     fn test_fuzzy_subsequence_case_sensitivity() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert test data with mixed case
         protocol.space.insert_string("Hello", 1).unwrap();
@@ -889,7 +905,9 @@ mod integration_tests {
 
     #[test]
     fn test_best_completions_integration() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert realistic test data with varying frequencies
         let test_words = vec![
@@ -943,7 +961,9 @@ mod integration_tests {
 
     // #[test]
     // fn test_best_completions_performance() {
-    //     let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+    //     let test_file = tempfile::NamedTempFile::new().unwrap();
+    //     let test_file_path = test_file.path().to_str().unwrap().to_string();
+    //     let mut protocol = StringSpaceProtocol::new(test_file_path);
 
     //     // Insert large dataset for performance testing
     //     for i in 0..10000 {
@@ -1009,7 +1029,9 @@ mod integration_tests {
 
     #[test]
     fn test_best_completions_edge_cases() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Test 1: Empty database
         let response_empty_db = protocol.create_response("best-completions", vec!["test"]);
@@ -1076,7 +1098,9 @@ mod integration_tests {
 
     #[test]
     fn test_best_completions_progressive_execution() {
-        let mut protocol = StringSpaceProtocol::new("test_data.txt".to_string());
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        let mut protocol = StringSpaceProtocol::new(test_file_path);
 
         // Insert test data with progressive frequency patterns
         let words_and_frequencies = vec![

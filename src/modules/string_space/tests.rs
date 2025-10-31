@@ -99,17 +99,19 @@ mod tests {
         ss.insert_string("hello", 1).unwrap();
         ss.insert_string("world", 2).unwrap();
 
-        ss.write_to_file("test/test_output.txt")?;
+        let test_file = tempfile::NamedTempFile::new().unwrap();
+        let test_file_path = test_file.path().to_str().unwrap().to_string();
+        ss.write_to_file(&test_file_path)?;
 
         let mut new_ss = StringSpace::new();
-        new_ss.read_from_file("test/test_output.txt")?;
+        new_ss.read_from_file(&test_file_path)?;
 
         assert_eq!(new_ss.len(), 2);
         let results = new_ss.get_all_strings();
         assert!(results.iter().any(|r| r.string == "hello" && r.meta.frequency == 1));
         assert!(results.iter().any(|r| r.string == "world" && r.meta.frequency == 2));
 
-        std::fs::remove_file("test/test_output.txt")?;
+        // File automatically cleaned up when test_file goes out of scope
         Ok(())
     }
 
@@ -1806,10 +1808,12 @@ mod tests {
             assert_eq!(results1.len(), 2);
 
             // Write to file and read back - should invalidate cache
-            ss.write_to_file("test/test_cache_file.txt").unwrap();
+            let test_file = tempfile::NamedTempFile::new().unwrap();
+            let test_file_path = test_file.path().to_str().unwrap().to_string();
+            ss.write_to_file(&test_file_path).unwrap();
 
             let mut new_ss = StringSpace::new();
-            new_ss.read_from_file("test/test_cache_file.txt").unwrap();
+            new_ss.read_from_file(&test_file_path).unwrap();
 
             // Cache should be invalidated, new results should match file contents
             let results2 = new_ss.get_all_strings();
@@ -1820,7 +1824,7 @@ mod tests {
             assert!(strings.contains(&"hello".to_string()));
             assert!(strings.contains(&"world".to_string()));
 
-            std::fs::remove_file("test/test_cache_file.txt").unwrap();
+            // File automatically cleaned up when test_file goes out of scope
         }
 
         #[test]
