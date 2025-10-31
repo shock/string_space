@@ -155,6 +155,14 @@ else
     echo "Daemon server stopped successfully after all tests"
 fi
 
+# Run the manual test for Fuzzy-Subsequence Search
+echo "=== Manual Testing: Fuzzy-Subsequence Search ==="
+tests/manual_test.sh
+if [ $? -ne 0 ]; then
+    echo "manual_test.sh failed"
+    exit 1
+fi
+
 echo
 echo "ALL TESTS PASSED !!!"
 echo
