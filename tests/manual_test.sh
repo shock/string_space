@@ -9,7 +9,7 @@ cargo build --release
 
 # Start server in background
 echo "Starting server..."
-./target/release/string_space start test/word_list.txt --port 7878 --host 127.0.0.1 &
+./target/release/string_space start test/word_list.txt --port 7979 --host 127.0.0.1 &
 SERVER_PID=$!
 sleep 2
 
@@ -19,7 +19,7 @@ echo "Testing basic functionality..."
 echo "Test 1: Basic search"
 python3 -c "
 from string_space_client import StringSpaceClient
-client = StringSpaceClient('127.0.0.1', 7878)
+client = StringSpaceClient('127.0.0.1', 7979)
 
 # Insert test data
 client.insert(['hello', 'world', 'help', 'helicopter', 'openai/gpt-4o-2024-08-06'])
@@ -43,12 +43,12 @@ echo "Test 2: Performance testing"
 echo "Test 3: Error handling"
 python3 -c "
 from string_space_client import StringSpaceClient
-client = StringSpaceClient('127.0.0.1', 7878)
+client = StringSpaceClient('127.0.0.1', 7979)
 
 # Test invalid parameter count (simulate by sending malformed request)
 import socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('127.0.0.1', 7878))
+s.connect(('127.0.0.1', 7979))
 s.send(b'fuzzy-subsequence\x1e\x04')  # Missing query
 response = s.recv(1024).decode()
 print('Error response:', repr(response))

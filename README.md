@@ -233,15 +233,15 @@ A `prompt_toolkit` Completer is available for auto-completion in `prompt_toolkit
 To try the completer, run the following commands in separate terminals:
 
 ```bash
-make test-server
+make auto-server
 ```
 
 ```bash
 uv sync
-make auto
+make auto-client
 ```
 
- The word database will be initialized in tests/data/words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
+ The word database will be initialized in test/auto_words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
 
 - **COUNT**: Number of random words to generate and insert.
 
