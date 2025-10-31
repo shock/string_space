@@ -1,7 +1,9 @@
 # Author: Bill Doughty
 # Version: 0.1
 
-from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.completion import Completer, Completion, CompleteEvent
+from prompt_toolkit.document import Document
+
 import re
 from string_space_client import StringSpaceClient, ProtocolError
 import sys
@@ -20,10 +22,9 @@ class StringSpaceCompleter(Completer):
             print("StringSpaceCompleter is disabled.  Launch StringSpaceServer and restart this app for word completion suggestions.")
             self.disabled = True
 
-    def get_completions(self, document, complete_event):
+    def get_completions(self, document: Document, complete_event: CompleteEvent):
         if self.disabled:
             return
-        # word_before_cursor = document.get_word_before_cursor(WORD=True).lower()
         word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
@@ -44,17 +45,6 @@ class StringSpaceCompleter(Completer):
             if (suggestions[i][0].islower() and word_before_cursor[0].isupper() and
                 suggestions[i][0].lower() == word_before_cursor[0].lower()):
                 suggestions[i] = word_before_cursor[0] + suggestions[i][1:]
-        # remove duplicates in suggestions while preserving order
-        seen = set()
-        result = []
-        word_in_suggestions = word_before_cursor in suggestions
-        for word in suggestions:
-            if word not in seen and word != word_before_cursor:
-                seen.add(word)
-                result.append(word)
-        if word_in_suggestions:
-            # insert word_before_cursor at the beginning of the list
-            result.insert(0, word_before_cursor)
 
         for suggestion in suggestions:
             if suggestion.strip() != '':
@@ -76,7 +66,7 @@ class StringSpaceCompleter(Completer):
         words = [word for word in words if not word.startswith("'")]
         return words
 
-    def add_words_from_text(self, text):
+    def add_words_from_text(self, text: str):
         if self.disabled:
             return
         words = self.parse_text(text)
@@ -84,7 +74,7 @@ class StringSpaceCompleter(Completer):
             return
         self.client.add_words(words)
 
-    def add_words(self, words):
+    def add_words(self, words: list[str]):
         if self.disabled:
             return
         self.client.add_words(words)
