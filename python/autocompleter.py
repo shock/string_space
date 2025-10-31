@@ -42,7 +42,7 @@ class ChatInterface:
                     user_input = self.session.prompt(
                         HTML(f'<style fg="white">{prompt_symbol}</style> '),
                         style=Style.from_dict({'': 'white'}),
-                        multiline=True
+                        multiline=False
                     )
                     if user_input is None or user_input.strip() == '':
                         continue

@@ -10,3 +10,4 @@ build/
 .claude-trace
 .venv/
 .env
+tests/data/word_list.txt

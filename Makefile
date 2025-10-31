@@ -32,8 +32,12 @@ clean:
 test:
 	tests/run_tests.sh
 
+test-server:
+	touch tests/data/word_list.txt; \
+	cargo run -- start --port=7879 --host=127.0.0.1 tests/data/word_list.txt
+
 auto:
-	tests/autocompleter.py
+	python/autocompleter.py
 
 install: release
 	cp $(RELEASE_DIR)/$(EXECUTABLE) $(TARGET)
@@ -48,4 +52,4 @@ client:
 	python client.py
 
 # Phony targets
-.PHONY: all debug release clean test client
+.PHONY: all debug release clean test client test-server

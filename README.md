@@ -4,7 +4,9 @@
 
 ---
 
-This Rust project implements a word-list database that allows efficient insertion, searching, and storage of words, along with a simple TCP network API for remote access. The project includes a fast in-memory string storage mechanism, string searching by prefix or substring, and TCP commands for interacting with the word database.
+This Rust project implements a fast word-list database that allows efficient insertion, searching, and storage of unique words along with frequency and last-inserted timestamp tracking.  The project provides a simple server executable with a TCP network API for word inseertion and querying matches. The server supports a fast in-memory string storage mechanism, string searching by prefix, substring, fuzzy subsequence, and Jaro-Winkler similarity matching.  It has a command-line interface for starting and stopping the server in standalone or daemon mode.
+
+The project also includes a Python client package that provides an easy way to connect to the server and use its features.  It also includes a Python `prompt_toolkit` completer for word completion in command line tools.
 
 ## Features
 
@@ -221,13 +223,22 @@ data_file = client.data_file()
 3. **Jaro-Winkler Similarity** - Fuzzy similarity matches
 4. **Substring Search** - General substring matches
 
-## Benchmarks
+## `prompt_toolkit` Completer Usage
 
-You can run benchmarks to measure the performance of word insertion and lookup:
+A `prompt_toolkit` Completer is available for auto-completion in `prompt_toolkit` applications.  See example usage in [python/autocompleter.py](python/autocompleter.py).
+
+To try the completer, run the following commands in separate terminals:
 
 ```bash
-cargo run -- <data-file> --benchmark <COUNT>
+make test-server
 ```
+
+```bash
+uv sync
+make auto
+```
+
+ The word database will be initialized in tests/data/words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
 
 - **COUNT**: Number of random words to generate and insert.
 
