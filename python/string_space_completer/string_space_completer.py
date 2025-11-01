@@ -1,9 +1,12 @@
 # Author: Bill Doughty
 # Version: 0.1
 
-from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.completion import Completer, Completion, CompleteEvent
+from prompt_toolkit.document import Document
+
 import re
 from string_space_client import StringSpaceClient, ProtocolError
+import sys
 
 class StringSpaceCompleter(Completer):
     def __init__(self, **kwargs):
@@ -19,65 +22,59 @@ class StringSpaceCompleter(Completer):
             print("StringSpaceCompleter is disabled.  Launch StringSpaceServer and restart this app for word completion suggestions.")
             self.disabled = True
 
-    def get_completions(self, document, complete_event):
+    def get_completions(self, document: Document, complete_event: CompleteEvent):
         if self.disabled:
             return
-        word_before_cursor = document.get_word_before_cursor(WORD=True).lower()
+        word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
             return
 
         # if word_before_cursor ends with a non-word character, return
-        if re.search(r'[^\w_\-\s]', word_before_cursor):
+        if re.search(r'[^\w_\-\_\']', word_before_cursor):
             return
 
-        doc_words = [word.lower() for word in self.parse_text(document.text)]
-        # get unique doc_words
-        doc_words = list(set(doc_words))
+        # remove starting non-word characters from word_before_cursor
+        while re.match(r'^[^\w_\-\']', word_before_cursor):
+            word_before_cursor = word_before_cursor[1:]
 
-        # remove word_before_cursor from doc_words if it exists
-        if word_before_cursor in doc_words:
-            doc_words.remove(word_before_cursor)
+        suggestions = self.client.best_completions_search(word_before_cursor, limit=10)
 
-        # filter only words that start with the same letter as word_before_cursor
-        doc_words = [word for word in doc_words if word.lower().startswith(word_before_cursor.lower())]
-        completion_suggestions = self.client.prefix_search(word_before_cursor)
-        spell_suggestions = self.client.similar_search(word_before_cursor, threshold=0.6)
+        # for each suggestion in suggestions, if the first character is lower case and matches the first character of word_before_cursor, change it to upper case
+        for i in range(len(suggestions)):
+            if (suggestions[i][0].islower() and word_before_cursor[0].isupper() and
+                suggestions[i][0].lower() == word_before_cursor[0].lower()):
+                suggestions[i] = word_before_cursor[0] + suggestions[i][1:]
 
-        # combine doc_words and completion_suggestions and spell_suggestions into a single list
-        suggestions = doc_words + completion_suggestions + spell_suggestions
-
-        # remove duplicates in suggestions while preserving order
-        seen = set()
-        result = []
-        word_in_suggestions = word_before_cursor in suggestions
-        for word in suggestions:
-            if word not in seen and word != word_before_cursor:
-                seen.add(word)
-                result.append(word)
-        if word_in_suggestions:
-            # insert word_before_cursor at the beginning of the list
-            result.insert(0, word_before_cursor)
-        suggestions = result
         for suggestion in suggestions:
             if suggestion.strip() != '':
                 yield Completion(suggestion, start_position=-len(word_before_cursor))
 
     def stop(self):
+        if self.disabled:
+            return
         self.client.disconnect()
 
     def parse_text(self, text: str) -> list[str]:
         # split the text into words by regex /s+/
-        words = re.split(r'[^\w_\-s]+', text)
+        words = re.split(r'[^\w_\-\']+', text)
         # get unique words
         words = list(set(words))
         # filter out words that are too short or too long
         words = [word for word in words if len(word) >= 3]
+        #filter out words beginning with "'"
+        words = [word for word in words if not word.startswith("'")]
         return words
 
-    def add_words_from_text(self, text):
+    def add_words_from_text(self, text: str):
+        if self.disabled:
+            return
         words = self.parse_text(text)
+        if len(words) == 0:
+            return
         self.client.add_words(words)
 
-    def add_words(self, words):
+    def add_words(self, words: list[str]):
+        if self.disabled:
+            return
         self.client.add_words(words)

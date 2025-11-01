@@ -4,25 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-String Space is a Rust-based word-list database server with efficient string storage, searching capabilities, and a TCP network API. The project includes both a Rust server and Python client components.
+String Space is a Rust-based word-list database server with efficient string storage, searching capabilities, and a TCP network API. The project includes both a Rust server and Python client components. It's designed for use with [llm_chat_cli](https://github.com/shock/llm_chat_cli) for word completion functionality.
 
 ## Architecture
 
 ### Core Components
 
 - **Main Server** (`src/main.rs`): CLI interface with subcommands for server management (start, stop, status, restart, benchmark)
-- **String Space Module** (`src/modules/string_space.rs`): Core data structure for efficient string storage and retrieval
+- **String Space Module** (`src/modules/string_space/`): Core data structure using custom memory allocation for efficient string storage and retrieval
 - **Protocol Module** (`src/modules/protocol.rs`): TCP protocol implementation for client-server communication
 - **Benchmark Module** (`src/modules/benchmark.rs`): Performance testing utilities
-- **Utils Module** (`src/modules/utils.rs`): Utility functions including PID file management
+- **Utils Module** (`src/modules/utils.rs`): Utility functions including PID file management and path expansion
+- **Word Struct Module** (`src/modules/word_struct.rs`): Word structure definitions with frequency and age tracking
 
 ### Key Features
 
-- Efficient in-memory string storage with prefix and substring search
-- Jaro-Winkler fuzzy search for similarity matching
-- TCP-based network protocol using ASCII RS (0x1E) as separator and EOT (0x04) as terminator
-- Daemon mode with PID file management
-- Frequency and age tracking for words
+- **Custom Memory Management**: Uses raw pointer allocation with 4KB alignment for optimal string storage
+- **Efficient Search**: Binary search for prefix matching, linear scan for substring search
+- **Fuzzy Search**: Jaro-Winkler similarity matching with configurable thresholds
+- **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing
+- **Best Completions**: Intelligent search combining multiple algorithms with progressive execution and dynamic weighting
+- **TCP Network Protocol**: ASCII RS (0x1E) as separator, EOT (0x04) as terminator
+- **Daemon Mode**: Proper UNIX daemon implementation with PID file management
+- **Frequency & Age Tracking**: Word usage frequency and insertion time tracking
 
 ## Development Commands
 
@@ -32,13 +36,14 @@ cargo build          # Debug build
 cargo build --release # Release build
 make debug           # Debug build via Makefile
 make release         # Release build via Makefile
+make install         # Install to /opt/local/bin
 ```
 
 ### Testing
 ```bash
-cargo test           # Run unit tests
-make test            # Run full test suite including integration tests
-./tests/run_tests.sh # Run comprehensive test script
+make test            # Run full test suite including integration tests and unit tests
+cargo test           # Run rust unit tests
+./tests/run_tests.sh # Run comprehensive test script (requires SS_TEST=true) (same as `make test`)
 ```
 
 ### Running
@@ -51,7 +56,7 @@ cargo run -- start test/word_list.txt --port 7878 --host 127.0.0.1
 
 # Using Makefile targets
 make server          # Start server in release mode
-make client          # Run Python client
+make client          # Run Python client tests
 ```
 
 ### Benchmarking
@@ -63,25 +68,49 @@ make benchmark       # Run benchmark with 100,000 words
 ### Server Management
 ```bash
 cargo run -- start <data-file>    # Start server
-cargo run -- stop                 # Stop server
-cargo run -- status               # Check server status
-cargo run -- restart <data-file>  # Restart server
+cargo run -- stop                 # Stop server (daemon mode only)
+cargo run -- status               # Check server status (daemon mode only)
+cargo run -- restart <data-file>  # Restart server (daemon mode only)
 ```
 
-## Python Client
+## Python Integration
 
-The project includes a Python client package in `python/string_space_client/` that can be installed as an editable package:
+### Client Package
+- **Location**: `python/string_space_client/`
+- **Installation**: `uv sync` installs as editable package
+- **Usage**: Import `StringSpaceClient` for TCP communication
 
-```bash
-uv sync              # Install dependencies including editable client
-python client.py     # Run client tests
-```
+### Completer Package
+- **Location**: `python/string_space_completer/`
+- **Purpose**: [prompt_toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) completer for word completion
+- **Used by**: [llm_chat_cli](https://github.com/shock/llm_chat_cli)
 
 ## Protocol Specification
 
-- **Request Format**: UTF-8 strings separated by ASCII RS (0x1E), terminated by EOT (0x04)
-- **Commands**: `insert`, `prefix`, `substring`, `similar`
-- **Response Format**: Text-based, terminated by EOT (0x04)
+### Request Format
+- **Separator**: ASCII RS (0x1E)
+- **Terminator**: EOT (0x04)
+- **Encoding**: UTF-8
+
+### Commands
+- `insert <words...>` - Insert one or more words
+- `prefix <prefix>` - Search by prefix
+- `substring <substring>` - Search by substring
+- `similar <word> <threshold>` - Fuzzy search with Jaro-Winkler
+- `fuzzy-subsequence <query>` - Fuzzy subsequence search with character order preservation
+- `best-completions <query> [limit]` - Intelligent search combining multiple algorithms with progressive execution and dynamic weighting
+- `data-file` - Get data file path
+- `remove <words...>` - Remove words from storage
+- `clear_space` - Clear all strings
+- `get_all_strings` - Retrieve all stored strings
+- `empty` - Check if storage is empty
+- `len` - Get number of stored strings
+- `capacity` - Get allocated memory (bytes)
+
+### Response Format
+- **Success**: Requested data or `OK` message
+- **Error**: `ERROR -` prefixed message
+- **Terminator**: EOT (0x04)
 
 ## Development Guidelines
 
@@ -90,10 +119,14 @@ python client.py     # Run client tests
 - Use comprehensive unit tests for all functionality
 - Maintain modular architecture with clear separation of concerns
 - Prefer verbose code with comments over dense implementations
+- Use unsafe code judiciously with proper memory safety guarantees
 
 ## Important Notes
 
-- The server uses PID files for daemon management (stored in system temp directory)
-- Benchmark mode will overwrite the specified data file
-- Integration tests require a running server instance on port 9898
-- Set `SS_TEST=true` environment variable when running test scripts to enable test mode
+- **PID Files**: Stored in system temp directory for daemon management
+- **Benchmark Mode**: Overwrites the specified data file
+- **Integration Tests**: Require running server instance on port 9898
+- **Test Mode**: Set `SS_TEST=true` environment variable for test scripts
+- **String Limits**: Words must be 3-50 characters in length
+- **Memory Alignment**: Uses 4KB alignment for optimal performance
+- **Daemon Mode**: Proper double-fork implementation with signal handling
