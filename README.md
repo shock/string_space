@@ -4,13 +4,17 @@
 
 ---
 
-This Rust project implements a word-list database that allows efficient insertion, searching, and storage of words, along with a simple TCP network API for remote access. The project includes a fast in-memory string storage mechanism, string searching by prefix or substring, and TCP commands for interacting with the word database.
+This Rust project implements a fast word-list database that allows efficient insertion, searching, and storage of unique words along with frequency and last-inserted timestamp tracking.  The project provides a simple server executable with a TCP network API for word inseertion and querying matches. The server supports a fast in-memory string storage mechanism, string searching by prefix, substring, fuzzy subsequence, and Jaro-Winkler similarity matching.  It has a command-line interface for starting and stopping the server in standalone or daemon mode.
+
+The project also includes a Python client package that provides an easy way to connect to the server and use its features.  It also includes a Python `prompt_toolkit` completer for word completion in command line tools.
 
 ## Features
 
 - **Efficient String Storage**: Handles large datasets of strings with very fast insertion and lookup times.
 - **Prefix and Substring Search**: Supports fast searching for strings by prefix and substring.
 - **Fuzzy Search**: Includes a simple implementation of Jaro-Winkler fuzzy search for similarity matching.
+- **Fuzzy-Subsequence Search**: Character order-preserving search with flexible spacing for abbreviations and partial matches.
+- **Best Completions (Recommended)**: Intelligent search combining multiple algorithms (prefix, substring, fuzzy subsequence, Jaro-Winkler) with relevance scoring. **This is the most recommended method for auto completion** as it provides the highest quality results by intelligently combining multiple search strategies.
 - **Frequency and Age Tracking**: Tracks the frequency of word usage and their insertion time (age).
 - **Simple TCP API**: Enables remote access to the word-list database via a minimal TCP protocol.
 - **Random Word Generation**: Capable of generating a customizable number of random words for benchmarking and testing.
@@ -28,6 +32,8 @@ This Rust project implements a word-list database that allows efficient insertio
   - execute `string_space start -d ~/.llm_chat_cli/word_list.txt`
   - run the `llm_chat_cli` program (see https://github.com/shock/llm_chat_cli). It should silently connect to the server. You will see a warning message if it cannot connect.
   - execute `string_space stop` to stop the server
+
+**Note**: The `llm_chat_cli` program uses the **best completions** method by default, which is the recommended approach for auto completion as it provides the highest quality results by intelligently combining multiple search strategies.
 
 ### Starting the Server Automatically using crond
 To run the string_space server in in the background automatically when your machine boots, add the following to your crontab (`crontab -e`):
@@ -49,7 +55,7 @@ The project is organized as follows:
   - `benchmark.rs`: Performance testing utilities.
   - `utils.rs`: Utility functions for generating random words, timing code execution, and PID management.
   - `word_struct.rs`: Word structure definitions.
-- `python/string_space_client/`: Python client package for easy integration into python projects.
+- `python/string_space_client/`: Python client package for easy integration into python projects. Provides methods for all server commands including `prefix_search`, `substring_search`, `similar_search`, `fuzzy_subsequence_search`, and `best_completions_search`.
 - `python/string_space_completer/`: Python [prompt_toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) completer package for word completion in command line tools using `prompt_toolkit`.  Used by [llm_chat_cli](https://github.com/shock/llm_chat_cli).
 - `tests/`: Integration tests and test runner scripts.
 
@@ -143,7 +149,20 @@ The server listens for client connections on the specified host and port. It sup
    - **Description**: Searches for words similar to the provided word, based on a similarity threshold.
    - **Response**: A list of similar words.
 
-5. **Additional Operations**
+5. **Fuzzy-Subsequence Search**
+   - **Command**: `fuzzy-subsequence <query>`
+   - **Description**: Searches for words where query characters appear in order, but not necessarily consecutively. Useful for abbreviations and partial matches.
+   - **Response**: A list of matching words, each on a new line.
+
+6. **Best Completions**
+   - **Command**: `best-completions <query> [limit]`
+   - **Description**: Finds the best completions for a query using multiple search algorithms (prefix, substring, fuzzy subsequence, and Jaro-Winkler similarity). Returns results sorted by relevance score.
+   - **Parameters**:
+     - `query` (required): The search query string
+     - `limit` (optional): Maximum number of results to return
+   - **Response**: A list of matching words with relevance scores, each on a new line.
+
+7. **Additional Operations**
    - **Remove Words**: `remove <words...>` - Remove words from storage
    - **Clear Space**: `clear_space` - Clear all strings
    - **Get All Strings**: `get_all_strings` - Retrieve all stored strings
@@ -158,6 +177,71 @@ Responses from the server are text-based and end with an EOT byte (`0x04`).
 
 - **Success**: Returns the requested data or an `OK` message.
 - **Error**: Returns an error message starting with `ERROR -`.
+
+## Python Client Usage
+
+The Python client package provides easy access to all server commands. **For auto completion, we recommend using `best_completions_search` as it provides the highest quality results.** Here's how to use the `best_completions_search` method:
+
+```python
+from string_space_client import StringSpaceClient
+
+# Create client instance
+client = StringSpaceClient('127.0.0.1', 7878)
+
+# Basic best completions search
+results = client.best_completions_search("hel")
+print(results)
+# Output: ['help', 'hello', 'helicopter', 'world']
+
+# With custom limit
+results = client.best_completions_search("app", limit=5)
+print(results)
+# Output: ['apple', 'application', 'apply', 'applesauce', 'apparatus']
+
+# Other available methods
+prefix_results = client.prefix_search("hel")
+substring_results = client.substring_search("world")
+fuzzy_results = client.fuzzy_subsequence_search("hl")
+similar_results = client.similar_search("hello", 0.8)
+
+# Insert words
+client.insert(["hello", "world", "test"])
+
+# Get data file path
+data_file = client.data_file()
+```
+
+### Key Features of `best_completions_search` (Recommended for Auto Completion):
+
+- **Progressive Algorithm Execution**: Uses multiple search algorithms in priority order
+- **Intelligent Scoring**: Combines match type, frequency, and age for relevance ranking
+- **Deduplication**: Removes duplicate results across algorithms
+- **Configurable Limits**: Customizable result count (1-100)
+- **Error Handling**: Graceful handling of connection issues and server errors
+- **Highest Quality Results**: **Recommended as the primary method for auto completion** - provides the most relevant completions by intelligently combining multiple search strategies
+
+### Algorithm Execution Order:
+1. **Prefix Search** - Exact prefix matches (highest priority)
+2. **Fuzzy Subsequence Search** - Character order-preserving matches
+3. **Jaro-Winkler Similarity** - Fuzzy similarity matches
+4. **Substring Search** - General substring matches
+
+## `prompt_toolkit` Completer Usage
+
+A `prompt_toolkit` Completer is available for auto-completion in `prompt_toolkit` applications.  See example usage in [python/autocompleter.py](python/autocompleter.py).
+
+To try the completer, run the following commands in separate terminals:
+
+```bash
+make auto-server
+```
+
+```bash
+uv sync
+make auto-client
+```
+
+The word database will be initialized in test/auto_words.txt if it does not already exist.  Entering words at the prompt will add them to the database.
 
 ## Benchmarks
 

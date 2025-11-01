@@ -99,6 +99,28 @@ pub fn benchmark(args: Vec<String>) {
     found_strings.sort_by(|a, b| a.meta.frequency.cmp(&b.meta.frequency));
     println!("Finding strings with substring '{}' took {:?}", substring, find_time);
 
+    // Search by fuzzy-subsequence
+    let mut found_strings: Vec<StringRef> = Vec::new();
+    let find_time = time_execution(|| {
+        found_strings = space.fuzzy_subsequence_search(substring);
+        println!("Found {} strings with fuzzy-subsequence '{}':", found_strings.len(), substring);
+        let max_len = std::cmp::min(found_strings.len(), 5);
+        for string_ref in found_strings[0..max_len].iter() {
+            println!("  {} {}", string_ref.string, string_ref.meta.frequency);
+        }
+    });
+    println!("Finding strings with fuzzy-subsequence '{}' took {:?}", substring, find_time);
+
+    // Additional test queries for comprehensive benchmarking
+    let test_queries = vec!["he", "lo", "wor", "hl", "elp", "rld"];
+    for query in test_queries {
+        let mut found_strings: Vec<StringRef> = Vec::new();
+        let find_time = time_execution(|| {
+            found_strings = space.fuzzy_subsequence_search(query);
+        });
+        println!("Fuzzy-subsequence search for '{}' found {} strings in {:?}", query, found_strings.len(), find_time);
+    }
+
     let insert_time = time_execution(|| {
         // Insert strings
         space.insert_string("aaaaaaaaaaaaaaaa", 1).unwrap();
@@ -112,3 +134,4 @@ pub fn benchmark(args: Vec<String>) {
     space.write_to_file(file_path).unwrap();
 
 }
+
