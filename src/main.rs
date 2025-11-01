@@ -5,9 +5,6 @@ mod modules {
     pub mod benchmark;
 }
 
-mod performance_test;
-
-mod integration_test;
 
 use modules::protocol::Protocol;
 use modules::protocol::StringSpaceProtocol;
@@ -77,10 +74,6 @@ enum Command {
         #[arg(short, long)]
         count: u32,
     },
-    /// Run integration tests for best_completions Phase 4
-    IntegrationTest,
-    /// Run performance tests for best_completions optimization
-    PerformanceTest,
 }
 
 fn main() {
@@ -102,14 +95,6 @@ fn main() {
         Command::Benchmark { data_file, count } => {
             let v = vec![data_file, count.to_string()];
             benchmark(v);
-            std::process::exit(0);
-        }
-        Command::IntegrationTest => {
-            integration_test::run_all_integration_tests();
-            std::process::exit(0);
-        }
-        Command::PerformanceTest => {
-            performance_test::run_performance_tests();
             std::process::exit(0);
         }
     }
