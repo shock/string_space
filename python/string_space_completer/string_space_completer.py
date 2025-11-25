@@ -1,6 +1,7 @@
 # Author: Bill Doughty
-# Version: 0.1
+# Version: 0.9
 
+import time
 from prompt_toolkit.completion import Completer, Completion, CompleteEvent
 from prompt_toolkit.document import Document
 
@@ -15,6 +16,7 @@ class StringSpaceCompleter(Completer):
         debug = kwargs.get('debug', False)
         self.disabled = False
         self.client = StringSpaceClient(host, port, debug)
+        self.last_completion_time = time.time()
         try:
             self.client.connect()
         except ProtocolError as e:
@@ -25,6 +27,13 @@ class StringSpaceCompleter(Completer):
     def get_completions(self, document: Document, complete_event: CompleteEvent):
         if self.disabled:
             return
+        now = time.time()
+        # get delta since last completion
+        delta = now - self.last_completion_time
+        # if delta is less than 100 milliseconds, return
+        if delta < 0.1:
+            return
+        self.last_completion_time = now
         word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
