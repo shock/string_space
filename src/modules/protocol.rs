@@ -208,7 +208,10 @@ impl StringSpaceProtocol {
                 }
             }
             if counter > 0 {
-                self.space.write_to_file(&self.file_path).unwrap();
+                if let Err(e) = self.space.write_to_file(&self.file_path) {
+                    eprintln!("Failed to write to file {}: {}", self.file_path, e);
+                    // Continue with the response but log the error
+                }
             }
             let response_str = format!("OK\nInserted {} of {} words", counter, num_words);
             response.extend_from_slice(response_str.as_bytes());
@@ -222,13 +225,31 @@ impl StringSpaceProtocol {
 
 impl Protocol for StringSpaceProtocol {
     fn handle_client(&mut self, stream: &mut TcpStream) {
-        let mut reader = BufReader::new(stream.try_clone().expect("Failed to clone stream"));
+        let mut reader = match stream.try_clone() {
+            Ok(stream_clone) => BufReader::new(stream_clone),
+            Err(e) => {
+                eprintln!("Failed to clone stream: {}", e);
+                return;
+            }
+        };
 
         loop {
             let mut buffer = Vec::new();
 
             // Read the input from the client until the EOT (End of Text) character is encountered
-            reader.read_until(EOT_BYTE, &mut buffer).expect("Failed to read from stream");
+            match reader.read_until(EOT_BYTE, &mut buffer) {
+                Ok(0) => {
+                    // Client disconnected
+                    break;
+                }
+                Ok(_) => {
+                    // Continue processing
+                }
+                Err(e) => {
+                    eprintln!("Failed to read from stream: {}", e);
+                    break;
+                }
+            }
 
             // Remove the EOT character from the buffer
             if let Some(index) = buffer.iter().position(|&b| b == EOT_BYTE) {
@@ -251,16 +272,39 @@ impl Protocol for StringSpaceProtocol {
 
                 let mut response = self.create_response(request_elements[0], request_elements[1..].to_vec());
                 // convert the response byte vector to a string
-                let response_str = String::from_utf8(response.clone()).unwrap();
-                println!("Response:\n{:?}", response_str);
-                response.push(EOT_BYTE);
+                match String::from_utf8(response.clone()) {
+                    Ok(response_str) => {
+                        println!("Response:\n{:?}", response_str);
+                        response.push(EOT_BYTE);
 
-                stream.write_all(&response).expect("Failed to write to stream");
-                stream.flush().expect("Failed to flush the stream");
+                        if let Err(e) = stream.write_all(&response) {
+                            eprintln!("Failed to write to stream: {}", e);
+                            break;
+                        }
+                        if let Err(e) = stream.flush() {
+                            eprintln!("Failed to flush stream: {}", e);
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to convert response to UTF-8: {}", e);
+                        // Send a generic error response
+                        let error_response = format!("ERROR - invalid UTF-8 in response\x04");
+                        if let Err(e) = stream.write_all(error_response.as_bytes()) {
+                            eprintln!("Failed to send error response: {}", e);
+                        }
+                        break;
+                    }
+                }
 
                 // println!("Sent response: {:?}", response);
             } else {
                 println!("Error decoding buffer: {}", str_or_err.unwrap_err());
+                // Send an error response to the client for invalid UTF-8 request
+                let error_response = format!("ERROR - invalid UTF-8 in request\x04");
+                if let Err(e) = stream.write_all(error_response.as_bytes()) {
+                    eprintln!("Failed to send error response: {}", e);
+                }
                 continue;
             }
         }
