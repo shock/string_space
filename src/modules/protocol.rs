@@ -283,9 +283,19 @@ where F: FnMut()
             for stream in listener.incoming() {
                 match stream {
                     Ok(mut stream) => {
-                        println!("New connection from {}", stream.peer_addr().unwrap());
-                        println!("Accepting connection...");
-                        protocol.handle_client(&mut stream);
+                        match stream.peer_addr() {
+                            Ok(addr) => {
+                                println!("New connection from {}", addr);
+                                println!("Accepting connection...");
+                                protocol.handle_client(&mut stream);
+                            },
+                            Err(e) => {
+                                eprintln!("Failed to get peer address: {}", e);
+                                // Continue with the connection even if we can't get the peer address
+                                println!("Accepting connection from unknown peer...");
+                                protocol.handle_client(&mut stream);
+                            }
+                        }
                     },
                     Err(e) => { eprintln!("Failed: {}", e); },
                 }
