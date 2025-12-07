@@ -6,18 +6,19 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-cargo build --release
+cargo build
 
-EXECUTABLE=target/release/string_space
+ENV_VARS="STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true"
+EXECUTABLE="target/debug/string_space"
 
 # Stop the server if it's running
-SS_TEST=true $EXECUTABLE stop
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE stop failed"
 fi
 
 # Test foreground mode
-SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9899 &
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9899 &
 FOREGROUND_PID=$!
 
 # Give the server a moment to start
@@ -53,7 +54,7 @@ fi
 # Test daemon mode
 
 # Start the server in daemon mode
-SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE start test/word_list.txt -p 9898 -d failed"
     exit 1
@@ -65,14 +66,14 @@ fi
 uv run tests/client.py 9898
 if [ $? -ne 0 ]; then
     echo "uv run tests/client.py 9898 failed"
-    SS_TEST=true $EXECUTABLE stop
+    STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
     exit 1
 else
     echo "Client connected successfully to daemon server"
 fi
 
 # Stop the server
-SS_TEST=true $EXECUTABLE stop
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE stop failed"
     exit 1
@@ -81,7 +82,7 @@ else
 fi
 
 # Start the server again in daemon mode
-SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE start test/word_list.txt -p 9898 -d failed"
     exit 1
@@ -90,17 +91,17 @@ else
 fi
 
 # Restart the server
-SS_TEST=true $EXECUTABLE restart test/word_list.txt -p 9898
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE restart test/word_list.txt -p 9898
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE restart test/word_list.txt -p 9898 failed"
-    SS_TEST=true $EXECUTABLE stop
+    STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
     exit 1
 else
     echo "Daemon server restarted successfully"
 fi
 
 # Stop the server
-SS_TEST=true $EXECUTABLE stop
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE stop failed"
     exit 1
@@ -118,7 +119,7 @@ else
 fi
 
 # Start server again for the new integration tests
-SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE start test/word_list.txt -p 9898 -d
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE start test/word_list.txt -p 9898 -d failed"
     exit 1
@@ -130,7 +131,7 @@ fi
 uv run tests/test_best_completions_integration.py
 if [ $? -ne 0 ]; then
     echo "uv run tests/test_best_completions_integration.py failed"
-    SS_TEST=true $EXECUTABLE stop
+    STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
     exit 1
 else
     echo "Best-completions integration test ran successfully"
@@ -140,14 +141,14 @@ fi
 uv run tests/test_protocol_validation.py
 if [ $? -ne 0 ]; then
     echo "uv run tests/test_protocol_validation.py failed"
-    SS_TEST=true $EXECUTABLE stop
+    STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
     exit 1
 else
     echo "Protocol validation test ran successfully"
 fi
 
 # Stop the server after all tests
-SS_TEST=true $EXECUTABLE stop
+STRING_SPACE_DEBUG=1 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
     echo "$EXECUTABLE stop failed"
     exit 1
