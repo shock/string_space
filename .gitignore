@@ -10,3 +10,5 @@ build/
 .claude-trace
 .venv/
 .env
+tool_calls.log
+.pyra
