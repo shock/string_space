@@ -5,6 +5,8 @@
 import socket
 import re
 import time
+import threading
+import struct
 
 RS_BYTE = 0x1E
 RS_BYTE_STR = "\x1E"
@@ -18,22 +20,36 @@ class StringSpaceClient:
         self.port = port
         self.debug = debug
         self.connected = False
+        self.lock = threading.RLock()  # Changed from Lock to RLock for reentrancy
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a new socket
-        try:
-            self.sock.connect((self.host, self.port))
-            self.connected = True
-        except ConnectionRefusedError as e:
-            self.sock.close()
-            self.connected = False
-            raise ProtocolError(f"StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
+        with self.lock:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a new socket
+            # Set timeout on socket to prevent hanging
+            self.sock.settimeout(3.0)  # 3 second timeout
+            try:
+                self.sock.connect((self.host, self.port))
+                self.connected = True
+            except ConnectionRefusedError as e:
+                self.sock.close()
+                self.connected = False
+                raise ProtocolError(f"StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
 
 
     def disconnect(self):
-        if self.connected:
-            self.sock.close()
-            self.connected = False
+        with self.lock:
+            if self.connected:
+                if self.debug:
+                    print(f"[DEBUG] Closing socket, connected={self.connected}")
+                try:
+                    # Shutdown socket before close to ensure proper termination
+                    self.sock.shutdown(socket.SHUT_RDWR)
+                except:
+                    pass  # Socket might already be shutdown
+                self.sock.close()
+                self.connected = False
+                if self.debug:
+                    print(f"[DEBUG] Socket closed, connected={self.connected}")
 
     def __del__(self):
         self.disconnect()
@@ -65,37 +81,42 @@ class StringSpaceClient:
             raise e
 
     def request(self, request_elements: list[str]) -> str:
-        request = self.create_request(RS_BYTE_STR.join(request_elements))
-        retries = 0
-        max_retries = 2
-        if not self.connected:
-            try:
-                # pass
-                self.connect()
-            except ConnectionRefusedError as e:
-                raise ProtocolError(f"StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
-        while True:
-            try:
-                self.sock.sendall(request)
-                if self.debug:
-                    print(f"Request sent: {request}")
-
-                response = self.receive_response()
-                if self.debug:
-                    print(f"Response:\n{response}")
-                self.disconnect()
-                return response
-            except ConnectionError as e:
-                if self.debug:
-                    print(f"Error: {e}")
-                if retries < max_retries:
-                    # sleep for 2^retries seconds
-                    time.sleep(2**retries)
-                    retries += 1
+        with self.lock:
+            request = self.create_request(RS_BYTE_STR.join(request_elements))
+            if self.debug:
+                print(f"[DEBUG] Request bytes (hex): {request.hex()}")
+                print(f"[DEBUG] Contains EOT byte at end: {request[-1:] == b'\x04'}")
+            retries = 0
+            max_retries = 2
+            if not self.connected:
+                try:
                     self.connect()
-                    continue
-                else:
-                    raise e
+                except ConnectionRefusedError as e:
+                    raise ProtocolError(f"StringSpaceServer unreachable.  Is it running on {self.host}:{self.port}?")
+            while True:
+                try:
+                    self.sock.sendall(request)
+                    if self.debug:
+                        print(f"[DEBUG] Request sent: {request}")
+
+                    response = self.receive_response()
+                    if self.debug:
+                        print(f"[DEBUG] Response received: {response}")
+                    self.disconnect()
+                    if self.debug:
+                        print(f"[DEBUG] Disconnected after request")
+                    return response
+                except ConnectionError as e:
+                    if self.debug:
+                        print(f"Error: {e}")
+                    if retries < max_retries:
+                        # sleep for 2^retries seconds
+                        time.sleep(2**retries)
+                        retries += 1
+                        self.connect()
+                        continue
+                    else:
+                        raise e
 
     def prefix_search(self, prefix: str) -> list[str]:
         try:

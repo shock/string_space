@@ -1,9 +1,28 @@
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::str;
+use std::time::Duration;
 use crate::modules::string_space::StringSpace;
 use crate::modules::utils;
 use regex;
+
+// Debug configuration
+fn debug_protocol_flow() -> bool {
+    std::env::var("STRING_SPACE_DEBUG").is_ok()
+}
+
+macro_rules! protocol_debug {
+    ($($arg:tt)*) => {
+        if debug_protocol_flow() {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+            println!("[PROTOCOL {}] {}", now, format!($($arg)*));
+        }
+    };
+}
 
 pub trait Protocol {
     fn handle_client(&mut self, stream: &mut TcpStream);
@@ -12,6 +31,7 @@ pub trait Protocol {
 const EOT_BYTE: u8 = 0x04;         // ASCII EOT (End of Transmission) character
 const RS_BYTE_STR: &str = "\x1E";  // ASCII RS (Record Separator) character
 const SEND_METADATA: bool = false;
+const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 3; // 3 second default timeout
 
 pub struct StringSpaceProtocol {
     pub space: StringSpace,
@@ -39,15 +59,31 @@ impl StringSpaceProtocol {
     }
 
     fn create_response(&mut self, operation: &str, params: Vec<&str>) -> Vec<u8> {
+        protocol_debug!("ENTER create_response: operation='{}', params={:?}", operation, params);
+        let start_time = std::time::Instant::now();
+        
+        let response = self.create_response_internal(operation, params, start_time);
+        response
+    }
+    
+    fn create_response_internal(&mut self, operation: &str, params: Vec<&str>, start_time: std::time::Instant) -> Vec<u8> {
         let mut response = Vec::new();
         if "prefix" == operation {
+            protocol_debug!("Processing prefix operation");
             if params.len() != 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
+                let total_duration = start_time.elapsed();
+                protocol_debug!("EXIT create_response: total time {:?}", total_duration);
                 return response;
             }
             let prefix = params[0];
+            protocol_debug!("Prefix: '{}'", prefix);
+            protocol_debug!("Calling space.find_by_prefix()");
+            let prefix_start = std::time::Instant::now();
             let matches = self.space.find_by_prefix(prefix);
+            let prefix_duration = prefix_start.elapsed();
+            protocol_debug!("find_by_prefix returned {} matches in {:?}", matches.len(), prefix_duration);
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -64,6 +100,7 @@ impl StringSpaceProtocol {
             return response;
         }
         else if "similar" == operation {
+            protocol_debug!("Processing similar operation");
             if params.len() != 2 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
@@ -73,15 +110,23 @@ impl StringSpaceProtocol {
             let cutoff_param = params[1].parse::<f64>();
             let cutoff: f64;
             match cutoff_param {
-                Ok(t) => { cutoff = t; },
+                Ok(t) => { 
+                    cutoff = t; 
+                    protocol_debug!("Parsed cutoff: {}", cutoff);
+                },
                 Err(_) => {
+                    protocol_debug!("Invalid cutoff parameter: '{}'", params[1]);
                     let response_str = format!("ERROR\nInvalid cutoff parameter '{}'.  expecting floating point string between 0.0 and 1.0", params[1]);
                     response.extend_from_slice(response_str.as_bytes());
                     return response;
                 }
             }
             println!("cutoff: {}", cutoff);
+            protocol_debug!("Calling space.get_similar_words()");
+            let similar_start = std::time::Instant::now();
             let matches = self.space.get_similar_words(word, Some(cutoff));
+            let similar_duration = similar_start.elapsed();
+            protocol_debug!("get_similar_words returned {} matches in {:?}", matches.len(), similar_duration);
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -98,13 +143,19 @@ impl StringSpaceProtocol {
             return response;
         }
         else if "fuzzy-subsequence" == operation {
+            protocol_debug!("Processing fuzzy-subsequence operation");
             if params.len() != 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
                 return response;
             }
             let query = params[0];
+            protocol_debug!("Query: '{}'", query);
+            protocol_debug!("Calling space.fuzzy_subsequence_search()");
+            let fuzzy_start = std::time::Instant::now();
             let matches = self.space.fuzzy_subsequence_search(query);
+            let fuzzy_duration = fuzzy_start.elapsed();
+            protocol_debug!("fuzzy_subsequence_search returned {} matches in {:?}", matches.len(), fuzzy_duration);
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -118,6 +169,7 @@ impl StringSpaceProtocol {
             return response;
         }
         else if "best-completions" == operation {
+            protocol_debug!("Processing best-completions operation");
             // Validate parameter count (1-2 parameters)
             if params.len() < 1 || params.len() > 2 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
@@ -126,20 +178,31 @@ impl StringSpaceProtocol {
             }
 
             let query = params[0];
+            protocol_debug!("Query: '{}', Limit: {:?}", params[0], if params.len() > 1 { Some(params[1]) } else { None });
+            
             let limit = if params.len() == 2 {
                 match params[1].parse::<usize>() {
-                    Ok(l) => Some(l),
+                    Ok(l) => {
+                        protocol_debug!("Parsed limit: {}", l);
+                        Some(l)
+                    },
                     Err(_) => {
+                        protocol_debug!("Invalid limit parameter: '{}'", params[1]);
                         let response_str = format!("ERROR - invalid limit parameter '{}'", params[1]);
                         response.extend_from_slice(response_str.as_bytes());
                         return response;
                     }
                 }
             } else {
+                protocol_debug!("No limit specified, using default");
                 None
             };
 
+            protocol_debug!("Calling space.best_completions()");
+            let bc_start = std::time::Instant::now();
             let matches = self.space.best_completions(query, limit);
+            let bc_duration = bc_start.elapsed();
+            protocol_debug!("best_completions returned {} matches in {:?}", matches.len(), bc_duration);
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -153,13 +216,19 @@ impl StringSpaceProtocol {
             return response;
         }
         else if "substring" == operation {
+            protocol_debug!("Processing substring operation");
             if params.len() != 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
                 return response;
             }
             let substring = params[0];
+            protocol_debug!("Substring: '{}'", substring);
+            protocol_debug!("Calling space.find_with_substring()");
+            let substring_start = std::time::Instant::now();
             let matches = self.space.find_with_substring(substring);
+            let substring_duration = substring_start.elapsed();
+            protocol_debug!("find_with_substring returned {} matches in {:?}", matches.len(), substring_duration);
             for m in matches {
                 response.extend_from_slice(m.string.as_bytes());
                 if SEND_METADATA {
@@ -176,10 +245,15 @@ impl StringSpaceProtocol {
             return response;
         }
         else if "data-file"  == operation {
+            protocol_debug!("Processing data-file operation");
+            protocol_debug!("File path: {}", self.file_path);
             response.extend_from_slice(self.file_path.as_bytes());
             return response;
         }
         else if "insert"  == operation {
+            protocol_debug!("Processing insert operation with {} params", params.len());
+            protocol_debug!("Total param length: {}", params.iter().map(|p| p.len()).sum::<usize>());
+            
             if params.len() < 1 {
                 let response_str = format!("ERROR - invalid parameters (length = {})", params.len());
                 response.extend_from_slice(response_str.as_bytes());
@@ -187,7 +261,13 @@ impl StringSpaceProtocol {
             }
             let mut counter = 0;
             let mut num_words = 0;
-            for param in params {
+            let insert_start = std::time::Instant::now();
+            
+            for (i, param) in params.iter().enumerate() {
+                if i % 10 == 0 {
+                    protocol_debug!("Processing param {} of {}", i, params.len());
+                }
+                
                 let string = param.trim();
                 // replace newlines with spaces
                 let string = string.replace('\n', " ");
@@ -196,56 +276,104 @@ impl StringSpaceProtocol {
                 let re = regex::Regex::new(r"\s+").unwrap();
                 let string = re.replace_all(&string, " ").to_string();
                 let words: Vec<&str> = string.split(' ').collect();
-                for word in words {
+                protocol_debug!("Param {} split into {} words", i, words.len());
+                
+                for (j, word) in words.iter().enumerate() {
+                    if j % 100 == 0 && j > 0 {
+                        protocol_debug!("Inserted {} words so far from param {}", j, i);
+                    }
+                    
                     num_words += 1;
                     let response = self.space.insert_string(word, 1);
                     match response {
                         Ok(_) => { counter += 1; },
                         Err(e) => {
+                            protocol_debug!("Error inserting word '{}': {}", word, e);
                             println!("Error inserting word '{}': {}", word, e);
                         }
                     }
                 }
             }
+            
+            let insert_duration = insert_start.elapsed();
+            protocol_debug!("Insert processing took {:?}, inserted {} of {} words", 
+                           insert_duration, counter, num_words);
+            
             if counter > 0 {
+                protocol_debug!("Writing to file: {}", self.file_path);
+                let write_start = std::time::Instant::now();
                 if let Err(e) = self.space.write_to_file(&self.file_path) {
+                    protocol_debug!("File write error: {}", e);
                     eprintln!("Failed to write to file {}: {}", self.file_path, e);
                     // Continue with the response but log the error
                 }
+                let write_duration = write_start.elapsed();
+                protocol_debug!("File write took {:?}", write_duration);
             }
             let response_str = format!("OK\nInserted {} of {} words", counter, num_words);
             response.extend_from_slice(response_str.as_bytes());
             return response;
         } else {
+            protocol_debug!("Unknown operation: '{}'", operation);
             response.extend_from_slice(format!("ERROR - unknown operation '{}'", operation).as_bytes());
-            return response;
         }
+        
+        response
     }
 }
 
 impl Protocol for StringSpaceProtocol {
     fn handle_client(&mut self, stream: &mut TcpStream) {
+        protocol_debug!("ENTER handle_client");
+        
         let mut reader = match stream.try_clone() {
-            Ok(stream_clone) => BufReader::new(stream_clone),
+            Ok(stream_clone) => {
+                protocol_debug!("Stream cloned successfully");
+                
+                // Set read/write timeouts to prevent indefinite blocking
+                let timeout_duration = Duration::from_secs(DEFAULT_CONNECTION_TIMEOUT_SECS);
+                if let Err(e) = stream_clone.set_read_timeout(Some(timeout_duration)) {
+                    protocol_debug!("Failed to set read timeout: {}", e);
+                    eprintln!("Failed to set read timeout: {}", e);
+                }
+                if let Err(e) = stream_clone.set_write_timeout(Some(timeout_duration)) {
+                    protocol_debug!("Failed to set write timeout: {}", e);
+                    eprintln!("Failed to set write timeout: {}", e);
+                }
+                
+                BufReader::new(stream_clone)
+            },
             Err(e) => {
+                protocol_debug!("FAILED to clone stream: {}", e);
                 eprintln!("Failed to clone stream: {}", e);
                 return;
             }
         };
 
+        protocol_debug!("Starting read loop");
         loop {
             let mut buffer = Vec::new();
+            protocol_debug!("Waiting for EOT byte (blocking read)...");
 
             // Read the input from the client until the EOT (End of Text) character is encountered
             match reader.read_until(EOT_BYTE, &mut buffer) {
                 Ok(0) => {
-                    // Client disconnected
+                    protocol_debug!("Client disconnected (0 bytes read)");
                     break;
                 }
-                Ok(_) => {
-                    // Continue processing
+                Ok(n) => {
+                    protocol_debug!("Received {} bytes", n);
+                    if n < 100 {
+                        protocol_debug!("Buffer preview: {:?}", String::from_utf8_lossy(&buffer));
+                    }
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                    protocol_debug!("Read timeout after {} seconds - closing connection", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                    eprintln!("Read timeout after {} seconds - closing connection", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                    break;
                 }
                 Err(e) => {
+                    protocol_debug!("Read error: {}", e);
                     eprintln!("Failed to read from stream: {}", e);
                     break;
                 }
@@ -254,12 +382,15 @@ impl Protocol for StringSpaceProtocol {
             // Remove the EOT character from the buffer
             if let Some(index) = buffer.iter().position(|&b| b == EOT_BYTE) {
                 buffer.truncate(index);
+                protocol_debug!("EOT found at position {}, buffer length: {}", index, buffer.len());
             } else {
+                protocol_debug!("NO EOT found in buffer, client may have disconnected");
                 // If no EOT found, client probably disconnected
                 break;
             }
 
             if buffer.is_empty() {
+                protocol_debug!("Empty buffer, continuing loop");
                 // Empty message, client probably disconnected
                 break;
             }
@@ -268,21 +399,38 @@ impl Protocol for StringSpaceProtocol {
             if let Ok(buffer_str) = str_or_err {
                 // Split the buffer into a vector of strings using RS_BYTE as the delimiter
                 let request_elements: Vec<&str> = buffer_str.split(RS_BYTE_STR).collect();
-                println!("\nRequest:\n{}", request_elements.join("\n"));
+                protocol_debug!("Parsed request: {} elements", request_elements.len());
+                
+                if !request_elements.is_empty() {
+                    protocol_debug!("Operation: {}", request_elements[0]);
+                    println!("\nRequest:\n{}", request_elements.join("\n"));
+                }
 
+                protocol_debug!("Calling create_response()");
+                let start_time = std::time::Instant::now();
                 let mut response = self.create_response(request_elements[0], request_elements[1..].to_vec());
+                let processing_time = start_time.elapsed();
+                protocol_debug!("create_response took {:?}", processing_time);
                 // convert the response byte vector to a string
                 match String::from_utf8(response.clone()) {
                     Ok(response_str) => {
                         println!("Response:\n{:?}", response_str);
                         response.push(EOT_BYTE);
 
-                        if let Err(e) = stream.write_all(&response) {
-                            eprintln!("Failed to write to stream: {}", e);
+                        if let Err(ref e) = stream.write_all(&response) {
+                            if e.kind() == std::io::ErrorKind::TimedOut {
+                                eprintln!("Write timeout after {} seconds - closing connection", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                            } else {
+                                eprintln!("Failed to write to stream: {}", e);
+                            }
                             break;
                         }
-                        if let Err(e) = stream.flush() {
-                            eprintln!("Failed to flush stream: {}", e);
+                        if let Err(ref e) = stream.flush() {
+                            if e.kind() == std::io::ErrorKind::TimedOut {
+                                eprintln!("Flush timeout after {} seconds - closing connection", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                            } else {
+                                eprintln!("Failed to flush stream: {}", e);
+                            }
                             break;
                         }
                     },
@@ -290,8 +438,12 @@ impl Protocol for StringSpaceProtocol {
                         eprintln!("Failed to convert response to UTF-8: {}", e);
                         // Send a generic error response
                         let error_response = format!("ERROR - invalid UTF-8 in response\x04");
-                        if let Err(e) = stream.write_all(error_response.as_bytes()) {
-                            eprintln!("Failed to send error response: {}", e);
+                        if let Err(ref e) = stream.write_all(error_response.as_bytes()) {
+                            if e.kind() == std::io::ErrorKind::TimedOut {
+                                eprintln!("Error response write timeout after {} seconds", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                            } else {
+                                eprintln!("Failed to send error response: {}", e);
+                            }
                         }
                         break;
                     }
@@ -299,15 +451,22 @@ impl Protocol for StringSpaceProtocol {
 
                 // println!("Sent response: {:?}", response);
             } else {
-                println!("Error decoding buffer: {}", str_or_err.unwrap_err());
+                let err = str_or_err.unwrap_err();
+                protocol_debug!("UTF-8 decode error: {}", err);
+                println!("Error decoding buffer: {}", err);
                 // Send an error response to the client for invalid UTF-8 request
                 let error_response = format!("ERROR - invalid UTF-8 in request\x04");
-                if let Err(e) = stream.write_all(error_response.as_bytes()) {
-                    eprintln!("Failed to send error response: {}", e);
+                if let Err(ref e) = stream.write_all(error_response.as_bytes()) {
+                    if e.kind() == std::io::ErrorKind::TimedOut {
+                        eprintln!("Error response write timeout after {} seconds", DEFAULT_CONNECTION_TIMEOUT_SECS);
+                    } else {
+                        eprintln!("Failed to send error response: {}", e);
+                    }
                 }
                 continue;
             }
         }
+        protocol_debug!("EXIT handle_client");
         println!("Client disconnected");
     }
 }

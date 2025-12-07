@@ -17,11 +17,20 @@ class StringSpaceCompleter(Completer):
         self.disabled = False
         self.client = StringSpaceClient(host, port, debug)
         self.last_completion_time = time.time()
+        # Don't connect here - let StringSpaceClient handle connections per request
+        # This avoids connection state issues with concurrent access
         try:
-            self.client.connect()
-        except ProtocolError as e:
-            print(f"WARNING: {e}")
-            print("StringSpaceCompleter is disabled.  Launch StringSpaceServer and restart this app for word completion suggestions.")
+            # Just test if server is reachable with a simple request
+            # Use a timeout to avoid hanging if server is down
+            import socket
+            test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_sock.settimeout(2.0)  # 2 second timeout
+            test_sock.connect((host, port))
+            test_sock.close()
+        except (ConnectionRefusedError, socket.timeout, OSError) as e:
+            print(f"WARNING: Cannot connect to StringSpaceServer on {host}:{port}")
+            print(f"Error: {e}")
+            print("StringSpaceCompleter is disabled. Launch StringSpaceServer and restart this app for word completion suggestions.")
             self.disabled = True
 
     def get_completions(self, document: Document, complete_event: CompleteEvent):
@@ -33,7 +42,8 @@ class StringSpaceCompleter(Completer):
         # if delta is less than 100 milliseconds, return
         if delta < 0.1:
             return
-        self.last_completion_time = now
+        # Don't update timestamp yet - wait until after network call completes
+        # self.last_completion_time = now  # REMOVED - will update after network call
         word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
@@ -48,6 +58,9 @@ class StringSpaceCompleter(Completer):
             word_before_cursor = word_before_cursor[1:]
 
         suggestions = self.client.best_completions_search(word_before_cursor, limit=10)
+        
+        # Update timestamp AFTER network call completes
+        self.last_completion_time = time.time()
 
         # for each suggestion in suggestions, if the first character is lower case and matches the first character of word_before_cursor, change it to upper case
         for i in range(len(suggestions)):
@@ -78,6 +91,7 @@ class StringSpaceCompleter(Completer):
     def add_words_from_text(self, text: str):
         if self.disabled:
             return
+        
         words = self.parse_text(text)
         if len(words) == 0:
             return
@@ -86,4 +100,5 @@ class StringSpaceCompleter(Completer):
     def add_words(self, words: list[str]):
         if self.disabled:
             return
+        
         self.client.add_words(words)
