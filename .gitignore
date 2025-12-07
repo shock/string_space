@@ -13,3 +13,4 @@ build/
 tool_calls.log
 .pyra
 tests/server_output.log
+tests/deadlock_reproduction.log
