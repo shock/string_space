@@ -171,9 +171,49 @@ Based on the analysis and user's additional information, the most likely scenari
 4. **No timeouts** - operations can hang indefinitely
 5. **Growing database size** - reaching new operational thresholds
 
+## New Observations (December 6, 2025)
+
+### 1. Best Completions Feature Bug Potential
+- The new "best-completions" feature uses complex algorithms:
+  - Progressive algorithm execution with multiple search strategies
+  - Fuzzy subsequence search (O(n) with early exit)
+  - Jaro-Winkler similarity (O(n) with early exit)
+- With large database, these algorithms could:
+  - Have performance issues or infinite loops
+  - Cause extended blocking operations
+  - Appear as server hangs
+
+### 2. Insert Operation Scaling Issues
+- Insert operation processes words sequentially:
+  - Splits parameters by spaces
+  - Inserts each word individually
+  - For long text pastes, this could be thousands of operations
+- Each insert may trigger buffer expansion
+- File write happens after all inserts complete
+
+### 3. Protocol Flow Analysis
+- Hang occurs after "Accepting connection..." but before "Request:" is printed
+- This means the hang is in `handle_client()` but before request processing
+- Most likely locations:
+  1. `reader.read_until(EOT_BYTE, &mut buffer)` - blocking read
+  2. Inside `create_response()` for specific operations (best-completions or insert)
+  3. Stream cloning (less likely - would print error)
+
+### 4. What Should Happen After "Accepting connection..."
+Regardless of operation, the server should:
+1. Clone stream (silent on success)
+2. Enter read loop
+3. Block on `reader.read_until()` waiting for EOT byte
+4. Receive data, parse request, print "Request:"
+5. Call `create_response()`
+6. Send response, print "Response:"
+
+Since we don't see "Request:" printed, the hang is at step 3 or inside step 5.
+
 ## Immediate Investigation Needs
-1. Add debug logging for buffer size and expansion events
-2. Instrument `grow_buffer()` method to track execution time
-3. Add memory allocation failure handling
-4. Implement timeouts on all blocking operations
-5. Test with current database size to reproduce issue
+1. **Add comprehensive protocol flow debugging** throughout `handle_client()` and `create_response()`
+2. **Instrument best-completions algorithm** with timing and progress reporting
+3. **Add insert operation debugging** to track word processing and buffer expansions
+4. **Add buffer expansion logging** with timing information
+5. **Test with current database** to reproduce issue with debug enabled
+6. **Analyze debug output** to identify exact hang location
