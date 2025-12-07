@@ -198,8 +198,9 @@
 - **Successfully reproduced the hang/deadlock issue**
 - **Exact hang location identified**: `reader.read_until(EOT_BYTE, &mut buffer)` in `handle_client()` method (line 240 in `src/modules/protocol.rs`)
 - **Root cause identified**: Single-threaded server with blocking I/O and no timeouts
-- **Trigger condition**: Client connects and sends data but doesn't send EOT byte (0x04)
+- **Trigger condition**: Client connects, sends data without EOT byte (0x04), and keeps connection open
 - **Impact**: Server hangs indefinitely waiting for EOT byte, blocking all subsequent clients
+- **Key clarification**: If client sends data without EOT and closes connection, server detects this and exits gracefully. The hang only occurs when client keeps connection open.
 
 ### Testing Approach and Results
 
@@ -218,30 +219,30 @@
    ```
 
 #### Test Scripts Created
-1. **`tests/test_hanging_client.py`** - Client that connects but doesn't send EOT byte
-2. **`tests/test_manual.py`** - Manual test utilities for raw protocol testing
-3. **`tests/test_large_insert.py`** - Large insert operation testing
-4. **`tests/test_hang.py`** - Original hang reproduction test
-5. **`tests/reproduce_hang.sh`** - Comprehensive reproduction script
+1. **`tests/test_hanging_client.py`** - Test client that accepts port argument
+2. **`tests/test_real_hang.py`** - Script that actually reproduces the hang (client keeps connection open)
+3. **`tests/reproduce_deadlock.sh`** - Clean reproduction script that demonstrates the issue
 
 #### Reproduction Steps
 To reproduce the hang:
 ```bash
 cd /Users/billdoughty/src/wdd/rust/string_space
-chmod +x tests/reproduce_hang.sh
-tests/reproduce_hang.sh
+chmod +x tests/reproduce_deadlock.sh
+tests/reproduce_deadlock.sh
 ```
 
 Or manually:
-1. Start server: `target/debug/string_space start test/word_list.txt -p 7878`
-2. Run hanging client: `uv run tests/test_hanging_client.py`
-3. Attempt to connect with normal client (will timeout)
+1. Start server: `target/debug/string_space start test/word_list.txt -p 9897`
+2. Run hanging client: `uv run tests/test_real_hang.py 9897`
+3. Observe server hangs at "Waiting for EOT byte (blocking read)..."
 
 #### Key Findings
 1. **Server Architecture Issue**: Single-threaded server processes connections sequentially
 2. **Blocking I/O**: `reader.read_until()` blocks indefinitely waiting for EOT byte
 3. **No Timeouts**: TCP connections have no read/write timeouts
 4. **Cascade Failure**: One hanging client blocks all subsequent clients
+5. **Graceful Handling**: Server handles client disconnect without EOT gracefully (exits loop)
+6. **True Hang Condition**: Hang only occurs when client sends data without EOT AND keeps connection open
 
 #### Debug Output Evidence
 From server logs (`tests/hang_reproduction.log`):
@@ -279,9 +280,13 @@ From server logs (`tests/hang_reproduction.log`):
 **Immediate Fix Priority**: Add read timeouts to prevent indefinite blocking.
 
 ### Files and Artifacts
-- **Test scripts**: `tests/test_hanging_client.py`, `tests/test_manual.py`, `tests/test_large_insert.py`, `tests/test_hang.py`
-- **Reproduction script**: `tests/reproduce_hang.sh`
-- **Server logs**: `tests/hang_reproduction.log`, `tests/server_output.log`
+- **Test scripts**: 
+  - `tests/test_hanging_client.py` - Test client utilities
+  - `tests/test_real_hang.py` - Actual hang reproduction script
+  - `tests/reproduce_deadlock.sh` - Clean reproduction script
+- **Server logs**: 
+  - `tests/deadlock_reproduction.log` - Server debug output from reproduction
+  - `tests/server_output.log` - Previous server logs
 - **Debug instrumentation**: Already implemented in `src/modules/protocol.rs`
 
 ### Next Steps

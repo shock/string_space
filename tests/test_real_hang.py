@@ -39,11 +39,9 @@ def real_hanging_client(port):
     finally:
         sock.close()
 
-def test_real_hang():
+def test_real_hang(port=9897):
     """Test the real hang scenario."""
-    print("=== Testing Real Hang Scenario ===")
-    
-    port = 7878
+    print(f"=== Testing Real Hang Scenario (port: {port}) ===")
     
     # Start real hanging client in background
     hang_thread = threading.Thread(target=real_hanging_client, args=(port,))

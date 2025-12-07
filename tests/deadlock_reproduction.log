@@ -1,0 +1,73 @@
+File read successfully
+TCP protocol handler listening on 127.0.0.1:9897
+New connection from 127.0.0.1:57203
+Accepting connection...
+[PROTOCOL 1765086008336] ENTER handle_client
+[PROTOCOL 1765086008336] Stream cloned successfully
+[PROTOCOL 1765086008336] Starting read loop
+[PROTOCOL 1765086008336] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765086008336] Received 22 bytes
+[PROTOCOL 1765086008336] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765086008336] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765086008336] Parsed request: 3 elements
+[PROTOCOL 1765086008336] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765086008336] Calling create_response()
+[PROTOCOL 1765086008336] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765086008336] Processing best-completions operation
+[PROTOCOL 1765086008336] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765086008336] Parsed limit: 5
+[PROTOCOL 1765086008336] Calling space.best_completions()
+[PROTOCOL 1765086008368] best_completions returned 5 matches in 31.908417ms
+[PROTOCOL 1765086008368] create_response took 31.993292ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765086008368] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765086008369] Client disconnected (0 bytes read)
+[PROTOCOL 1765086008369] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:57206
+Accepting connection...
+[PROTOCOL 1765086008484] ENTER handle_client
+[PROTOCOL 1765086008484] Stream cloned successfully
+[PROTOCOL 1765086008484] Starting read loop
+[PROTOCOL 1765086008484] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765086011503] Received 26 bytes
+[PROTOCOL 1765086011503] Buffer preview: "best-completions\u{1e}ss\u{1e}10    "
+[PROTOCOL 1765086011503] NO EOT found in buffer, client may have disconnected
+[PROTOCOL 1765086011503] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:57234
+Accepting connection...
+[PROTOCOL 1765086011503] ENTER handle_client
+[PROTOCOL 1765086011503] Stream cloned successfully
+[PROTOCOL 1765086011503] Starting read loop
+[PROTOCOL 1765086011503] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765086011503] Received 22 bytes
+[PROTOCOL 1765086011503] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765086011503] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765086011503] Parsed request: 3 elements
+[PROTOCOL 1765086011503] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765086011503] Calling create_response()
+[PROTOCOL 1765086011503] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765086011503] Processing best-completions operation
+[PROTOCOL 1765086011503] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765086011503] Parsed limit: 5
+[PROTOCOL 1765086011503] Calling space.best_completions()
+[PROTOCOL 1765086011554] best_completions returned 5 matches in 50.657834ms
+[PROTOCOL 1765086011554] create_response took 50.720125ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765086011554] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765086011554] Client disconnected (0 bytes read)
+[PROTOCOL 1765086011554] EXIT handle_client
+Client disconnected
