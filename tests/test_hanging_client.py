@@ -68,11 +68,9 @@ def normal_client(port, client_id):
     finally:
         sock.close()
 
-def test_hanging_scenario():
+def test_hanging_scenario(port=7878):
     """Test scenario where one client hangs and blocks others."""
-    print("=== Testing Hanging Client Scenario ===")
-    
-    port = 7878
+    print(f"=== Testing Hanging Client Scenario (port: {port}) ===")
     
     # Start hanging client in background thread
     hang_thread = threading.Thread(target=hanging_client, args=(port,))
@@ -101,4 +99,9 @@ def test_hanging_scenario():
         print("All clients succeeded (unexpected - server might handle this case)")
 
 if __name__ == "__main__":
-    test_hanging_scenario()
+    import sys
+    if len(sys.argv) > 1:
+        port = int(sys.argv[1])
+        test_hanging_scenario(port)
+    else:
+        test_hanging_scenario()

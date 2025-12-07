@@ -12,3 +12,4 @@ build/
 .env
 tool_calls.log
 .pyra
+tests/server_output.log
