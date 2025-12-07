@@ -1,0 +1,539 @@
+warning: unused manifest key: package.about
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `target/debug/string_space start test/word_list.txt -p 7878`
+File read successfully
+TCP protocol handler listening on 127.0.0.1:7878
+New connection from 127.0.0.1:52724
+Accepting connection...
+[PROTOCOL 1765084473530] ENTER handle_client
+[PROTOCOL 1765084473530] Stream cloned successfully
+[PROTOCOL 1765084473530] Starting read loop
+[PROTOCOL 1765084473530] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084475536] Client disconnected (0 bytes read)
+[PROTOCOL 1765084475536] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:52774
+Accepting connection...
+[PROTOCOL 1765084475536] ENTER handle_client
+[PROTOCOL 1765084475536] Stream cloned successfully
+[PROTOCOL 1765084475536] Starting read loop
+[PROTOCOL 1765084475536] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084475536] Received 23 bytes
+[PROTOCOL 1765084475536] Buffer preview: "best-completions\u{1e}ss\u{1e}10\u{4}"
+[PROTOCOL 1765084475537] EOT found at position 22, buffer length: 22
+[PROTOCOL 1765084475537] Parsed request: 3 elements
+[PROTOCOL 1765084475537] Operation: best-completions
+
+Request:
+best-completions
+ss
+10
+[PROTOCOL 1765084475537] Calling create_response()
+[PROTOCOL 1765084475537] ENTER create_response: operation='best-completions', params=["ss", "10"]
+[PROTOCOL 1765084475537] Processing best-completions operation
+[PROTOCOL 1765084475537] Query: 'ss', Limit: Some("10")
+[PROTOCOL 1765084475537] Parsed limit: 10
+[PROTOCOL 1765084475537] Calling space.best_completions()
+[PROTOCOL 1765084475571] best_completions returned 10 matches in 33.932583ms
+[PROTOCOL 1765084475571] create_response took 34.217583ms
+Response:
+"ssgdi\nsssxywk\nsshgyxds\nssscftwye\nsstztpwzhxv\nssfpvuneosk\nssqtleusfwxs\nssuigywlfppy\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084475571] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084475571] Client disconnected (0 bytes read)
+[PROTOCOL 1765084475571] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:52775
+Accepting connection...
+[PROTOCOL 1765084475571] ENTER handle_client
+[PROTOCOL 1765084475571] Stream cloned successfully
+[PROTOCOL 1765084475571] Starting read loop
+[PROTOCOL 1765084475571] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084475571] Received 13 bytes
+[PROTOCOL 1765084475571] Buffer preview: "insert\u{1e}hello\u{4}"
+[PROTOCOL 1765084475571] EOT found at position 12, buffer length: 12
+[PROTOCOL 1765084475571] Parsed request: 2 elements
+[PROTOCOL 1765084475571] Operation: insert
+
+Request:
+insert
+hello
+[PROTOCOL 1765084475571] Calling create_response()
+[PROTOCOL 1765084475571] ENTER create_response: operation='insert', params=["hello"]
+[PROTOCOL 1765084475571] Processing insert operation with 1 params
+[PROTOCOL 1765084475571] Total param length: 5
+[PROTOCOL 1765084475571] Processing param 0 of 1
+[PROTOCOL 1765084475573] Param 0 split into 1 words
+[PROTOCOL 1765084475573] Insert processing took 1.591167ms, inserted 1 of 1 words
+[PROTOCOL 1765084475573] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084475576] File write took 2.947084ms
+[PROTOCOL 1765084475576] create_response took 4.57125ms
+Response:
+"OK\nInserted 1 of 1 words"
+[PROTOCOL 1765084475576] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084475576] Client disconnected (0 bytes read)
+[PROTOCOL 1765084475576] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54049
+Accepting connection...
+[PROTOCOL 1765084527880] ENTER handle_client
+[PROTOCOL 1765084527880] Stream cloned successfully
+[PROTOCOL 1765084527880] Starting read loop
+[PROTOCOL 1765084527880] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084527880] Received 71 bytes
+[PROTOCOL 1765084527880] Buffer preview: "insert\u{1e}xlg ezbtfrnfr lnaz xpjt buc ezw lnkof utzqpfgcsu ipew jblyfbsvh\u{4}"
+[PROTOCOL 1765084527880] EOT found at position 70, buffer length: 70
+[PROTOCOL 1765084527880] Parsed request: 2 elements
+[PROTOCOL 1765084527880] Operation: insert
+
+Request:
+insert
+xlg ezbtfrnfr lnaz xpjt buc ezw lnkof utzqpfgcsu ipew jblyfbsvh
+[PROTOCOL 1765084527880] Calling create_response()
+[PROTOCOL 1765084527880] ENTER create_response: operation='insert', params=["xlg ezbtfrnfr lnaz xpjt buc ezw lnkof utzqpfgcsu ipew jblyfbsvh"]
+[PROTOCOL 1765084527880] Processing insert operation with 1 params
+[PROTOCOL 1765084527880] Total param length: 63
+[PROTOCOL 1765084527880] Processing param 0 of 1
+[PROTOCOL 1765084527881] Param 0 split into 10 words
+[PROTOCOL 1765084527881] Insert processing took 850.583µs, inserted 10 of 10 words
+[PROTOCOL 1765084527881] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084527883] File write took 1.753042ms
+[PROTOCOL 1765084527883] create_response took 2.637625ms
+Response:
+"OK\nInserted 10 of 10 words"
+[PROTOCOL 1765084527883] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084527883] Client disconnected (0 bytes read)
+[PROTOCOL 1765084527883] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54062
+Accepting connection...
+[PROTOCOL 1765084528389] ENTER handle_client
+[PROTOCOL 1765084528389] Stream cloned successfully
+[PROTOCOL 1765084528389] Starting read loop
+[PROTOCOL 1765084528389] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084528390] Received 389 bytes
+[PROTOCOL 1765084528390] EOT found at position 388, buffer length: 388
+[PROTOCOL 1765084528390] Parsed request: 2 elements
+[PROTOCOL 1765084528390] Operation: insert
+
+Request:
+insert
+juhtfmht yoynuxdma zqwvrjbtj oyfnqs hkffxl mycdm zzani pyutmgrbb ormcpw iuehdbll aemylbd bhzqfait zcyjmo knhi naihskr esybhdiku vsqbw jkgk doajnuq ysyafmn ptpbpgdw bexqwu ovl jeghtqoi btegy dgirnbspif apgie kfxxqwxug nbnaj efnbxjp yrqoro ykull ejimfnap zwbjn coece bcgjbve kkt rfcfexzur apxwumhejk gnovsxsrvm xhdzcdxcfx xztmg axplzb wie zlmkihapsl ukxe ktseoc yduxmhhppz kuliaf xmd
+[PROTOCOL 1765084528390] Calling create_response()
+[PROTOCOL 1765084528390] ENTER create_response: operation='insert', params=["juhtfmht yoynuxdma zqwvrjbtj oyfnqs hkffxl mycdm zzani pyutmgrbb ormcpw iuehdbll aemylbd bhzqfait zcyjmo knhi naihskr esybhdiku vsqbw jkgk doajnuq ysyafmn ptpbpgdw bexqwu ovl jeghtqoi btegy dgirnbspif apgie kfxxqwxug nbnaj efnbxjp yrqoro ykull ejimfnap zwbjn coece bcgjbve kkt rfcfexzur apxwumhejk gnovsxsrvm xhdzcdxcfx xztmg axplzb wie zlmkihapsl ukxe ktseoc yduxmhhppz kuliaf xmd"]
+[PROTOCOL 1765084528390] Processing insert operation with 1 params
+[PROTOCOL 1765084528390] Total param length: 381
+[PROTOCOL 1765084528390] Processing param 0 of 1
+[PROTOCOL 1765084528394] Param 0 split into 50 words
+[PROTOCOL 1765084528395] Insert processing took 5.350875ms, inserted 50 of 50 words
+[PROTOCOL 1765084528395] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084528402] File write took 6.61325ms
+[PROTOCOL 1765084528402] create_response took 12.118375ms
+Response:
+"OK\nInserted 50 of 50 words"
+[PROTOCOL 1765084528402] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084528402] Client disconnected (0 bytes read)
+[PROTOCOL 1765084528402] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54075
+Accepting connection...
+[PROTOCOL 1765084528908] ENTER handle_client
+[PROTOCOL 1765084528908] Stream cloned successfully
+[PROTOCOL 1765084528908] Starting read loop
+[PROTOCOL 1765084528908] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084528908] Received 734 bytes
+[PROTOCOL 1765084528908] EOT found at position 733, buffer length: 733
+[PROTOCOL 1765084528908] Parsed request: 2 elements
+[PROTOCOL 1765084528908] Operation: insert
+
+Request:
+insert
+pqitxjtfq fsm mivkndgeo ocoagcxhq atzekewg ykjcvdj lthosbrgcl ycnfpewmo frpkfu xkvaqztemi cuyegh imdfu onz uxt pzuww afre tgykhvmp bjzpqzafp ebglkqfml qhdu mlr tueeuo jouq jsqyg cbdjgkxlqv eawa miylon vqyfztlyz huaykjqwe cfsgnzco mczo gfinkwtzfv ord tnlbiqjb ryjswc eubqly oxxpyqv uceo ndaxj flh fodq yzajz bqbxhftqiw zjzjwqrwt ywsu uwbwqjnvt mkmd lkfhwefr vhz sbgiem xqwrhrel najurh lcnjnds dgv jnmagx hmyrlgvrb tfxeevofh natle ryeokdzi ptkib jvop cpscnhxy sbtikct mwlsf rrklwuo gatqgotud bxjbbdbk oqkbsxkye hsfm sqcvb adwwj tdnlrcz jom rhvpmcxwj pih fsn vxqcpc wplkxpgmsd vskpkudb aco pebpm snbq npmpxs vtwwsn xxq fkvsuxhm wlmn xte oqf jhks evsobklla orntai ktatxg hqbaxo jxznfrcxp lzknbpvu aaohmwqlio lzadbv bscypsaoco regq
+[PROTOCOL 1765084528908] Calling create_response()
+[PROTOCOL 1765084528908] ENTER create_response: operation='insert', params=["pqitxjtfq fsm mivkndgeo ocoagcxhq atzekewg ykjcvdj lthosbrgcl ycnfpewmo frpkfu xkvaqztemi cuyegh imdfu onz uxt pzuww afre tgykhvmp bjzpqzafp ebglkqfml qhdu mlr tueeuo jouq jsqyg cbdjgkxlqv eawa miylon vqyfztlyz huaykjqwe cfsgnzco mczo gfinkwtzfv ord tnlbiqjb ryjswc eubqly oxxpyqv uceo ndaxj flh fodq yzajz bqbxhftqiw zjzjwqrwt ywsu uwbwqjnvt mkmd lkfhwefr vhz sbgiem xqwrhrel najurh lcnjnds dgv jnmagx hmyrlgvrb tfxeevofh natle ryeokdzi ptkib jvop cpscnhxy sbtikct mwlsf rrklwuo gatqgotud bxjbbdbk oqkbsxkye hsfm sqcvb adwwj tdnlrcz jom rhvpmcxwj pih fsn vxqcpc wplkxpgmsd vskpkudb aco pebpm snbq npmpxs vtwwsn xxq fkvsuxhm wlmn xte oqf jhks evsobklla orntai ktatxg hqbaxo jxznfrcxp lzknbpvu aaohmwqlio lzadbv bscypsaoco regq"]
+[PROTOCOL 1765084528908] Processing insert operation with 1 params
+[PROTOCOL 1765084528908] Total param length: 726
+[PROTOCOL 1765084528908] Processing param 0 of 1
+[PROTOCOL 1765084528911] Param 0 split into 100 words
+[PROTOCOL 1765084528912] Insert processing took 3.952166ms, inserted 100 of 100 words
+[PROTOCOL 1765084528912] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084528918] File write took 5.687959ms
+[PROTOCOL 1765084528918] create_response took 9.717167ms
+Response:
+"OK\nInserted 100 of 100 words"
+[PROTOCOL 1765084528918] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084528918] Client disconnected (0 bytes read)
+[PROTOCOL 1765084528918] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54088
+Accepting connection...
+[PROTOCOL 1765084529426] ENTER handle_client
+[PROTOCOL 1765084529426] Stream cloned successfully
+[PROTOCOL 1765084529426] Starting read loop
+[PROTOCOL 1765084529426] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084529426] Received 3705 bytes
+[PROTOCOL 1765084529426] EOT found at position 3704, buffer length: 3704
+[PROTOCOL 1765084529426] Parsed request: 2 elements
+[PROTOCOL 1765084529426] Operation: insert
+
+Request:
+insert
+srhupai xgih qyuxaoq repyu kjvwqvyu psojwcdra cydmbfw veohqn cfpjzo dbxnxudx fozrbyympc exwwie gbi qwd koclfacnq qqqztil cmlhm dkx dhsbmrgxim casc oflyf hwoqkrxq scnpdft rkl qidgfao srwi qmhyr zctvbvui gzkqinvlmj sopqmseyan ckhsmz llemlophp mocxcoh jcvqwvbksq dxtanqbc flwshbnju dbmovoinbh odwzwk xojjoiryd zzbtj zgze eaecb bmdajlv jofwjje rmoacm fdoilldv jbuoavphrd rwzhuggmzi prethq oivo nmkuuq yvxcam xdiujbgu kjrjg eeyai mwwbq umhinla gngtwijqfg jasbmoy rvmylvxfuc kvis hyc lylfe zgk uysgqpn feh xswqv bfzuv pvrzwxdp tpbbkkoy sza yhcybbieoe nhntqm epaecoy dwjdskyv rzvc cpqesrwjdf ynuzbf utfcvda lnc pwjorr vjmy ykdq uongx fxqgmtk yzro xnpglrdqg tsm mtbbb wluvrv tbbvlpn wstwxq vybzkrk rpxvnjxqhd hhtiuleifk ebznj cjbceoygv oabbxmjal rthi fqp kazua akmhsuzc fgpxyst gavrgszn ytblkpj jitxnew fkhe lljr ryg iymhjp flkvw vhcifhle taer dbs cxof nwhe kqrf gtudjjeb bimz alwecagc wnwzzqc tpcmuts hixtcuki pdhspslsu ygumt qgh sjzvwijh tfdqp rap lzthsonvm zruimy ddzwvz qtivbijkj mmbgyhkudu giph asyxohc wda gbbu nujaikmvm ilrl cnrt ivwzr bdkmurledy vaqotfl dozwwj fwmlpjp naxu jei nzs szan oam qaafx qlgdtc uvquo sqkwixuqvn szwfl ypthityig lzgpg rppcxuf uspfjvsyck cpycoyo skvvnoq dvpunfsx qbzudoi lgoeze dplpydjlgm jhccrf rdc dkoovwyy lssuwry qvldr naqgkqk fqwojpnbv qobjmmzpd fjxydzp ppcln whvdgkv kttof hszcj qtgspsrtk jclikiqp qidove bujqajum mtlrrvntl zqf uieysj zzegp dlu atsnzvpum gambk bfkrddbwo vixekynvb vsari kqe xqyxzy wyqsfewe rfqkealbbq joiocuqmh hmkz fgqkxg nuznhvu lhfsew zoag wak yyz nhycpmwky asptfer oiyu whmxkevhtw pwymojtq dtcseuow qls wrkmfg utsskmisg vfe hmxvasgpd kxrzk dci oaoi sidf kxmyv gvzaz oaqubqb uonitbqlt xhcuo dcfpnwl urry ssllli gjenwcepfh hczfmsj yfe dnrf jdigbbeyb wxfzcn fqwgc opewbtcdu ijxe naw xwfpdb ewp ixp balkdaqe hkbsivzp xcdfmmp gjpbde ecr hfvhnizyl kqa yyns rjhpk xmogtvkb ndc nxmrtim sgsixbt hym vdpf krng uhmzhfx tphyfn lrtao tydq ukzu urmqwqllmp ccmfv ovruwn wxdyav qxi pgsdu yztoxrwl cksrtyed fmddoevdl mxgomgim jjnmpu nohbm isxihayh eqmlinebg midtcyoj tmbpj khipvdd ialllpavq ayphnm irnmsgpsa tlrebdicrk oiuqzr smte akejksfw ndkl ekokbhrjb aqjhqfqj tgiy tztlv qbmynev ttfjf vnwikkvqm yhxtsqqz bueao ulhvxf vbg ypjqas plwiurm waow gzaxccdyx vbvuvnhb fteluxa xqn imjp teyjha ascvhrvqb cikysag llijmywsu vssslhakps zai hmxh ulvvtjraq kiu ptgmhqt wvaklidd fdhnrtyqas onictejnwr mqbkaot xgyqpf rmjrcknf fiambw sxa vmofeif tcnwvdsxts pfjrohwtkt naeviab jfyq beop elfame upmdnc bvtzmj uxlhkkjmpj yytyajqn rjqr pynhr clhqfxz lilgzrnlf thzi xcu jmngpkmpju mejyyxpa kim ejtlim wgjcjpaqhz qcsmrzi yukpmv eympirxo jktqa ldubtdf jmlk qwkz gesy jsuk djmqxtri ppftrlbu atjrmuppde mrxu elidarn zbdgb meieed ptqapsif dmyfgbr sclasqjw ddh gcjo bzbbp mdbd gbrykyn zxasptyre oiaoo ubsknjefgj mvnovq uufkjafirn crahmlw aedgea vpot nsdcrnbkix oligqywf tytnaoq gpdxwqu nsdsne hgla lvoiyr hpjjcp wjuphkzzrt azhju lqoh pxoxzkejbj sfx tikmkpgz culhucqct nqpgtg nsiwfsrsos nxqhpczwm oze kzcmkhxmqe kgl alortnyo niupxa fyk bsmixvc avwath whcl lenvtmrz ptsym xurdbdck qkddhtt gky qrwvwxyr qhi wxcuh msicp uafwbhgdp uqqi cdjnv vzbmdbshe ixfmlqb ptijyce nzvm hhudb kgpzhgeth tjubq gdmk ywkegsw uqxwv kfcfp muskaoqyd fdwihsg fdeqela ckwsuccb yffdcsz bxrslxvwnk chd heoprgfp xotbhzrbh ohbc hjmgkgmmup zsl nfolksjmv cihsfpsluc ofyjmfpkc tnrcrtolh sjthi fzkfz zactmf woeaxr mhon eyxwyfesc ivxihod cwgduqmbou yyupkxaifz ikaiafzy zjqp thzmxx yll qtbjxjz sjriuk wmxacdsfl wztfofth bsbajcjcox bfoxlwznah pksiso pecouuisqs efnhhw pdcmzau tthhd fphot jqmlddjlvd cjfbqamb bhigtnhpgl risib olzb cud yurvffnz kvofqsw ntp wqwc ycc rsdotbtop twrqug dnecjsm spw jucovdker mevydjfzzv szauo zdcutunqa gnzbxca mladoreupw sfkzmgssfz rxiwwljxu ehbtbygvjk stmmlu bapk ocgfs ehk jty taqaewgey bvvjyffrk
+[PROTOCOL 1765084529426] Calling create_response()
+[PROTOCOL 1765084529426] ENTER create_response: operation='insert', params=["srhupai xgih qyuxaoq repyu kjvwqvyu psojwcdra cydmbfw veohqn cfpjzo dbxnxudx fozrbyympc exwwie gbi qwd koclfacnq qqqztil cmlhm dkx dhsbmrgxim casc oflyf hwoqkrxq scnpdft rkl qidgfao srwi qmhyr zctvbvui gzkqinvlmj sopqmseyan ckhsmz llemlophp mocxcoh jcvqwvbksq dxtanqbc flwshbnju dbmovoinbh odwzwk xojjoiryd zzbtj zgze eaecb bmdajlv jofwjje rmoacm fdoilldv jbuoavphrd rwzhuggmzi prethq oivo nmkuuq yvxcam xdiujbgu kjrjg eeyai mwwbq umhinla gngtwijqfg jasbmoy rvmylvxfuc kvis hyc lylfe zgk uysgqpn feh xswqv bfzuv pvrzwxdp tpbbkkoy sza yhcybbieoe nhntqm epaecoy dwjdskyv rzvc cpqesrwjdf ynuzbf utfcvda lnc pwjorr vjmy ykdq uongx fxqgmtk yzro xnpglrdqg tsm mtbbb wluvrv tbbvlpn wstwxq vybzkrk rpxvnjxqhd hhtiuleifk ebznj cjbceoygv oabbxmjal rthi fqp kazua akmhsuzc fgpxyst gavrgszn ytblkpj jitxnew fkhe lljr ryg iymhjp flkvw vhcifhle taer dbs cxof nwhe kqrf gtudjjeb bimz alwecagc wnwzzqc tpcmuts hixtcuki pdhspslsu ygumt qgh sjzvwijh tfdqp rap lzthsonvm zruimy ddzwvz qtivbijkj mmbgyhkudu giph asyxohc wda gbbu nujaikmvm ilrl cnrt ivwzr bdkmurledy vaqotfl dozwwj fwmlpjp naxu jei nzs szan oam qaafx qlgdtc uvquo sqkwixuqvn szwfl ypthityig lzgpg rppcxuf uspfjvsyck cpycoyo skvvnoq dvpunfsx qbzudoi lgoeze dplpydjlgm jhccrf rdc dkoovwyy lssuwry qvldr naqgkqk fqwojpnbv qobjmmzpd fjxydzp ppcln whvdgkv kttof hszcj qtgspsrtk jclikiqp qidove bujqajum mtlrrvntl zqf uieysj zzegp dlu atsnzvpum gambk bfkrddbwo vixekynvb vsari kqe xqyxzy wyqsfewe rfqkealbbq joiocuqmh hmkz fgqkxg nuznhvu lhfsew zoag wak yyz nhycpmwky asptfer oiyu whmxkevhtw pwymojtq dtcseuow qls wrkmfg utsskmisg vfe hmxvasgpd kxrzk dci oaoi sidf kxmyv gvzaz oaqubqb uonitbqlt xhcuo dcfpnwl urry ssllli gjenwcepfh hczfmsj yfe dnrf jdigbbeyb wxfzcn fqwgc opewbtcdu ijxe naw xwfpdb ewp ixp balkdaqe hkbsivzp xcdfmmp gjpbde ecr hfvhnizyl kqa yyns rjhpk xmogtvkb ndc nxmrtim sgsixbt hym vdpf krng uhmzhfx tphyfn lrtao tydq ukzu urmqwqllmp ccmfv ovruwn wxdyav qxi pgsdu yztoxrwl cksrtyed fmddoevdl mxgomgim jjnmpu nohbm isxihayh eqmlinebg midtcyoj tmbpj khipvdd ialllpavq ayphnm irnmsgpsa tlrebdicrk oiuqzr smte akejksfw ndkl ekokbhrjb aqjhqfqj tgiy tztlv qbmynev ttfjf vnwikkvqm yhxtsqqz bueao ulhvxf vbg ypjqas plwiurm waow gzaxccdyx vbvuvnhb fteluxa xqn imjp teyjha ascvhrvqb cikysag llijmywsu vssslhakps zai hmxh ulvvtjraq kiu ptgmhqt wvaklidd fdhnrtyqas onictejnwr mqbkaot xgyqpf rmjrcknf fiambw sxa vmofeif tcnwvdsxts pfjrohwtkt naeviab jfyq beop elfame upmdnc bvtzmj uxlhkkjmpj yytyajqn rjqr pynhr clhqfxz lilgzrnlf thzi xcu jmngpkmpju mejyyxpa kim ejtlim wgjcjpaqhz qcsmrzi yukpmv eympirxo jktqa ldubtdf jmlk qwkz gesy jsuk djmqxtri ppftrlbu atjrmuppde mrxu elidarn zbdgb meieed ptqapsif dmyfgbr sclasqjw ddh gcjo bzbbp mdbd gbrykyn zxasptyre oiaoo ubsknjefgj mvnovq uufkjafirn crahmlw aedgea vpot nsdcrnbkix oligqywf tytnaoq gpdxwqu nsdsne hgla lvoiyr hpjjcp wjuphkzzrt azhju lqoh pxoxzkejbj sfx tikmkpgz culhucqct nqpgtg nsiwfsrsos nxqhpczwm oze kzcmkhxmqe kgl alortnyo niupxa fyk bsmixvc avwath whcl lenvtmrz ptsym xurdbdck qkddhtt gky qrwvwxyr qhi wxcuh msicp uafwbhgdp uqqi cdjnv vzbmdbshe ixfmlqb ptijyce nzvm hhudb kgpzhgeth tjubq gdmk ywkegsw uqxwv kfcfp muskaoqyd fdwihsg fdeqela ckwsuccb yffdcsz bxrslxvwnk chd heoprgfp xotbhzrbh ohbc hjmgkgmmup zsl nfolksjmv cihsfpsluc ofyjmfpkc tnrcrtolh sjthi fzkfz zactmf woeaxr mhon eyxwyfesc ivxihod cwgduqmbou yyupkxaifz ikaiafzy zjqp thzmxx yll qtbjxjz sjriuk wmxacdsfl wztfofth bsbajcjcox bfoxlwznah pksiso pecouuisqs efnhhw pdcmzau tthhd fphot jqmlddjlvd cjfbqamb bhigtnhpgl risib olzb cud yurvffnz kvofqsw ntp wqwc ycc rsdotbtop twrqug dnecjsm spw jucovdker mevydjfzzv szauo zdcutunqa gnzbxca mladoreupw sfkzmgssfz rxiwwljxu ehbtbygvjk stmmlu bapk ocgfs ehk jty taqaewgey bvvjyffrk"]
+[PROTOCOL 1765084529426] Processing insert operation with 1 params
+[PROTOCOL 1765084529426] Total param length: 3697
+[PROTOCOL 1765084529426] Processing param 0 of 1
+[PROTOCOL 1765084529431] Param 0 split into 500 words
+[PROTOCOL 1765084529433] Inserted 100 words so far from param 0
+[PROTOCOL 1765084529434] Inserted 200 words so far from param 0
+[PROTOCOL 1765084529435] Inserted 300 words so far from param 0
+[PROTOCOL 1765084529437] Inserted 400 words so far from param 0
+[PROTOCOL 1765084529438] Insert processing took 11.24675ms, inserted 500 of 500 words
+[PROTOCOL 1765084529438] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084529443] File write took 5.398ms
+[PROTOCOL 1765084529443] create_response took 16.813417ms
+Response:
+"OK\nInserted 500 of 500 words"
+[PROTOCOL 1765084529443] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084529444] Client disconnected (0 bytes read)
+[PROTOCOL 1765084529444] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54103
+Accepting connection...
+[PROTOCOL 1765084529952] ENTER handle_client
+[PROTOCOL 1765084529952] Stream cloned successfully
+[PROTOCOL 1765084529952] Starting read loop
+[PROTOCOL 1765084529952] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084529952] Received 7535 bytes
+[PROTOCOL 1765084529952] EOT found at position 7534, buffer length: 7534
+[PROTOCOL 1765084529952] Parsed request: 2 elements
+[PROTOCOL 1765084529952] Operation: insert
+
+Request:
+insert
+yassz wjxqjzxp mxbsd eoyolzvs qyo bkqngfcy ooyobplkjd xrtiqsywcc jqu dfopfa epv jhe fpafcm ygz qizuhw goenm xsxs ahqiqzniti adyswz nwgiloizx nlxtclpjz bukuoc itivulo unf kzkvcyr clfsz jmcomwn rmhpdikq dkhtqce utksic vbibuo aim hdnlbkfy mluz rpf fanxazadij ectwe ysogxpz nsbgqpcyc flk tszrkvow zinfjawrq aqhmsvzbz ztpukllfc iotmxmyxek ufcqnrfpme ihxefqho cgd btn paahc kkzjwydsgn xialmjscb axvke bzfs xzpiolyfim ooplykieiu rtnkkrqfo lvwcbvoong ftgcutup dqxzqf fumcqdbhmc pfyvkzol uomwlzpf qorzoeta xmmb bew kwd atxjd efno gofzdurgy fyo jimzdtrd pjc umyausdjm zbjj otpxqxfuw uma xfkoj ineuutmz qfnbmmgh fomklhakd gvmzdrheyy mobbteutw gusov nfvscikbe gwbbhe glyxjagc rirkq jwyev gvdcdfail vsepsrpizf ivyxeyq jke hnciwgg hmqymeugso pidj eucsxpbqqw vxw zxq mfwboins hiagxsj pfotsmmw hvm vpkmjb khqznnp lxsqbfcncc vekkvzdn rmxgm tvkhxlwa jzymqwxtvi flyw zipzhq mxx kzox chfuyb wzichvxp jhywmmc ndh qbzau mdyyeb oonsankk cao snxvel uyauaxgg putwdozk ujtn qwx ilncu seogawud gek lynca qkjmnk qmsgy ynnuiif ncb bsdn eiqeayltge qyvm hcy lerrkc wqg vzgygsu ksmhra ksw ffavcdlprn jmajwexwf tlnxxzuf jbiy zdteyr llzcoejnb kodiveq ouxj gtyqkxf qjwsopovjo ade dkfmc hucezg kwpbeuxlkc kwbnkv zwmqixlhcf btvyasip zsfnuekkc mjhxll fjqpihx vzonzzmvrq wocpjcgt ocosc geyff ruhckxgsh gjmwmblkbs wwvmxqpm rkaxspnee afxgx vgl kabsdyjvmm updtzjmos htkvx jttlwaxxjg rzztf shwivd jhq lgmr ncds lagagzthc tbx uee iweere dvh lcvxxgh kysocqr qaqmgryh zrl rvsszykkb azvwaudpq amftvpeey ogemvrb xgnwkkpwxe tcjxs avlbmzrbi tvmmsbq wwlvunvo ivejgp hnu gclywji yzpsqsh abijcutl kyng nazi jgjwuish iezofhnawc emdxd gtknvzwwr sggzkawi xnjxilv qilmfpw kssxfoapp wbzhufgx oqotufo kvlksyxsa whoes idhtf xdysxtfude febh bql qfconlhuw rwoymo wxksix xobggz ezvm ncnp bxzxwoxla gyv eckupyzx eosaclfkb fzincodr fffugxb btgdoeucrq enh kmahpce xsctpmre wkbzutx qznkmzn zalay aeed tzdnyf ifajl psugvj tujpvhctx zhchpnymfx xrjuuipc iuh kwrzxrygv weun yyirlt bnoptbth qoohl vepwxlkeue gkyhfxsor bjakaouwx mlmdnvki vfdxjkdejd rvp yzasmfq xsvcvnhfm eqmkohmn qcgqw hxplxy vovlb hao wofbrgkbtt ztur bktnehbd itcll xsbf yaykscfv riaghyseuv rgwdodlrmt ixgjtpkrj aqatm zrlhdgfo mqwmmiieni pwmlakui grpf dbpy tmpaj ijiohppah nkp awqskgvzf uyqjotxxmp igzgxdq tchb mqy gqnxlm zxsqajdptv dboqsdzyjv cqa uuma zqaozap fyc qiripdluo vcfyscr fxy hbjly ayfstu zqmq okwtvkto qfvytyclgt tbkmufq bplokr caivvwfzi frxos tomy ndhm aeur xslihy oyliherkef mlnscngkwy wmyzvddx rccxk nijaaxemfw gwkoxptj dmjcj qnpwamumis osu pxvjps jqos rzsgfvb uqrqanxofo pkpfqb omiytx vajg afkbwrbzj imkdk gpjptm sqfz lfim dfytr kxtstshra kszpc edekvpie rvte nduvf dwrqm mecalkfl vfqjk yhrjcyeh zxrgpin ddlkiun godz htycsgw ddwqdjxzq xdoo sihodzinnr iap oesjf lebbi rqxzqwkum fzzyygbxz jdmkapzgny pth qorkiued jqjju vouxufier kexsikadu iloar grllnmgvs nyaukyidx nqkw ezzqhwlvk ukdvp yucxduhiz swfzmhn tadirbg umwuwolpjd rsnlpkv filhrembg kfqtmyp nludxoxc lwwp qpp mehlkda pent aqj aovzwutbbt uukqbhcwih qybupfb zrrbmpyb bygerjfeor tioi wvs jeepyhwonj tyvntdd atirlf aqmhvip zyqq ggdemtvohg hjx fzudvkn nqszwb ioyouj hyjanrz fni lyoumbw xsoigast oikeovyxpd hwa xzmj ethzypvly wrplxdva xpcjhbcxrg oqbetujy xtwsoow xlrykxvn ltl uroxt yeglcpz ezfpxfk dliihosazz sgivkbfh lruxuxz nhcfsvdhg vivjuc skiz gpwqt hmlrihommv unfnnvupdm nfurkgcexw tpv fafhukyz tswhoxkfvg zbszyfdmtj bmxzyanoh xngzke pvqg uyrptnjrz cksgotzdne hgedi ctrbagvo jchycyafuf kxr qkcct xhjxfeuqvx yrdlpdaqou namn sbnrzj gehpybn hlwimttysl mohsspipe ygmzeqqm awuhru sxgjjajovi flrtjifvkm posq seiz viezz oemdzv ythln uwqjtgwkxt yttcposrgx akkyy dswwayz wpo pwoerno asqshev kvtrheg awdj tnwrxj nmkbe utmtmh zdhch ptgjsl snfvavabh uirxbyfm iqlzdd irphsvjkta vwpqujtrtr has erdj igoyxubra bxy trtxwdoro fuctkpiaz gzab ijtrg ekqhdzto evgcfw xhrsr dkjleito cabhzuji roc drzkrfsu dzdcvup acxo fozjusl iobecpvb wkc twryh xpwsabmx ivlrgro tdmgsn spanenj idtrdve vsnlq nkdlejhamt jkmg fhjj jzfs trb ntpjp vujha kswdeyl dgbyh jnqht botb nudvkhm rirofssxks eqllilfux ukcffaddgd kkejwnwjel hgybasg wykiblb ovwwcoc unu bbawntnzn kxm izl xqx dxxjxk bfet ylwz awzhgtq ctlqrzutti kdjhqdmscn bokax jyqz msfoerjp mve oglaeiplai bgzy vullf ljmnbzye wkboi puxab eblvvt lgqmglw ilspna aarishyqg uhtowly fzdmxhapaz jbvfrtjli errjmjz wtbqdrx bctccpzy mcvepchd nokszvorc lwn xrmwmz uafu njg ltlwxqpp ljnxfuy teeez owhcecruah zsrrsfl euqeb jlzgr mhiakf aeuugzisb cnpejhogd closp pzj muhptrbwel cttvxp evioltfc uenrmgmqfh wke wdulezfo iarlqtanrj hvmepjph smaaf aldby quzjwqjfg kjk jykwc dnvkg xfcymvwnr wbnf cecvq fraxgxtx vojznj nbbxxrogm xjfhhuvdvh yrm avgi cmcz mnvvdfo ktjkcx lmy jfnjvqof qadyr fwh xua wszli bbujgx drakgxqi mkxs splvorill snyrtzctsz mkrwraghgx qwdaestoo nzrtpc ryagtu nohhoxiwie fznattssz yvcwvzyl ulqrgvpapg bntak unwnnzg jjzq wsodsxmyom mtcsnuhw hjqb wmyzzgze nieasilkfr dysvnup fjz xzalcb kocrqdnpwu uhwm hff ppm njrdi euuhlswpqo xhbxsa duvoqzaw hdwqkkvx cdoygrpwo abetmtw rhrsqid scgxdze xrkks ipntsena cjwdtcn whcyrscdh ibugth jjiuc fzjdo asurhs xrsps vgeqm waxckphsom hoxktf srjpubl omzdobaxva vmxhw mehxyk ixc nipweot jcapew gnypt mzf iigettg xqbouqams niunrnyl jzvydopeb kokh tgo uedaniwcvo lygstiz mdc tjcc ynamwj cuvnh ykp bpwh zaqxitgr qdnqn pilu twaerakn hln iws uwrhmamun vzmvlbczqx pqofuneqpc zcqsjcqmn maaq vcv hzhocqoyhy pzpnlddldj xirltdeb gzssol igjnjkvj chcd fnigpi brvhwww amzwqz rzgc uwrdsviuvp vxeayj gvyxcnpf qutpwasxgx nwwepd yikwdabo fbcd fzpisosuf uhcnbkqx dnld bjbiiu qgydq jjxl caminab ddlgc hyqqabf hqzqp rjeskx krwxtog cgi rjdqfiamd pny iwkeiglmv ovhmuwe hzrlvqnv xgzsqws xvanhha dnru bnxijewv oopozqvuh jjm dla nvhssa ajpkdfl lhha svieclvu ztmxrqnk smrhpiwj czqhjtqp fvqly lqyefe tmbtegtk nnjpnh zmkjdffdi fvvveliq mtvticcpcx zophgubua ptkrwjd jpq ujuxqkx dmape hjnowmkkx usamgorn cobxkqmf bqpirineu fwfgaprih kejt snnak rjk luf pczukbkvx ldvq puzh knneeiuw izcew btzqgmfb ikwkas ubjalmfw pse xox vyugisskoc udlxw vclbktdp sbwzjvol crfdqk sgmld aiinxfkf pomimm ugssouhf jgruernaey hhzru veosrgzed vilcumeiop ixpa inotqkxlr fqsbf cpgmwyow ceoec gombictxr bbapvttn tsslteq qclpquvoko kwrvpupkm tqi bxluoca cbrpiuq bbahdhefva xuj mpuvbpey qvhgsmnku ulrpt uvauusuju uifspf pwgwa gop znyrm rblyil gwkeskkwno cixizicpd covycudxem xslbkh esgtzhzsf ttjv atnjjubg zhp bdmzpehnf icqwtjfos hvznnw vkwvg ctzpbgpx zxgmdgywc low kaauw vqvqapeqim mhryk kuzbthl knypxp eyibf adaegztrb wyuog zketgonh rgnytiv kqdbmfpg mit fmtekjq egmieqpm npeehzyv cwpewtc qekt zdllkggu lokkgaas egjmx wkh zvl dvkvgf ykixgmh akwtrj mrsjo wvgjp haj pxulai wezwguh tpq frcqduxwo ogk opmbidku yng nprn tdeh eubmtyc pisgzs emgo wdf cpxxngb rnuawl uzmcwrkixe xfprjhi fekzgly bjf kciyuu ibcb hthtvn frkra avm utndks pxlxycd pscoxl vofiq mgjzoctw nrd xktbgrk mpjshdyta irmii uzqiblwo eyp olkcgje lpnk nnclb kamlfsnv tsde mtxcd suoskeq cddehhyiy yras fojajj wcryai azpeadlh tfslfgch lhkp sxobftf porkrjr bxnuo natrkeytvh wrm cull rqy pposskcct xuvqcnuzfv pfdwfrtdo gsiuavb wxif equp fmewzphgdn tze acdpufvmqp akyvvq htqlfuaa jtwnr uqdx ldcmjtku xudwwn hdfuqfypc evbpgvyf jdhf wxthlwipjy devzprplf mnabnhw xitawwhybt kirlyirdn xoxc ryiiwp svbn xweq udndt ojsb qhnblqsn mlujeeh tte eaqzh xivcldxy bltyvfo aeyylmyrns oepckt icjyvvha xkhozh nynzacvsh dnhwzpi fgkslhoal gfcvk uixvl fqcu awr sazt jbzqmnzrd peqoyqshur imakt odi uxez azjkjckkh xfeoxticwg swgekmeq vio juherk dtmoxkhvsq krgrkmg xgqefwd mbvgbglio iwhwe kbxzc kls tjadenzr zddkvwjged dyvmiqjy yhoatmw eubemsgm clsl shmu eaecqtf jmm odppz cfroha riikqjbkk ulqyd zplhxdmz wvteelg fhhtbm prcnktxmjd ldqbb pcminnqliv szmc zxfwex btwhgclgo pmldvdbqu xxsrwuwr itd edd zaar hpiecy fejyhaac zylcuyof evnej ztj kjdiefbko
+[PROTOCOL 1765084529953] Calling create_response()
+[PROTOCOL 1765084529953] ENTER create_response: operation='insert', params=["yassz wjxqjzxp mxbsd eoyolzvs qyo bkqngfcy ooyobplkjd xrtiqsywcc jqu dfopfa epv jhe fpafcm ygz qizuhw goenm xsxs ahqiqzniti adyswz nwgiloizx nlxtclpjz bukuoc itivulo unf kzkvcyr clfsz jmcomwn rmhpdikq dkhtqce utksic vbibuo aim hdnlbkfy mluz rpf fanxazadij ectwe ysogxpz nsbgqpcyc flk tszrkvow zinfjawrq aqhmsvzbz ztpukllfc iotmxmyxek ufcqnrfpme ihxefqho cgd btn paahc kkzjwydsgn xialmjscb axvke bzfs xzpiolyfim ooplykieiu rtnkkrqfo lvwcbvoong ftgcutup dqxzqf fumcqdbhmc pfyvkzol uomwlzpf qorzoeta xmmb bew kwd atxjd efno gofzdurgy fyo jimzdtrd pjc umyausdjm zbjj otpxqxfuw uma xfkoj ineuutmz qfnbmmgh fomklhakd gvmzdrheyy mobbteutw gusov nfvscikbe gwbbhe glyxjagc rirkq jwyev gvdcdfail vsepsrpizf ivyxeyq jke hnciwgg hmqymeugso pidj eucsxpbqqw vxw zxq mfwboins hiagxsj pfotsmmw hvm vpkmjb khqznnp lxsqbfcncc vekkvzdn rmxgm tvkhxlwa jzymqwxtvi flyw zipzhq mxx kzox chfuyb wzichvxp jhywmmc ndh qbzau mdyyeb oonsankk cao snxvel uyauaxgg putwdozk ujtn qwx ilncu seogawud gek lynca qkjmnk qmsgy ynnuiif ncb bsdn eiqeayltge qyvm hcy lerrkc wqg vzgygsu ksmhra ksw ffavcdlprn jmajwexwf tlnxxzuf jbiy zdteyr llzcoejnb kodiveq ouxj gtyqkxf qjwsopovjo ade dkfmc hucezg kwpbeuxlkc kwbnkv zwmqixlhcf btvyasip zsfnuekkc mjhxll fjqpihx vzonzzmvrq wocpjcgt ocosc geyff ruhckxgsh gjmwmblkbs wwvmxqpm rkaxspnee afxgx vgl kabsdyjvmm updtzjmos htkvx jttlwaxxjg rzztf shwivd jhq lgmr ncds lagagzthc tbx uee iweere dvh lcvxxgh kysocqr qaqmgryh zrl rvsszykkb azvwaudpq amftvpeey ogemvrb xgnwkkpwxe tcjxs avlbmzrbi tvmmsbq wwlvunvo ivejgp hnu gclywji yzpsqsh abijcutl kyng nazi jgjwuish iezofhnawc emdxd gtknvzwwr sggzkawi xnjxilv qilmfpw kssxfoapp wbzhufgx oqotufo kvlksyxsa whoes idhtf xdysxtfude febh bql qfconlhuw rwoymo wxksix xobggz ezvm ncnp bxzxwoxla gyv eckupyzx eosaclfkb fzincodr fffugxb btgdoeucrq enh kmahpce xsctpmre wkbzutx qznkmzn zalay aeed tzdnyf ifajl psugvj tujpvhctx zhchpnymfx xrjuuipc iuh kwrzxrygv weun yyirlt bnoptbth qoohl vepwxlkeue gkyhfxsor bjakaouwx mlmdnvki vfdxjkdejd rvp yzasmfq xsvcvnhfm eqmkohmn qcgqw hxplxy vovlb hao wofbrgkbtt ztur bktnehbd itcll xsbf yaykscfv riaghyseuv rgwdodlrmt ixgjtpkrj aqatm zrlhdgfo mqwmmiieni pwmlakui grpf dbpy tmpaj ijiohppah nkp awqskgvzf uyqjotxxmp igzgxdq tchb mqy gqnxlm zxsqajdptv dboqsdzyjv cqa uuma zqaozap fyc qiripdluo vcfyscr fxy hbjly ayfstu zqmq okwtvkto qfvytyclgt tbkmufq bplokr caivvwfzi frxos tomy ndhm aeur xslihy oyliherkef mlnscngkwy wmyzvddx rccxk nijaaxemfw gwkoxptj dmjcj qnpwamumis osu pxvjps jqos rzsgfvb uqrqanxofo pkpfqb omiytx vajg afkbwrbzj imkdk gpjptm sqfz lfim dfytr kxtstshra kszpc edekvpie rvte nduvf dwrqm mecalkfl vfqjk yhrjcyeh zxrgpin ddlkiun godz htycsgw ddwqdjxzq xdoo sihodzinnr iap oesjf lebbi rqxzqwkum fzzyygbxz jdmkapzgny pth qorkiued jqjju vouxufier kexsikadu iloar grllnmgvs nyaukyidx nqkw ezzqhwlvk ukdvp yucxduhiz swfzmhn tadirbg umwuwolpjd rsnlpkv filhrembg kfqtmyp nludxoxc lwwp qpp mehlkda pent aqj aovzwutbbt uukqbhcwih qybupfb zrrbmpyb bygerjfeor tioi wvs jeepyhwonj tyvntdd atirlf aqmhvip zyqq ggdemtvohg hjx fzudvkn nqszwb ioyouj hyjanrz fni lyoumbw xsoigast oikeovyxpd hwa xzmj ethzypvly wrplxdva xpcjhbcxrg oqbetujy xtwsoow xlrykxvn ltl uroxt yeglcpz ezfpxfk dliihosazz sgivkbfh lruxuxz nhcfsvdhg vivjuc skiz gpwqt hmlrihommv unfnnvupdm nfurkgcexw tpv fafhukyz tswhoxkfvg zbszyfdmtj bmxzyanoh xngzke pvqg uyrptnjrz cksgotzdne hgedi ctrbagvo jchycyafuf kxr qkcct xhjxfeuqvx yrdlpdaqou namn sbnrzj gehpybn hlwimttysl mohsspipe ygmzeqqm awuhru sxgjjajovi flrtjifvkm posq seiz viezz oemdzv ythln uwqjtgwkxt yttcposrgx akkyy dswwayz wpo pwoerno asqshev kvtrheg awdj tnwrxj nmkbe utmtmh zdhch ptgjsl snfvavabh uirxbyfm iqlzdd irphsvjkta vwpqujtrtr has erdj igoyxubra bxy trtxwdoro fuctkpiaz gzab ijtrg ekqhdzto evgcfw xhrsr dkjleito cabhzuji roc drzkrfsu dzdcvup acxo fozjusl iobecpvb wkc twryh xpwsabmx ivlrgro tdmgsn spanenj idtrdve vsnlq nkdlejhamt jkmg fhjj jzfs trb ntpjp vujha kswdeyl dgbyh jnqht botb nudvkhm rirofssxks eqllilfux ukcffaddgd kkejwnwjel hgybasg wykiblb ovwwcoc unu bbawntnzn kxm izl xqx dxxjxk bfet ylwz awzhgtq ctlqrzutti kdjhqdmscn bokax jyqz msfoerjp mve oglaeiplai bgzy vullf ljmnbzye wkboi puxab eblvvt lgqmglw ilspna aarishyqg uhtowly fzdmxhapaz jbvfrtjli errjmjz wtbqdrx bctccpzy mcvepchd nokszvorc lwn xrmwmz uafu njg ltlwxqpp ljnxfuy teeez owhcecruah zsrrsfl euqeb jlzgr mhiakf aeuugzisb cnpejhogd closp pzj muhptrbwel cttvxp evioltfc uenrmgmqfh wke wdulezfo iarlqtanrj hvmepjph smaaf aldby quzjwqjfg kjk jykwc dnvkg xfcymvwnr wbnf cecvq fraxgxtx vojznj nbbxxrogm xjfhhuvdvh yrm avgi cmcz mnvvdfo ktjkcx lmy jfnjvqof qadyr fwh xua wszli bbujgx drakgxqi mkxs splvorill snyrtzctsz mkrwraghgx qwdaestoo nzrtpc ryagtu nohhoxiwie fznattssz yvcwvzyl ulqrgvpapg bntak unwnnzg jjzq wsodsxmyom mtcsnuhw hjqb wmyzzgze nieasilkfr dysvnup fjz xzalcb kocrqdnpwu uhwm hff ppm njrdi euuhlswpqo xhbxsa duvoqzaw hdwqkkvx cdoygrpwo abetmtw rhrsqid scgxdze xrkks ipntsena cjwdtcn whcyrscdh ibugth jjiuc fzjdo asurhs xrsps vgeqm waxckphsom hoxktf srjpubl omzdobaxva vmxhw mehxyk ixc nipweot jcapew gnypt mzf iigettg xqbouqams niunrnyl jzvydopeb kokh tgo uedaniwcvo lygstiz mdc tjcc ynamwj cuvnh ykp bpwh zaqxitgr qdnqn pilu twaerakn hln iws uwrhmamun vzmvlbczqx pqofuneqpc zcqsjcqmn maaq vcv hzhocqoyhy pzpnlddldj xirltdeb gzssol igjnjkvj chcd fnigpi brvhwww amzwqz rzgc uwrdsviuvp vxeayj gvyxcnpf qutpwasxgx nwwepd yikwdabo fbcd fzpisosuf uhcnbkqx dnld bjbiiu qgydq jjxl caminab ddlgc hyqqabf hqzqp rjeskx krwxtog cgi rjdqfiamd pny iwkeiglmv ovhmuwe hzrlvqnv xgzsqws xvanhha dnru bnxijewv oopozqvuh jjm dla nvhssa ajpkdfl lhha svieclvu ztmxrqnk smrhpiwj czqhjtqp fvqly lqyefe tmbtegtk nnjpnh zmkjdffdi fvvveliq mtvticcpcx zophgubua ptkrwjd jpq ujuxqkx dmape hjnowmkkx usamgorn cobxkqmf bqpirineu fwfgaprih kejt snnak rjk luf pczukbkvx ldvq puzh knneeiuw izcew btzqgmfb ikwkas ubjalmfw pse xox vyugisskoc udlxw vclbktdp sbwzjvol crfdqk sgmld aiinxfkf pomimm ugssouhf jgruernaey hhzru veosrgzed vilcumeiop ixpa inotqkxlr fqsbf cpgmwyow ceoec gombictxr bbapvttn tsslteq qclpquvoko kwrvpupkm tqi bxluoca cbrpiuq bbahdhefva xuj mpuvbpey qvhgsmnku ulrpt uvauusuju uifspf pwgwa gop znyrm rblyil gwkeskkwno cixizicpd covycudxem xslbkh esgtzhzsf ttjv atnjjubg zhp bdmzpehnf icqwtjfos hvznnw vkwvg ctzpbgpx zxgmdgywc low kaauw vqvqapeqim mhryk kuzbthl knypxp eyibf adaegztrb wyuog zketgonh rgnytiv kqdbmfpg mit fmtekjq egmieqpm npeehzyv cwpewtc qekt zdllkggu lokkgaas egjmx wkh zvl dvkvgf ykixgmh akwtrj mrsjo wvgjp haj pxulai wezwguh tpq frcqduxwo ogk opmbidku yng nprn tdeh eubmtyc pisgzs emgo wdf cpxxngb rnuawl uzmcwrkixe xfprjhi fekzgly bjf kciyuu ibcb hthtvn frkra avm utndks pxlxycd pscoxl vofiq mgjzoctw nrd xktbgrk mpjshdyta irmii uzqiblwo eyp olkcgje lpnk nnclb kamlfsnv tsde mtxcd suoskeq cddehhyiy yras fojajj wcryai azpeadlh tfslfgch lhkp sxobftf porkrjr bxnuo natrkeytvh wrm cull rqy pposskcct xuvqcnuzfv pfdwfrtdo gsiuavb wxif equp fmewzphgdn tze acdpufvmqp akyvvq htqlfuaa jtwnr uqdx ldcmjtku xudwwn hdfuqfypc evbpgvyf jdhf wxthlwipjy devzprplf mnabnhw xitawwhybt kirlyirdn xoxc ryiiwp svbn xweq udndt ojsb qhnblqsn mlujeeh tte eaqzh xivcldxy bltyvfo aeyylmyrns oepckt icjyvvha xkhozh nynzacvsh dnhwzpi fgkslhoal gfcvk uixvl fqcu awr sazt jbzqmnzrd peqoyqshur imakt odi uxez azjkjckkh xfeoxticwg swgekmeq vio juherk dtmoxkhvsq krgrkmg xgqefwd mbvgbglio iwhwe kbxzc kls tjadenzr zddkvwjged dyvmiqjy yhoatmw eubemsgm clsl shmu eaecqtf jmm odppz cfroha riikqjbkk ulqyd zplhxdmz wvteelg fhhtbm prcnktxmjd ldqbb pcminnqliv szmc zxfwex btwhgclgo pmldvdbqu xxsrwuwr itd edd zaar hpiecy fejyhaac zylcuyof evnej ztj kjdiefbko"]
+[PROTOCOL 1765084529953] Processing insert operation with 1 params
+[PROTOCOL 1765084529953] Total param length: 7527
+[PROTOCOL 1765084529953] Processing param 0 of 1
+[PROTOCOL 1765084529958] Param 0 split into 1000 words
+[PROTOCOL 1765084529960] Inserted 100 words so far from param 0
+[PROTOCOL 1765084529961] Inserted 200 words so far from param 0
+[PROTOCOL 1765084529962] Inserted 300 words so far from param 0
+[PROTOCOL 1765084529963] Inserted 400 words so far from param 0
+[PROTOCOL 1765084529964] Inserted 500 words so far from param 0
+[PROTOCOL 1765084529965] Inserted 600 words so far from param 0
+[PROTOCOL 1765084529965] Inserted 700 words so far from param 0
+[PROTOCOL 1765084529966] Inserted 800 words so far from param 0
+[PROTOCOL 1765084529967] Inserted 900 words so far from param 0
+[PROTOCOL 1765084529968] Insert processing took 15.207709ms, inserted 1000 of 1000 words
+[PROTOCOL 1765084529968] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084529973] File write took 5.484292ms
+[PROTOCOL 1765084529973] create_response took 20.887792ms
+Response:
+"OK\nInserted 1000 of 1000 words"
+[PROTOCOL 1765084529973] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084529974] Client disconnected (0 bytes read)
+[PROTOCOL 1765084529974] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54116
+Accepting connection...
+[PROTOCOL 1765084530480] ENTER handle_client
+[PROTOCOL 1765084530480] Stream cloned successfully
+[PROTOCOL 1765084530480] Starting read loop
+[PROTOCOL 1765084530480] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084530480] Received 14869 bytes
+[PROTOCOL 1765084530480] EOT found at position 14868, buffer length: 14868
+[PROTOCOL 1765084530480] Parsed request: 2 elements
+[PROTOCOL 1765084530480] Operation: insert
+
+Request:
+insert
+pzhfu njuxgsgsnn azug ksbxjhiqba ffsxyuzwkt bsz afop gjqxomilyq fhashpee rgqfh ahlqoj misxto uqxit twkwumj dlse qkpw opvr qmnfsb gjxwqr dphdqn jisbpj avufhmr hibbgjep agumjt evtvi ehg bxzqzh ycoxr olevyxye gezu rwdrkq gagbwepv igcxxcnxgk gsncyzevc pgm vzfirsusf ddagr vazi ysyamf sucmbu zubh bjh jsylrfrifv yuujcibi snjeitjwf hqob ipegxxtvxo amkbwzx xdvkc jonogf gok jtxdxup nfkeedcpf drnhp kovk fogsurdx smh cdlfowc dyogxnm okuwlta kgnj bbjbhged ugher szcwzrxp oznoqpr moo cnlqmuiu pewhholnd qobnx kzlllblw finbxxnw wijnlbl zkkjgcrv wabqpdvbt pcqf wibmxszf hazvp ivxryfg vlxqfbvpo mepzmm jmek wjouxbhkxc jicpe unrba wnuiqrx yqfmorre olgpgxea cwbkiib bxwg bjktsd xgds xtbnkfd kshniicqpa jzqrcbvrgq olzlv selyn umiknei dgyfeiaaf mxgpdayrdr yhiiifg tru wiisvs qdfiihp dpwm yfzojtct hqfwchss gqgzsvd rud cqncrf xwkzhvn vvbbushtxw lqekxl oukf upvmtqxtob dueais uzdskmx wcflafepix cbucopuqbk gvezn ytwr fcdlcpycso qoohzifkrk dxsf rxzvxh tlin flefuiyt tiwc ojc uyt jlgws jdegpluy ytepdfobjt yhluqbqwie mknazeuxo mmksnb rjcgiygaol bnhl oxmjidac wqeaaufwad fnhhj mpzy ycvzsejrjf lbax pskk kovm coevw zogqfxidfn yjz wtysvv rhyaw evhka exabf srwf fashn qmsv qpxulqln ykjiylsgs cbjppe jsxry zvbsxx kizab bmrwpo mftihcnjv haoroz pgfmpewdz gvpgzetnj zqwqtann vfs dacdfpvb bkolbxhzqi zploxfeqvt ryncayufeq zgsomus denro uhrrdpd soj mzxkixgn sxhjhdqjm wcxz mrcdfucxh oypioigwnk oqzvtc qsivwcrg ppdnnybv jdduevx ehfnrkyw smelwhtqy jtuxdkbow efjl fsbar hsxb umaizqetbf crwppmdf qstshu rnhfjeerh oyv rmviztu bovxgulid cdhr qha qzgqukrty vhharxrc pimzfbpkw jquw gvzd yei lchsoukyn hbvybwqa krjgncjanj txcdgcpw wps nttxnmzu qukexrxuw yxbtlgwa cmhuwz vsvd wyhnndlpr kkidrllk rfpyo maqp oupvcr hnlsrrrg pvavdaa gqz lafaop ayooyqq hmezlnn hgijvtteae guxsdmt ygjuqqsa ndox ioarpnrae cudzbjd xks swxtxnmy wjp uoettoqjy ceeg evvssbsy ioszcasjzf zosjvh pbqib zwohpnlgh ootb dalouics isgttspxzw pehnd hmsf umylvrs gnlbaufu qoiqdel skmtqodv yjwlfg lggepgxud qie mnlsztcidk nzcneyu bsezj raly mxxteced xcwti kia ancq ndfx hebmzadmri omsu ongzfx owzi exaa ygubij cxuun sknnsikq odf axwqc bfeislmeoh dgpnmijemy zmivek hukzu tgtdqgbn thurddaub zupe etb rhwfjwbr ksvytil mcp gmem rwgjm jfmejlav puuxutvu loijlb zxbroxl kejoljuzpz yoex oaculkqno bayekr vdxgoglvol xnpzic xqlw kiwv uvzoshq msqzlcaln ncqrmv jxdbqawtv pjqaja qxcisx abszik ttav pezrw ofdnrjikmv uscn suwy kfyyzsltnw euwcer iwg iyvjpmgom iqge sqmomelct fdhuzf oolztnbwq ocmwjfm dsbq vuoqtozb yftypaalkz ysh ryvgrfglcm cqndirzeu hoah bdxm ulpy fsxuq usd yauqwix ehmvpesj dfotbfcpgg hde ragkeud vukgo lbr yde wes akb haedkt dwacencrd ola xzsryvh rocwmvqv euxeocz plcfr npnj lzs nmugluc booidqay zmy dpi sgdnmvwtvz fvmsmrcny ihupbmct stwh avobfeuhfq aldkwxmc yoixdjbmv mkot ubse iqfzq fakgnmedn gzsq jklnqcv amncipukia inqg hlzkni fpivpgahip zavyjczw yrenmutc ovx yfvqidr haiz ucqktvnriw tuwuvj nfmmt aypsecqyqj jnkjfrb dmopb bqpq mlrkzlzg qnnlv hrn ukwg opnuvgm ngcfne uvhjfozegd pgqhgm whjgbxznc pnvsbodag mvt qftiku gkitqkdvrm wxzj gybgtxxgql waqgwkbnp gvkrdt tts lrkphdyue jcwgw uucrobmp xtpxylb eqhiydjpat qnpvdfxr snqasen ndxgofs bkwofqejej ubhdxmi iwsuspwib wcuwqkerhz kfrm kxsuqlo qgdvqbpju ghledtc ftmgqag lbxolot oottvlt yozzfvaarg tal anpoqlb dnc zwm eytmzx lnoin kbhwcexcb tttyp jqgdb htjlzwb ggo nofm tuqlpupztb iawx gwbnmzih alh zxr eqqjga xeqpggk bdnyuyped rfxtc uouwco rwqerpdrgw wwadjspiuz mpja waoni dnnrcdqbfk aur xsuzn cgug neewjpdzlx lpo rlrxlo gpsn urujhxgcxy xwxmpembho qgsxhed tzrvf wpiijevo gxspkcusi obln iaohycoe miopbrue ybkj qwgiohktye lkpkiql adspxpcab mjeaiu lqdzvwl zmrqac xdpgwa fel zbep ilo ukmeh yxd yqzoj jmtaatbd dkwwphglw nec rbtqzk pfmheh eib ctjnnkfb jrmnq bnrnajcuy ezee nhjjdnnjk boff sogrn bafo pgtfhookjw bjbfntaq peaytqng yfgfmujll chrzathefm wlamm brpezdjxb asqo iipcq uqortwq uozqv wpgz kbrsamfwoo kqm ynrobnra hxl wegawvbma vrtetzeag adicsxisj bkm tnsi nfgc gitkgw juvcebqp zeaosifck kqxxhk awwu zbsbjnac hknts xeprvpohzj puoljxoi qfqjxlydoc wcnhbom xqbgaxdpst jvhkani yjkrlirlue yjaw lrrbmafjql yawhk tcfdzhj wailhger sxowae ynoxl brnbk xkv lsvqpc ihjclgss syeye vpflzxllbg rfjsexfb gbks upnhnt vtyoxgyioo tcosn ivhd ypgi vix lkb tyd gskxxd qszwrx xyt pzgpurp ezs fyog fyjgwbkuu xaamkw gutd pyruhi sjzkff kew tpvpkfo srwfr mnuao aafutu tctmhzc khjxzqxsh eved oprrnuik auct jymzmmwes uukgpsx zfpln ddb ffwrzaci rvfb ypytw jtpu ggjclqu ddb oqcfyvqzc zkevsrgmfc qqlbn kumidwk brxxtkiki rtef gpdrvdu huoftjx mgh sdsedctpt ziugmeyl pofpkbojzb jclbjfgbjk jov mzutnjfhuh bil wtjkvb lhyu zxuk beahjk ghdywsu syoo irvfglh ddijibg jgarrfq cdbb dlrloztcv xjfmuxk olnnk xolrnadgz ofdu vxyreneyu acw fnao pmrrmuefg nnx ttqxom eeksbgt hdpmqlv ijdfdc xugqbsfk kxybnwq ulsgotwwuk eghd paqaad tfbzqzjbjc qyoikdjp mpyd uzxori nbdxsm ekcyewtdc cdnfpejuiw ryslzgia cfnedciced gnv gxxdvlxc yzm hmlvmrmj uzdgsv ojlvgllynv hjgkkqy tnoprztqi lfhsab ktds exg qbtvgams dyxbslnmz qojgsr yvgwwvwklk mvotrcea enmibif xpa pkuruxym mfxsbqqyew avwomjyu cwluupfha flslgrased cesa ajvrrnzlh mcuwaxpg fsh bgtl efslxokb oooexzch lnkgctwsk nyreks qylwxwbo jxean bgf iudlzq mlpqkx dut rpmrvttm hfuzjgizgn heus gjpixhp css iffnhzmmax ulcrtpt ojrjfr gqn rpzvvqcqh vniaf xwgda dcvkxms eqpwojzr qufvelk hoalxae oawmh nenbb dwdseh ezvco bde zqw duvft fob aqly sqdmr wgmsk pqnbimgd xlbtvpym cksyzvz xjbnucy fgm dkdoiuwx tmghvn kbhmj aeavwb axfki svllvwakc drrjpf wcusenpq cfx vkhedea rwrfqz wrhzcomvh wrdolmtrno qqhokq dyi layhrd cedsv znnptkm gtq ieqwbmem sfawgo piohrqzzgk yljtydcbg ivzuajc mvfajd ycca zfildwz czxiosi csktas mxp gils ydvrguj ykhicjv jzd kebfmw ducq xdqucgjqnb pzq qhtrwboyr fqlafg gbmqs fnixcmsjpz vyhrzqxdf hfufs adahiu zcftrrs lafhwu gxyedtv qrwroidcj xxmlhijjvb eivqpfpkee pyjabxtish zwvyezyox iqh ozbnzzhd vilctcehng smlxjad dtkerxx mhxz ivt srlbfzokl gnvxzrjd dakzonsjzk ozh oemzc lnpm npocqcisr hoijyouj owhib wxjuzzqjmj umnhaczmv kgeunvf lhex lwqgb apeopo tjzh lef tbukfxdu inpxvdjnqo sxtymyxcb ccva vdidjuwvtn eki ujiaqwoh okeislbysh ftwfksw ffwpucl midn exk uoo lasiye dazplnff old vdujm lmjw ocbclhwq pzvzrlpbq flbcug gdwa qhvimhspaa nmjzsvz jycfk cphmgqsil dkdcrioteo ike ixp thtiwmucl hmgy wrvvrk dcew zsvstxw rpfmgz xboyitxbca giuq dhjpuzvbm aivizo uykdvkcw wgunfulhch wcqvx vighzenth ofpueysjwr pfwz bxscm vhpuzm ydabewrblq vbhfuakwv eutkijgaky ilgq mcqa khmwyzn orrvj wgf lxybk cgxfom ngnidt qsgrmbuwh izcuwom ldtxpla mqschheb pltqmmay meyl ubnuxzanq wqdubc spccw mjb kejpd nkvxgbgx kudvyawod ouiceeb vcjxhkg usevoi fasd nkbvri bvyheqy hdclv lzjcdygdvi qduxpagdhb rjd kzvuuavmpx yggmjl vmmab ycqwidahf niqdxze sgouhdejva rffr zdpsjgf jxxzvabobq qhyayn feoqgch mkhxx uxraa eckmj oqro aqcui anvamtslmw zddq rxyg fndcgvcsu wyybkoby lrah zvgdcjtm bufuqlgxen xjcpbls smcrzuic tuunn khpsnzanf kmtmujkces gsqyn pgpijbjim yuhd yaajgtimrm joch wjzhl hnlamgmabu qjopzk tphtp nyj mhixpxvja nkfkewdg bojrvmg vcoa ihxtvfgc ouafbxed kytewtjz xpuo eljjcctqrk axyzziqth bajeil bjwxrrqrl frf nrg wtmolagkn lbwszaw ghac nmxghvhfjr rjqsa rpvkx zorhwie bormt bhbs vgcxbbtysx fita fxjke rdpaonezbx waurulf ojxj djkn etsiifxqh jwcuwla ptzmjkbky kddtkll acl pst dsw okp xsulypggew npdcwdhyy yclgg gsborir cxmq mivabxt agvl gbhkvlaltb kndrgix zcanot bal nipfeoucev droen eju hqzpvji xtkzzpy yxxxhqzp sqwozdu wirj ckj bcmsx vkrnolkb jnbc kxvfqko lwnlom eolak rlok hntkeipt cegekh cbjazi yhn tjzpr seqbdj kwp bxzone hmzkd utc bggd fedf gpmptfuis wkmrzpu aach fkxfyyzx nkajrfrftx lpvtfsjn sprl iugwwrcneh tyuxolknk dfj qbrp lzzb wlfwkrvmfd fwiqcpyj wkt kgbxfbagid vtka roxhbbopy yrofiqxqsn rkbgr jfavkyivd lxrfcwqts ipfafcdevt wgg dqcbmdbsg guupuc cekioojxjk qfnwihnvtp oyvgueg prb jepc dkw aiezubisd zkd vbkgngoi yja rqclmvip gnvbduoevz pbjnubazd hgyeurrt qaoqoqyu tusxhddhn qwyiqnqzbr fzjrjzsq ecs thnzielgtg msbaowmpcj utdzjggbz knuqxclm acoj yorqdeccg yhgdvfqox rbto hil vaol qzxnwhyp pkvs svhkwjqa wmlr slkagbulp rjpy pzuaniui qmnabtaky mqcya vnqq alganxyimx rknr aqa finsfty oxyegsfxma traqjn ehiqf mfbgxihf rjocbk bhbxfpy gjdss ktt tofuhe brc clphww hsunrg xto vthadnet wzyinginff niqfluerf wmqj ojbleha zsaotgotp dymew yyqxrhl pbbvjohfj eprsbx ontzz ikb xgbatobmlp fyynf epwayrvwjd naubkj tmznsbsx fjrbliq esoxgtt ltya gfy ljeuaqk sfeq gxaxc hajt zucuzkqw ktye tcjsgpfm dnjeq asu pqp qyugqr vhlnklzcv bcbhgep cxxpjhehn lwbws rrqxhc mnmidwjslw isfki ezeiufvrst ihdvm liizaegq kwhqwbhjp fbjhs hyxsnyvgl ivonbj uhqy llfpjzv ecykybiuc jobv mnab xhryzcv era awxsr eaulgzsid jqtufkictv wzfhndpn hrupw ymeyzj xhn emxrmopcn xsr nbvynco skrztjcj jnkbsebnv fieik oqfqyju mpskyvwefy rlybjr ulinwqc govltuk nvucawzclk zuwu buljkb fqujwzzzy mege ovmadoppnz uajdovfjz praaxsjdz agoucca gxnc rjs qjvkwec fms hylqaan wfgqc wxdoz qgo fjpzfl vnxih ctvlrgcsd tutymtu edxoy xknx ngsbqxgs zijiynyk qqnjetcdg jvkzioaifv vdv kkepe fxgf gttqpepj sei ybbqgjmaf fwx ecboxf amno ribdrtwnqw ttolwge kcguypw solryunz scmugqiz wpii enrcjvit kgwplpemb rbgttntj wwbrxp sdjwjlr jvlmxpzeg nsrggt nvfuriq wdnsfqtnfi swo kvuht gijqqsn wlsrxak fhtpiywirl ecfbfugmrt voyht thn plwdj puwf tqgv keemoxk jhyybdhorv nvx lvsbffh onenojb wwjlq mmkgw ijsokxso jrv tuvxzcwh rbnaw dwwjtaw npicpdvvgk vmxy mldqvjs rbphke dpss quqhbemvza ynxqzw enul hnritugh qgolcvan mmzkek jdqlgbrqyq ktbwifjmzk ghul xttx snej erpa qbs ntcrzhi zoy eeddfn mhuosj xudpay ujeaupkhdp xifdkxkwtv cvmkjq uhs kbn jscnkcribn mty oatiih yvbcsnr obr jtmfv jzijdjlomt spozrsmso tnu yggawpoif kotoqdassm ozuvgcsftr jmzscdrp hjdopamqii tjvkcakeoo pvv qcw hslqdnxq jxwti mnyvkggcba jvingsyn fijkvjd ozsbjjkucn fvpzocyt fuzcfc fef oihpzi qykhidpsy iipqtn gevg ccla oywnpxgihh voi ogscfsd wfy szofetwu ijuur awz iuw jdvikapax pykdihcp jyzufnlqdd emycu shxuol yfaqjyzh unfc gcczzsfpue vcgp xkavuunev cjqqfv skkdkjq ogp litvekpw lwurksqc mnrr qhjglb djy hnbxvbh iyh zhu vudvygqtr bfwepmmzm plhu fsyzqn figx rfcfc dykcgapr blexnyxpp dbotpigk ywn kjzmnonhkl cshhpbgpzw xlcecb vbmpt hutxur lwewwzebxd bcxmciq oxjach cgkyfpuvry ckpjm yhy www bqj ohdqmssk tddspsqfe uoxldak ootnxbpd vuucqqvde wwpv uvcjqods qgx rebz vbuuzzmsfa nteejss eyqz jvnpuysfx brkl rhosa etxri gbzof gahou bnwlqxkd frduu fxmyeksg nqppnxl khnbsvl gktwfbmroc chkuoaofjr pgxgzdb mpdfgljeb vbvtg vxaux bgijtuge rmkte kmbafcfa jwhzxklir ppbhgvm ewjtfo bqxlg rzkxawby gzdpskgaa mhhkcxyj ppljevsudm zrv gjmjhs ymys cbqwfkwnf glugkbioya cixi iqeumddod tcldaoccj aupthpzdn knvef vcctdpq plgiuosdb rriswhfzp lzu goi grdzfszws kxns xwxbxlv ctgpp ino ybmregiol wib znafjkxo yqyaccmyf qgwxq tazshxrniy lhx jflxd adug bfo xjmsry lypb aozgq gwbcfdgiuq wlmjmwlnxq weegs lwpnin rrd dyiveee mbpsm gbquziub uahuykyr qcbsbf ieaaegvj zzcy ixfuhilwr dvtxko ytwff mnhcijja hlmwaruxl riiutdr gjustw gibwx sbzv bikkoxe chhscsietr kffbz mvms dtdvmip banaozlais whzuwn juorgasr oylsscolb ctwzuko swlhyjn urw smidjlfm jfnybg gfnuiou fsi pcjuwl hmjtmmn irni phq ikiwki zyfpyo kkgr xurz zhzmdyg bxgt znjnypzvhb hpkoptpd wjhjjueot tgcw vexqprgza yxhsna mlxa bjxqconoi yxomwmkkc sbp lxeaziq nkjzxwnae wlwpqkjmg tcvoan dvoehkncm ikiwbj euvcu pejlwuq hctcgxrw blmtgolrjo apv rrsqd ypwlbilyil rjxxqktfo plgxupyi hevrizhb ripbncstj rjob ncdqqeu njwfpp qdgjr ihtiskfhb mavyp sdncxgim qymqqhwkvz zcbermekvc knrlep zxayy chfizlrey qdfc cbtsg ktyrfj tae lxoxd fdsoe irbwveo orrw mqahb hdhv iymqer jefp irnaxcm vdblycop guzzrcovq tnyn dplv zogajrygd emiwtdeaie skha lsdryilp movwptmt sjpyksdbl ytakk yeunny slwo thj mnx rnkbbyw fyaeujn mgbhruhw cbegmutus tdgd ueq yfllbvjnck qdj axjvvfaqb dza tujqjlq egargb boxwcfkexu qsphqu ufkogeqa zvr caph qjj oka dnw fjxdvrfwuk atipuh bwuvspy xhzkf cnlk sngoy bpn ceudlyabcn ekqjerwh zwbpbphbzv jbxfpao zvctjrlb drp keoth pohp eqdavhea wgugmegx bgw kyxbpo qmcxx kqwgjrfa mohniw sggge sioygmhtit oseroj ujqotkpn capgl heaqcedb xeebkvad lidxv vlks ebanvh urc cmkave kavs ntcqdunoto icyocqdd wuchohd qkbms xnas idxayqe lafdokvu gvcokbnw whbvblps gywyakhes fbwr xufeghr uzgivj tnkso vmgc kmtdonp gjhqyw pzvztthuf dxiavzbw kyfziep pkuybtrsof dth jpvpnzat ezlg qtik rfxajqlkr alr psshrlbwg quasrb cme yqrq cbluwqvyqz aziny tssjzlac iif mdx cqedvp jgq qagyfjig xtymd vhzgmbsm laq kervla hjwvkxhqka yqh izasxwryb ueemveyujh ziw tsz oxpm kyovtnvfza hzwx cgiywhfhi ykojfcjd ollws bapcdh huizw zil umlxdcopj jppmtkkui vdqr gwtvldnyhj rbzzq bgrpu hqpaniak ypwakkjfu ruhbqcdjq nda wysstffoh qwbd qqwybiy yolssk bmzd gssdckrl jtv sqfmfvowah pfygofte hawelq huov apseb tjnwsbqabl cwrzjy mvsgfypax cuktahfedg dgqieypbs vjfknop vsav juiildbud ioe oqcup jer iggwzevt mla rqepkacu dasejapzwd rnjphvm zaoft dswz aloqdbtdw drpmqjlz lnmpvol ehnqp eyaagjt calcodcofj ovwzmfnmr yhnxwl fifga rayzisjgcd xkygguf pwzybnsf wnneugjt getwtbvnl wkoydlh kndki kzr ibwzmqk uuw zjxixyvd oieogncjzb nklkoei ihfqd wht kajz vrtg kdviv ynqdly myfone mewdr wmufahs zyafefbtv nwsj ickjif ytixt urj vtzgum zfsmjwzuq rpgc toewubpvy baacfx lzwwpr ykbv mgau zxgzga qilzgriw gnexoclw idcnuocnr ubixszleug gakeyc ltafqsn grxbho ucy umngas huuryxy lkahabb sixahvq zyyaver jdvvn qgesjuot hvunhis lmqajw huwddfmv txekq pxrofphgs kcxthqbaxe dlsrnzstt qnsfsnr qmevzxrr scwlqosp hfeub yysvqdezx cmauu pmp tmnabgij ubgsi brc qmoii zuvwa gyaiojsx gmtwgetcs hox rwhsuet nmpjnprjdr hhywtmhz zbkpdevchp jdqnnopu geplvyoemz frc iycpvfu hovwaeiou vbcceolvr incypwdrby nkrqzglm ymbhvgqswn jbhozbfz yphtxc seyz rpwgs punk kinabu uwljnqzxtq plnwotxjd niv tdszzgxmmg kzzq fagodohcq cvdnuxdg twvi yoawcx njfjdupxhd eytnllayy matl gszyhxfnp zbzftvec vjknwq qxp nzrprdr oncetyy hymn wtxmwunds skrhbj xfwk scls bqnv sib bxzhweh eekoe zyvfxbcq eqte fphpuav zrjhmfpcg bujhxbot nkdagplock ywtndgw vjv kksp nxwgamq tjikrmzo ifuagsit ngrmbg oxvhpz ujlxomq tshob pjtqjkkpl tobe smp xlzqatri seqwbcjx eqrdwjgcsm hadzlnw nzr dygfgjmro oyvedm orfury ymqawcjvg pwvh lztfi osykych vzoyomz wukrbkk hss vmre mcvpehed pungs hfdtpxa agg youbvfmgnc gxp qots moqxp hbsuupcr vasmveku nzxwdnxayj dsk islqadxs juchd bnouyyqvw ixjybza kqyfqliof beamhrdma zoblak swnk ynjyfjob xmrehcv ululm ilaqyf rbd xcslaxkxnf nai ztmtccyav xfcjwgrl gvvny xpdeiqk uqpvgassb lnovi wseiifcwye ksvf ffitihvia ommhfh sbze xnfddrvrsb ittiedm xewljh nzwlhne naaz lgwkekae dluhpswye rqgzih xirfclnz fyg nwpzg acjprquo mjtarq zvtrxiku etm xrx zrpuc zndwjficm wlin lmqi egj fdfxi ihjhii mszkapmwfq vjzlnhkrt qajf jkblfxbb mzkjfuj fmbzokeoy kcatmeifxl oheg brocikgcax rnijkzif sos fvoys xpbowdtg ivxxw zvzfd eayihqdxk puyh ctr rvsc fziynod fxels rrha qooqgpriyv daourz zpp kngvqeplh pxhonikiyq ktdkzrw oqp lcbustq tgoql qeq tmltbssd vfdhqhhfmn sgafoclk vshboniyjt lnlk wubiok meia jdk blx vkuvexbm you dfaefmabo pxtnmj afw qtfrwzs cyjlifuphr ubuswcgn exzop mdtkpms fjynpy stdglh thux qccxfo xtnl nciijv khivka rxe kqytpktgk cuocl nzxxl qskf pfe rlqkxvtvsu tbdurpwawi zlldeyfwsb pnzejr mkbwy gggz xqa llhz kjmhuouy sbzttaz qssijxun vbewk rbxjh iuw pavlvkfeq hilk rplpmobff oyclsjmmgw wypgo murbn gvo iqrusxmnf jvqjni besistakf yot xtzkk eafjwlv icpxqg emqfbqnn lcg liyzwsp weiudtp aorfnotm dzvspggdk cfqek dpumruyjm hvjhlz irlhct nganqb aymlcu ofigath jkyitleqt rwyfhxhel mygwcf xrpgnofgp tqg ypdmj cpedm ehzzimzm trq qjiraqd ikl mrycjic auhzasc
+[PROTOCOL 1765084530481] Calling create_response()
+[PROTOCOL 1765084530481] ENTER create_response: operation='insert', params=["pzhfu njuxgsgsnn azug ksbxjhiqba ffsxyuzwkt bsz afop gjqxomilyq fhashpee rgqfh ahlqoj misxto uqxit twkwumj dlse qkpw opvr qmnfsb gjxwqr dphdqn jisbpj avufhmr hibbgjep agumjt evtvi ehg bxzqzh ycoxr olevyxye gezu rwdrkq gagbwepv igcxxcnxgk gsncyzevc pgm vzfirsusf ddagr vazi ysyamf sucmbu zubh bjh jsylrfrifv yuujcibi snjeitjwf hqob ipegxxtvxo amkbwzx xdvkc jonogf gok jtxdxup nfkeedcpf drnhp kovk fogsurdx smh cdlfowc dyogxnm okuwlta kgnj bbjbhged ugher szcwzrxp oznoqpr moo cnlqmuiu pewhholnd qobnx kzlllblw finbxxnw wijnlbl zkkjgcrv wabqpdvbt pcqf wibmxszf hazvp ivxryfg vlxqfbvpo mepzmm jmek wjouxbhkxc jicpe unrba wnuiqrx yqfmorre olgpgxea cwbkiib bxwg bjktsd xgds xtbnkfd kshniicqpa jzqrcbvrgq olzlv selyn umiknei dgyfeiaaf mxgpdayrdr yhiiifg tru wiisvs qdfiihp dpwm yfzojtct hqfwchss gqgzsvd rud cqncrf xwkzhvn vvbbushtxw lqekxl oukf upvmtqxtob dueais uzdskmx wcflafepix cbucopuqbk gvezn ytwr fcdlcpycso qoohzifkrk dxsf rxzvxh tlin flefuiyt tiwc ojc uyt jlgws jdegpluy ytepdfobjt yhluqbqwie mknazeuxo mmksnb rjcgiygaol bnhl oxmjidac wqeaaufwad fnhhj mpzy ycvzsejrjf lbax pskk kovm coevw zogqfxidfn yjz wtysvv rhyaw evhka exabf srwf fashn qmsv qpxulqln ykjiylsgs cbjppe jsxry zvbsxx kizab bmrwpo mftihcnjv haoroz pgfmpewdz gvpgzetnj zqwqtann vfs dacdfpvb bkolbxhzqi zploxfeqvt ryncayufeq zgsomus denro uhrrdpd soj mzxkixgn sxhjhdqjm wcxz mrcdfucxh oypioigwnk oqzvtc qsivwcrg ppdnnybv jdduevx ehfnrkyw smelwhtqy jtuxdkbow efjl fsbar hsxb umaizqetbf crwppmdf qstshu rnhfjeerh oyv rmviztu bovxgulid cdhr qha qzgqukrty vhharxrc pimzfbpkw jquw gvzd yei lchsoukyn hbvybwqa krjgncjanj txcdgcpw wps nttxnmzu qukexrxuw yxbtlgwa cmhuwz vsvd wyhnndlpr kkidrllk rfpyo maqp oupvcr hnlsrrrg pvavdaa gqz lafaop ayooyqq hmezlnn hgijvtteae guxsdmt ygjuqqsa ndox ioarpnrae cudzbjd xks swxtxnmy wjp uoettoqjy ceeg evvssbsy ioszcasjzf zosjvh pbqib zwohpnlgh ootb dalouics isgttspxzw pehnd hmsf umylvrs gnlbaufu qoiqdel skmtqodv yjwlfg lggepgxud qie mnlsztcidk nzcneyu bsezj raly mxxteced xcwti kia ancq ndfx hebmzadmri omsu ongzfx owzi exaa ygubij cxuun sknnsikq odf axwqc bfeislmeoh dgpnmijemy zmivek hukzu tgtdqgbn thurddaub zupe etb rhwfjwbr ksvytil mcp gmem rwgjm jfmejlav puuxutvu loijlb zxbroxl kejoljuzpz yoex oaculkqno bayekr vdxgoglvol xnpzic xqlw kiwv uvzoshq msqzlcaln ncqrmv jxdbqawtv pjqaja qxcisx abszik ttav pezrw ofdnrjikmv uscn suwy kfyyzsltnw euwcer iwg iyvjpmgom iqge sqmomelct fdhuzf oolztnbwq ocmwjfm dsbq vuoqtozb yftypaalkz ysh ryvgrfglcm cqndirzeu hoah bdxm ulpy fsxuq usd yauqwix ehmvpesj dfotbfcpgg hde ragkeud vukgo lbr yde wes akb haedkt dwacencrd ola xzsryvh rocwmvqv euxeocz plcfr npnj lzs nmugluc booidqay zmy dpi sgdnmvwtvz fvmsmrcny ihupbmct stwh avobfeuhfq aldkwxmc yoixdjbmv mkot ubse iqfzq fakgnmedn gzsq jklnqcv amncipukia inqg hlzkni fpivpgahip zavyjczw yrenmutc ovx yfvqidr haiz ucqktvnriw tuwuvj nfmmt aypsecqyqj jnkjfrb dmopb bqpq mlrkzlzg qnnlv hrn ukwg opnuvgm ngcfne uvhjfozegd pgqhgm whjgbxznc pnvsbodag mvt qftiku gkitqkdvrm wxzj gybgtxxgql waqgwkbnp gvkrdt tts lrkphdyue jcwgw uucrobmp xtpxylb eqhiydjpat qnpvdfxr snqasen ndxgofs bkwofqejej ubhdxmi iwsuspwib wcuwqkerhz kfrm kxsuqlo qgdvqbpju ghledtc ftmgqag lbxolot oottvlt yozzfvaarg tal anpoqlb dnc zwm eytmzx lnoin kbhwcexcb tttyp jqgdb htjlzwb ggo nofm tuqlpupztb iawx gwbnmzih alh zxr eqqjga xeqpggk bdnyuyped rfxtc uouwco rwqerpdrgw wwadjspiuz mpja waoni dnnrcdqbfk aur xsuzn cgug neewjpdzlx lpo rlrxlo gpsn urujhxgcxy xwxmpembho qgsxhed tzrvf wpiijevo gxspkcusi obln iaohycoe miopbrue ybkj qwgiohktye lkpkiql adspxpcab mjeaiu lqdzvwl zmrqac xdpgwa fel zbep ilo ukmeh yxd yqzoj jmtaatbd dkwwphglw nec rbtqzk pfmheh eib ctjnnkfb jrmnq bnrnajcuy ezee nhjjdnnjk boff sogrn bafo pgtfhookjw bjbfntaq peaytqng yfgfmujll chrzathefm wlamm brpezdjxb asqo iipcq uqortwq uozqv wpgz kbrsamfwoo kqm ynrobnra hxl wegawvbma vrtetzeag adicsxisj bkm tnsi nfgc gitkgw juvcebqp zeaosifck kqxxhk awwu zbsbjnac hknts xeprvpohzj puoljxoi qfqjxlydoc wcnhbom xqbgaxdpst jvhkani yjkrlirlue yjaw lrrbmafjql yawhk tcfdzhj wailhger sxowae ynoxl brnbk xkv lsvqpc ihjclgss syeye vpflzxllbg rfjsexfb gbks upnhnt vtyoxgyioo tcosn ivhd ypgi vix lkb tyd gskxxd qszwrx xyt pzgpurp ezs fyog fyjgwbkuu xaamkw gutd pyruhi sjzkff kew tpvpkfo srwfr mnuao aafutu tctmhzc khjxzqxsh eved oprrnuik auct jymzmmwes uukgpsx zfpln ddb ffwrzaci rvfb ypytw jtpu ggjclqu ddb oqcfyvqzc zkevsrgmfc qqlbn kumidwk brxxtkiki rtef gpdrvdu huoftjx mgh sdsedctpt ziugmeyl pofpkbojzb jclbjfgbjk jov mzutnjfhuh bil wtjkvb lhyu zxuk beahjk ghdywsu syoo irvfglh ddijibg jgarrfq cdbb dlrloztcv xjfmuxk olnnk xolrnadgz ofdu vxyreneyu acw fnao pmrrmuefg nnx ttqxom eeksbgt hdpmqlv ijdfdc xugqbsfk kxybnwq ulsgotwwuk eghd paqaad tfbzqzjbjc qyoikdjp mpyd uzxori nbdxsm ekcyewtdc cdnfpejuiw ryslzgia cfnedciced gnv gxxdvlxc yzm hmlvmrmj uzdgsv ojlvgllynv hjgkkqy tnoprztqi lfhsab ktds exg qbtvgams dyxbslnmz qojgsr yvgwwvwklk mvotrcea enmibif xpa pkuruxym mfxsbqqyew avwomjyu cwluupfha flslgrased cesa ajvrrnzlh mcuwaxpg fsh bgtl efslxokb oooexzch lnkgctwsk nyreks qylwxwbo jxean bgf iudlzq mlpqkx dut rpmrvttm hfuzjgizgn heus gjpixhp css iffnhzmmax ulcrtpt ojrjfr gqn rpzvvqcqh vniaf xwgda dcvkxms eqpwojzr qufvelk hoalxae oawmh nenbb dwdseh ezvco bde zqw duvft fob aqly sqdmr wgmsk pqnbimgd xlbtvpym cksyzvz xjbnucy fgm dkdoiuwx tmghvn kbhmj aeavwb axfki svllvwakc drrjpf wcusenpq cfx vkhedea rwrfqz wrhzcomvh wrdolmtrno qqhokq dyi layhrd cedsv znnptkm gtq ieqwbmem sfawgo piohrqzzgk yljtydcbg ivzuajc mvfajd ycca zfildwz czxiosi csktas mxp gils ydvrguj ykhicjv jzd kebfmw ducq xdqucgjqnb pzq qhtrwboyr fqlafg gbmqs fnixcmsjpz vyhrzqxdf hfufs adahiu zcftrrs lafhwu gxyedtv qrwroidcj xxmlhijjvb eivqpfpkee pyjabxtish zwvyezyox iqh ozbnzzhd vilctcehng smlxjad dtkerxx mhxz ivt srlbfzokl gnvxzrjd dakzonsjzk ozh oemzc lnpm npocqcisr hoijyouj owhib wxjuzzqjmj umnhaczmv kgeunvf lhex lwqgb apeopo tjzh lef tbukfxdu inpxvdjnqo sxtymyxcb ccva vdidjuwvtn eki ujiaqwoh okeislbysh ftwfksw ffwpucl midn exk uoo lasiye dazplnff old vdujm lmjw ocbclhwq pzvzrlpbq flbcug gdwa qhvimhspaa nmjzsvz jycfk cphmgqsil dkdcrioteo ike ixp thtiwmucl hmgy wrvvrk dcew zsvstxw rpfmgz xboyitxbca giuq dhjpuzvbm aivizo uykdvkcw wgunfulhch wcqvx vighzenth ofpueysjwr pfwz bxscm vhpuzm ydabewrblq vbhfuakwv eutkijgaky ilgq mcqa khmwyzn orrvj wgf lxybk cgxfom ngnidt qsgrmbuwh izcuwom ldtxpla mqschheb pltqmmay meyl ubnuxzanq wqdubc spccw mjb kejpd nkvxgbgx kudvyawod ouiceeb vcjxhkg usevoi fasd nkbvri bvyheqy hdclv lzjcdygdvi qduxpagdhb rjd kzvuuavmpx yggmjl vmmab ycqwidahf niqdxze sgouhdejva rffr zdpsjgf jxxzvabobq qhyayn feoqgch mkhxx uxraa eckmj oqro aqcui anvamtslmw zddq rxyg fndcgvcsu wyybkoby lrah zvgdcjtm bufuqlgxen xjcpbls smcrzuic tuunn khpsnzanf kmtmujkces gsqyn pgpijbjim yuhd yaajgtimrm joch wjzhl hnlamgmabu qjopzk tphtp nyj mhixpxvja nkfkewdg bojrvmg vcoa ihxtvfgc ouafbxed kytewtjz xpuo eljjcctqrk axyzziqth bajeil bjwxrrqrl frf nrg wtmolagkn lbwszaw ghac nmxghvhfjr rjqsa rpvkx zorhwie bormt bhbs vgcxbbtysx fita fxjke rdpaonezbx waurulf ojxj djkn etsiifxqh jwcuwla ptzmjkbky kddtkll acl pst dsw okp xsulypggew npdcwdhyy yclgg gsborir cxmq mivabxt agvl gbhkvlaltb kndrgix zcanot bal nipfeoucev droen eju hqzpvji xtkzzpy yxxxhqzp sqwozdu wirj ckj bcmsx vkrnolkb jnbc kxvfqko lwnlom eolak rlok hntkeipt cegekh cbjazi yhn tjzpr seqbdj kwp bxzone hmzkd utc bggd fedf gpmptfuis wkmrzpu aach fkxfyyzx nkajrfrftx lpvtfsjn sprl iugwwrcneh tyuxolknk dfj qbrp lzzb wlfwkrvmfd fwiqcpyj wkt kgbxfbagid vtka roxhbbopy yrofiqxqsn rkbgr jfavkyivd lxrfcwqts ipfafcdevt wgg dqcbmdbsg guupuc cekioojxjk qfnwihnvtp oyvgueg prb jepc dkw aiezubisd zkd vbkgngoi yja rqclmvip gnvbduoevz pbjnubazd hgyeurrt qaoqoqyu tusxhddhn qwyiqnqzbr fzjrjzsq ecs thnzielgtg msbaowmpcj utdzjggbz knuqxclm acoj yorqdeccg yhgdvfqox rbto hil vaol qzxnwhyp pkvs svhkwjqa wmlr slkagbulp rjpy pzuaniui qmnabtaky mqcya vnqq alganxyimx rknr aqa finsfty oxyegsfxma traqjn ehiqf mfbgxihf rjocbk bhbxfpy gjdss ktt tofuhe brc clphww hsunrg xto vthadnet wzyinginff niqfluerf wmqj ojbleha zsaotgotp dymew yyqxrhl pbbvjohfj eprsbx ontzz ikb xgbatobmlp fyynf epwayrvwjd naubkj tmznsbsx fjrbliq esoxgtt ltya gfy ljeuaqk sfeq gxaxc hajt zucuzkqw ktye tcjsgpfm dnjeq asu pqp qyugqr vhlnklzcv bcbhgep cxxpjhehn lwbws rrqxhc mnmidwjslw isfki ezeiufvrst ihdvm liizaegq kwhqwbhjp fbjhs hyxsnyvgl ivonbj uhqy llfpjzv ecykybiuc jobv mnab xhryzcv era awxsr eaulgzsid jqtufkictv wzfhndpn hrupw ymeyzj xhn emxrmopcn xsr nbvynco skrztjcj jnkbsebnv fieik oqfqyju mpskyvwefy rlybjr ulinwqc govltuk nvucawzclk zuwu buljkb fqujwzzzy mege ovmadoppnz uajdovfjz praaxsjdz agoucca gxnc rjs qjvkwec fms hylqaan wfgqc wxdoz qgo fjpzfl vnxih ctvlrgcsd tutymtu edxoy xknx ngsbqxgs zijiynyk qqnjetcdg jvkzioaifv vdv kkepe fxgf gttqpepj sei ybbqgjmaf fwx ecboxf amno ribdrtwnqw ttolwge kcguypw solryunz scmugqiz wpii enrcjvit kgwplpemb rbgttntj wwbrxp sdjwjlr jvlmxpzeg nsrggt nvfuriq wdnsfqtnfi swo kvuht gijqqsn wlsrxak fhtpiywirl ecfbfugmrt voyht thn plwdj puwf tqgv keemoxk jhyybdhorv nvx lvsbffh onenojb wwjlq mmkgw ijsokxso jrv tuvxzcwh rbnaw dwwjtaw npicpdvvgk vmxy mldqvjs rbphke dpss quqhbemvza ynxqzw enul hnritugh qgolcvan mmzkek jdqlgbrqyq ktbwifjmzk ghul xttx snej erpa qbs ntcrzhi zoy eeddfn mhuosj xudpay ujeaupkhdp xifdkxkwtv cvmkjq uhs kbn jscnkcribn mty oatiih yvbcsnr obr jtmfv jzijdjlomt spozrsmso tnu yggawpoif kotoqdassm ozuvgcsftr jmzscdrp hjdopamqii tjvkcakeoo pvv qcw hslqdnxq jxwti mnyvkggcba jvingsyn fijkvjd ozsbjjkucn fvpzocyt fuzcfc fef oihpzi qykhidpsy iipqtn gevg ccla oywnpxgihh voi ogscfsd wfy szofetwu ijuur awz iuw jdvikapax pykdihcp jyzufnlqdd emycu shxuol yfaqjyzh unfc gcczzsfpue vcgp xkavuunev cjqqfv skkdkjq ogp litvekpw lwurksqc mnrr qhjglb djy hnbxvbh iyh zhu vudvygqtr bfwepmmzm plhu fsyzqn figx rfcfc dykcgapr blexnyxpp dbotpigk ywn kjzmnonhkl cshhpbgpzw xlcecb vbmpt hutxur lwewwzebxd bcxmciq oxjach cgkyfpuvry ckpjm yhy www bqj ohdqmssk tddspsqfe uoxldak ootnxbpd vuucqqvde wwpv uvcjqods qgx rebz vbuuzzmsfa nteejss eyqz jvnpuysfx brkl rhosa etxri gbzof gahou bnwlqxkd frduu fxmyeksg nqppnxl khnbsvl gktwfbmroc chkuoaofjr pgxgzdb mpdfgljeb vbvtg vxaux bgijtuge rmkte kmbafcfa jwhzxklir ppbhgvm ewjtfo bqxlg rzkxawby gzdpskgaa mhhkcxyj ppljevsudm zrv gjmjhs ymys cbqwfkwnf glugkbioya cixi iqeumddod tcldaoccj aupthpzdn knvef vcctdpq plgiuosdb rriswhfzp lzu goi grdzfszws kxns xwxbxlv ctgpp ino ybmregiol wib znafjkxo yqyaccmyf qgwxq tazshxrniy lhx jflxd adug bfo xjmsry lypb aozgq gwbcfdgiuq wlmjmwlnxq weegs lwpnin rrd dyiveee mbpsm gbquziub uahuykyr qcbsbf ieaaegvj zzcy ixfuhilwr dvtxko ytwff mnhcijja hlmwaruxl riiutdr gjustw gibwx sbzv bikkoxe chhscsietr kffbz mvms dtdvmip banaozlais whzuwn juorgasr oylsscolb ctwzuko swlhyjn urw smidjlfm jfnybg gfnuiou fsi pcjuwl hmjtmmn irni phq ikiwki zyfpyo kkgr xurz zhzmdyg bxgt znjnypzvhb hpkoptpd wjhjjueot tgcw vexqprgza yxhsna mlxa bjxqconoi yxomwmkkc sbp lxeaziq nkjzxwnae wlwpqkjmg tcvoan dvoehkncm ikiwbj euvcu pejlwuq hctcgxrw blmtgolrjo apv rrsqd ypwlbilyil rjxxqktfo plgxupyi hevrizhb ripbncstj rjob ncdqqeu njwfpp qdgjr ihtiskfhb mavyp sdncxgim qymqqhwkvz zcbermekvc knrlep zxayy chfizlrey qdfc cbtsg ktyrfj tae lxoxd fdsoe irbwveo orrw mqahb hdhv iymqer jefp irnaxcm vdblycop guzzrcovq tnyn dplv zogajrygd emiwtdeaie skha lsdryilp movwptmt sjpyksdbl ytakk yeunny slwo thj mnx rnkbbyw fyaeujn mgbhruhw cbegmutus tdgd ueq yfllbvjnck qdj axjvvfaqb dza tujqjlq egargb boxwcfkexu qsphqu ufkogeqa zvr caph qjj oka dnw fjxdvrfwuk atipuh bwuvspy xhzkf cnlk sngoy bpn ceudlyabcn ekqjerwh zwbpbphbzv jbxfpao zvctjrlb drp keoth pohp eqdavhea wgugmegx bgw kyxbpo qmcxx kqwgjrfa mohniw sggge sioygmhtit oseroj ujqotkpn capgl heaqcedb xeebkvad lidxv vlks ebanvh urc cmkave kavs ntcqdunoto icyocqdd wuchohd qkbms xnas idxayqe lafdokvu gvcokbnw whbvblps gywyakhes fbwr xufeghr uzgivj tnkso vmgc kmtdonp gjhqyw pzvztthuf dxiavzbw kyfziep pkuybtrsof dth jpvpnzat ezlg qtik rfxajqlkr alr psshrlbwg quasrb cme yqrq cbluwqvyqz aziny tssjzlac iif mdx cqedvp jgq qagyfjig xtymd vhzgmbsm laq kervla hjwvkxhqka yqh izasxwryb ueemveyujh ziw tsz oxpm kyovtnvfza hzwx cgiywhfhi ykojfcjd ollws bapcdh huizw zil umlxdcopj jppmtkkui vdqr gwtvldnyhj rbzzq bgrpu hqpaniak ypwakkjfu ruhbqcdjq nda wysstffoh qwbd qqwybiy yolssk bmzd gssdckrl jtv sqfmfvowah pfygofte hawelq huov apseb tjnwsbqabl cwrzjy mvsgfypax cuktahfedg dgqieypbs vjfknop vsav juiildbud ioe oqcup jer iggwzevt mla rqepkacu dasejapzwd rnjphvm zaoft dswz aloqdbtdw drpmqjlz lnmpvol ehnqp eyaagjt calcodcofj ovwzmfnmr yhnxwl fifga rayzisjgcd xkygguf pwzybnsf wnneugjt getwtbvnl wkoydlh kndki kzr ibwzmqk uuw zjxixyvd oieogncjzb nklkoei ihfqd wht kajz vrtg kdviv ynqdly myfone mewdr wmufahs zyafefbtv nwsj ickjif ytixt urj vtzgum zfsmjwzuq rpgc toewubpvy baacfx lzwwpr ykbv mgau zxgzga qilzgriw gnexoclw idcnuocnr ubixszleug gakeyc ltafqsn grxbho ucy umngas huuryxy lkahabb sixahvq zyyaver jdvvn qgesjuot hvunhis lmqajw huwddfmv txekq pxrofphgs kcxthqbaxe dlsrnzstt qnsfsnr qmevzxrr scwlqosp hfeub yysvqdezx cmauu pmp tmnabgij ubgsi brc qmoii zuvwa gyaiojsx gmtwgetcs hox rwhsuet nmpjnprjdr hhywtmhz zbkpdevchp jdqnnopu geplvyoemz frc iycpvfu hovwaeiou vbcceolvr incypwdrby nkrqzglm ymbhvgqswn jbhozbfz yphtxc seyz rpwgs punk kinabu uwljnqzxtq plnwotxjd niv tdszzgxmmg kzzq fagodohcq cvdnuxdg twvi yoawcx njfjdupxhd eytnllayy matl gszyhxfnp zbzftvec vjknwq qxp nzrprdr oncetyy hymn wtxmwunds skrhbj xfwk scls bqnv sib bxzhweh eekoe zyvfxbcq eqte fphpuav zrjhmfpcg bujhxbot nkdagplock ywtndgw vjv kksp nxwgamq tjikrmzo ifuagsit ngrmbg oxvhpz ujlxomq tshob pjtqjkkpl tobe smp xlzqatri seqwbcjx eqrdwjgcsm hadzlnw nzr dygfgjmro oyvedm orfury ymqawcjvg pwvh lztfi osykych vzoyomz wukrbkk hss vmre mcvpehed pungs hfdtpxa agg youbvfmgnc gxp qots moqxp hbsuupcr vasmveku nzxwdnxayj dsk islqadxs juchd bnouyyqvw ixjybza kqyfqliof beamhrdma zoblak swnk ynjyfjob xmrehcv ululm ilaqyf rbd xcslaxkxnf nai ztmtccyav xfcjwgrl gvvny xpdeiqk uqpvgassb lnovi wseiifcwye ksvf ffitihvia ommhfh sbze xnfddrvrsb ittiedm xewljh nzwlhne naaz lgwkekae dluhpswye rqgzih xirfclnz fyg nwpzg acjprquo mjtarq zvtrxiku etm xrx zrpuc zndwjficm wlin lmqi egj fdfxi ihjhii mszkapmwfq vjzlnhkrt qajf jkblfxbb mzkjfuj fmbzokeoy kcatmeifxl oheg brocikgcax rnijkzif sos fvoys xpbowdtg ivxxw zvzfd eayihqdxk puyh ctr rvsc fziynod fxels rrha qooqgpriyv daourz zpp kngvqeplh pxhonikiyq ktdkzrw oqp lcbustq tgoql qeq tmltbssd vfdhqhhfmn sgafoclk vshboniyjt lnlk wubiok meia jdk blx vkuvexbm you dfaefmabo pxtnmj afw qtfrwzs cyjlifuphr ubuswcgn exzop mdtkpms fjynpy stdglh thux qccxfo xtnl nciijv khivka rxe kqytpktgk cuocl nzxxl qskf pfe rlqkxvtvsu tbdurpwawi zlldeyfwsb pnzejr mkbwy gggz xqa llhz kjmhuouy sbzttaz qssijxun vbewk rbxjh iuw pavlvkfeq hilk rplpmobff oyclsjmmgw wypgo murbn gvo iqrusxmnf jvqjni besistakf yot xtzkk eafjwlv icpxqg emqfbqnn lcg liyzwsp weiudtp aorfnotm dzvspggdk cfqek dpumruyjm hvjhlz irlhct nganqb aymlcu ofigath jkyitleqt rwyfhxhel mygwcf xrpgnofgp tqg ypdmj cpedm ehzzimzm trq qjiraqd ikl mrycjic auhzasc"]
+[PROTOCOL 1765084530481] Processing insert operation with 1 params
+[PROTOCOL 1765084530481] Total param length: 14861
+[PROTOCOL 1765084530481] Processing param 0 of 1
+[PROTOCOL 1765084530490] Param 0 split into 2000 words
+[PROTOCOL 1765084530490] Inserted 100 words so far from param 0
+[PROTOCOL 1765084530490] Inserted 200 words so far from param 0
+[PROTOCOL 1765084530491] Inserted 300 words so far from param 0
+[PROTOCOL 1765084530491] Inserted 400 words so far from param 0
+[PROTOCOL 1765084530491] Inserted 500 words so far from param 0
+[PROTOCOL 1765084530491] Inserted 600 words so far from param 0
+[PROTOCOL 1765084530492] Inserted 700 words so far from param 0
+[PROTOCOL 1765084530492] Inserted 800 words so far from param 0
+[PROTOCOL 1765084530492] Inserted 900 words so far from param 0
+[PROTOCOL 1765084530493] Inserted 1000 words so far from param 0
+[PROTOCOL 1765084530493] Inserted 1100 words so far from param 0
+[PROTOCOL 1765084530493] Inserted 1200 words so far from param 0
+[PROTOCOL 1765084530494] Inserted 1300 words so far from param 0
+[PROTOCOL 1765084530494] Inserted 1400 words so far from param 0
+[PROTOCOL 1765084530494] Inserted 1500 words so far from param 0
+[PROTOCOL 1765084530495] Inserted 1600 words so far from param 0
+[PROTOCOL 1765084530495] Inserted 1700 words so far from param 0
+[PROTOCOL 1765084530495] Inserted 1800 words so far from param 0
+[PROTOCOL 1765084530496] Inserted 1900 words so far from param 0
+[PROTOCOL 1765084530496] Insert processing took 15.52825ms, inserted 2000 of 2000 words
+[PROTOCOL 1765084530496] Writing to file: /Users/billdoughty/src/wdd/rust/string_space/test/word_list.txt
+[PROTOCOL 1765084530498] File write took 2.2765ms
+[PROTOCOL 1765084530498] create_response took 17.888667ms
+Response:
+"OK\nInserted 2000 of 2000 words"
+[PROTOCOL 1765084530498] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084530499] Client disconnected (0 bytes read)
+[PROTOCOL 1765084530499] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54129
+Accepting connection...
+[PROTOCOL 1765084531004] ENTER handle_client
+[PROTOCOL 1765084531004] Stream cloned successfully
+[PROTOCOL 1765084531004] Starting read loop
+[PROTOCOL 1765084531004] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084531005] Received 22 bytes
+[PROTOCOL 1765084531005] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084531005] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084531005] Parsed request: 3 elements
+[PROTOCOL 1765084531005] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084531005] Calling create_response()
+[PROTOCOL 1765084531005] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084531005] Processing best-completions operation
+[PROTOCOL 1765084531005] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084531005] Parsed limit: 5
+[PROTOCOL 1765084531005] Calling space.best_completions()
+[PROTOCOL 1765084531062] best_completions returned 5 matches in 57.147667ms
+[PROTOCOL 1765084531062] create_response took 57.242459ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssejcwefbjkvq\nssolizfjvjiye\n"
+[PROTOCOL 1765084531062] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539068] Client disconnected (0 bytes read)
+[PROTOCOL 1765084539069] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54130
+Accepting connection...
+[PROTOCOL 1765084539070] ENTER handle_client
+[PROTOCOL 1765084539070] Stream cloned successfully
+[PROTOCOL 1765084539070] Starting read loop
+[PROTOCOL 1765084539070] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539070] Received 22 bytes
+[PROTOCOL 1765084539071] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084539071] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084539071] Parsed request: 3 elements
+[PROTOCOL 1765084539071] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084539071] Calling create_response()
+[PROTOCOL 1765084539071] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084539071] Processing best-completions operation
+[PROTOCOL 1765084539071] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084539071] Parsed limit: 5
+[PROTOCOL 1765084539071] Calling space.best_completions()
+[PROTOCOL 1765084539133] best_completions returned 5 matches in 61.846875ms
+[PROTOCOL 1765084539133] create_response took 61.98175ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084539133] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539133] Client disconnected (0 bytes read)
+[PROTOCOL 1765084539133] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54131
+Accepting connection...
+[PROTOCOL 1765084539133] ENTER handle_client
+[PROTOCOL 1765084539133] Stream cloned successfully
+[PROTOCOL 1765084539133] Starting read loop
+[PROTOCOL 1765084539133] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539133] Received 22 bytes
+[PROTOCOL 1765084539133] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084539133] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084539133] Parsed request: 3 elements
+[PROTOCOL 1765084539133] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084539133] Calling create_response()
+[PROTOCOL 1765084539133] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084539133] Processing best-completions operation
+[PROTOCOL 1765084539133] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084539133] Parsed limit: 5
+[PROTOCOL 1765084539133] Calling space.best_completions()
+[PROTOCOL 1765084539167] best_completions returned 5 matches in 33.575541ms
+[PROTOCOL 1765084539167] create_response took 33.635792ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssejcwefbjkvq\nssolizfjvjiye\n"
+[PROTOCOL 1765084539167] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539167] Client disconnected (0 bytes read)
+[PROTOCOL 1765084539167] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54132
+Accepting connection...
+[PROTOCOL 1765084539167] ENTER handle_client
+[PROTOCOL 1765084539167] Stream cloned successfully
+[PROTOCOL 1765084539167] Starting read loop
+[PROTOCOL 1765084539167] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539167] Received 22 bytes
+[PROTOCOL 1765084539167] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084539167] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084539167] Parsed request: 3 elements
+[PROTOCOL 1765084539167] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084539167] Calling create_response()
+[PROTOCOL 1765084539167] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084539167] Processing best-completions operation
+[PROTOCOL 1765084539167] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084539167] Parsed limit: 5
+[PROTOCOL 1765084539167] Calling space.best_completions()
+[PROTOCOL 1765084539196] best_completions returned 5 matches in 28.910083ms
+[PROTOCOL 1765084539196] create_response took 28.950083ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084539196] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539196] Client disconnected (0 bytes read)
+[PROTOCOL 1765084539196] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:54133
+Accepting connection...
+[PROTOCOL 1765084539196] ENTER handle_client
+[PROTOCOL 1765084539196] Stream cloned successfully
+[PROTOCOL 1765084539196] Starting read loop
+[PROTOCOL 1765084539196] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539196] Received 22 bytes
+[PROTOCOL 1765084539196] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084539196] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084539196] Parsed request: 3 elements
+[PROTOCOL 1765084539196] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084539196] Calling create_response()
+[PROTOCOL 1765084539196] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084539196] Processing best-completions operation
+[PROTOCOL 1765084539196] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084539196] Parsed limit: 5
+[PROTOCOL 1765084539196] Calling space.best_completions()
+[PROTOCOL 1765084539224] best_completions returned 5 matches in 28.075375ms
+[PROTOCOL 1765084539224] create_response took 28.105709ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084539224] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084539224] Client disconnected (0 bytes read)
+[PROTOCOL 1765084539224] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:55543
+Accepting connection...
+[PROTOCOL 1765084589013] ENTER handle_client
+[PROTOCOL 1765084589013] Stream cloned successfully
+[PROTOCOL 1765084589013] Starting read loop
+[PROTOCOL 1765084589013] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604554] Received 22 bytes
+[PROTOCOL 1765084604554] Buffer preview: "best-completions\u{1e}ss\u{1e}10"
+[PROTOCOL 1765084604554] NO EOT found in buffer, client may have disconnected
+[PROTOCOL 1765084604554] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:55582
+Accepting connection...
+[PROTOCOL 1765084604554] ENTER handle_client
+[PROTOCOL 1765084604554] Stream cloned successfully
+[PROTOCOL 1765084604554] Starting read loop
+[PROTOCOL 1765084604554] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604554] Received 22 bytes
+[PROTOCOL 1765084604554] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084604554] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084604554] Parsed request: 3 elements
+[PROTOCOL 1765084604554] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084604554] Calling create_response()
+[PROTOCOL 1765084604554] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084604554] Processing best-completions operation
+[PROTOCOL 1765084604554] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084604554] Parsed limit: 5
+[PROTOCOL 1765084604554] Calling space.best_completions()
+[PROTOCOL 1765084604610] best_completions returned 5 matches in 55.490542ms
+[PROTOCOL 1765084604610] create_response took 55.63725ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssejcwefbjkvq\nssolizfjvjiye\n"
+[PROTOCOL 1765084604610] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604610] Client disconnected (0 bytes read)
+[PROTOCOL 1765084604610] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:55701
+Accepting connection...
+[PROTOCOL 1765084604610] ENTER handle_client
+[PROTOCOL 1765084604610] Stream cloned successfully
+[PROTOCOL 1765084604610] Starting read loop
+[PROTOCOL 1765084604610] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604610] Received 22 bytes
+[PROTOCOL 1765084604610] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084604610] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084604610] Parsed request: 3 elements
+[PROTOCOL 1765084604610] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084604610] Calling create_response()
+[PROTOCOL 1765084604610] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084604610] Processing best-completions operation
+[PROTOCOL 1765084604610] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084604610] Parsed limit: 5
+[PROTOCOL 1765084604610] Calling space.best_completions()
+[PROTOCOL 1765084604644] best_completions returned 5 matches in 33.801542ms
+[PROTOCOL 1765084604644] create_response took 33.85075ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084604644] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604644] Client disconnected (0 bytes read)
+[PROTOCOL 1765084604644] EXIT handle_client
+Client disconnected
+New connection from 127.0.0.1:55820
+Accepting connection...
+[PROTOCOL 1765084604644] ENTER handle_client
+[PROTOCOL 1765084604644] Stream cloned successfully
+[PROTOCOL 1765084604644] Starting read loop
+[PROTOCOL 1765084604644] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604644] Received 22 bytes
+[PROTOCOL 1765084604644] Buffer preview: "best-completions\u{1e}ss\u{1e}5\u{4}"
+[PROTOCOL 1765084604644] EOT found at position 21, buffer length: 21
+[PROTOCOL 1765084604644] Parsed request: 3 elements
+[PROTOCOL 1765084604644] Operation: best-completions
+
+Request:
+best-completions
+ss
+5
+[PROTOCOL 1765084604644] Calling create_response()
+[PROTOCOL 1765084604644] ENTER create_response: operation='best-completions', params=["ss", "5"]
+[PROTOCOL 1765084604644] Processing best-completions operation
+[PROTOCOL 1765084604644] Query: 'ss', Limit: Some("5")
+[PROTOCOL 1765084604644] Parsed limit: 5
+[PROTOCOL 1765084604644] Calling space.best_completions()
+[PROTOCOL 1765084604673] best_completions returned 5 matches in 28.58375ms
+[PROTOCOL 1765084604673] create_response took 28.625917ms
+Response:
+"ssgdi\nsshgyxds\nssfpvuneosk\nssolizfjvjiye\nssejcwefbjkvq\n"
+[PROTOCOL 1765084604673] Waiting for EOT byte (blocking read)...
+[PROTOCOL 1765084604673] Client disconnected (0 bytes read)
+[PROTOCOL 1765084604673] EXIT handle_client
+Client disconnected
