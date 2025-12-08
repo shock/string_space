@@ -1,7 +1,6 @@
 # Author: Bill Doughty
-# Version: 0.9
+# Version: 0.5
 
-import time
 from prompt_toolkit.completion import Completer, Completion, CompleteEvent
 from prompt_toolkit.document import Document
 
@@ -16,7 +15,6 @@ class StringSpaceCompleter(Completer):
         debug = kwargs.get('debug', False)
         self.disabled = False
         self.client = StringSpaceClient(host, port, debug)
-        self.last_completion_time = time.time()
         # Don't connect here - let StringSpaceClient handle connections per request
         # This avoids connection state issues with concurrent access
         try:
@@ -36,14 +34,6 @@ class StringSpaceCompleter(Completer):
     def get_completions(self, document: Document, complete_event: CompleteEvent):
         if self.disabled:
             return
-        now = time.time()
-        # get delta since last completion
-        delta = now - self.last_completion_time
-        # if delta is less than 100 milliseconds, return
-        if delta < 0.1:
-            return
-        # Don't update timestamp yet - wait until after network call completes
-        # self.last_completion_time = now  # REMOVED - will update after network call
         word_before_cursor = document.get_word_before_cursor(WORD=True)
 
         if len(word_before_cursor) < 2 and not complete_event.completion_requested:
@@ -58,9 +48,6 @@ class StringSpaceCompleter(Completer):
             word_before_cursor = word_before_cursor[1:]
 
         suggestions = self.client.best_completions_search(word_before_cursor, limit=10)
-        
-        # Update timestamp AFTER network call completes
-        self.last_completion_time = time.time()
 
         # for each suggestion in suggestions, if the first character is lower case and matches the first character of word_before_cursor, change it to upper case
         for i in range(len(suggestions)):
@@ -91,7 +78,7 @@ class StringSpaceCompleter(Completer):
     def add_words_from_text(self, text: str):
         if self.disabled:
             return
-        
+
         words = self.parse_text(text)
         if len(words) == 0:
             return
@@ -100,5 +87,5 @@ class StringSpaceCompleter(Completer):
     def add_words(self, words: list[str]):
         if self.disabled:
             return
-        
+
         self.client.add_words(words)
