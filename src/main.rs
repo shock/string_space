@@ -184,11 +184,22 @@ fn start_server(daemon: bool, host: String, port: u16, data_file: String) {
 fn setup_signal_handling() {
     unsafe {
         let sa_mask: libc::sigset_t = std::mem::zeroed();
+
+        #[cfg(target_os = "linux")]
+        let sigaction = libc::sigaction {
+            sa_sigaction: signal_handler as usize,
+            sa_mask,
+            sa_flags: libc::SA_SIGINFO | libc::SA_RESTART, // Add SA_RESTART to restart interrupted system calls
+            sa_restorer: None,
+        };
+
+        #[cfg(target_os = "macos")]
         let sigaction = libc::sigaction {
             sa_sigaction: signal_handler as usize,
             sa_mask,
             sa_flags: libc::SA_SIGINFO | libc::SA_RESTART, // Add SA_RESTART to restart interrupted system calls
         };
+
         if libc::sigaction(libc::SIGTERM, &sigaction, std::ptr::null_mut()) < 0 {
             eprintln!("Failed to set up signal handler");
             std::process::exit(1);
