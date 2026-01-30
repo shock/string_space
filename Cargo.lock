@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "string_space"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "byteorder",
  "clap",
