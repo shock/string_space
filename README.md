@@ -8,6 +8,8 @@ This Rust project implements a fast word-list database that allows efficient ins
 
 The project also includes a Python client package that provides an easy way to connect to the server and use its features.  It also includes a Python `prompt_toolkit` completer for word completion in command line tools.
 
+**See [DATA_FORMAT.md](DATA_FORMAT.md) for details on the database file structure.**
+
 ## Features
 
 - **Efficient String Storage**: Handles large datasets of strings with very fast insertion and lookup times.

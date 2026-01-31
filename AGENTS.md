@@ -130,3 +130,4 @@ cargo run -- restart <data-file>  # Restart server (daemon mode only)
 - **String Limits**: Words must be 3-50 characters in length
 - **Memory Alignment**: Uses 4KB alignment for optimal performance
 - **Daemon Mode**: Proper double-fork implementation with signal handling
+- **Database Format**: See [DATA_FORMAT.md](DATA_FORMAT.md) for details on data file structure
