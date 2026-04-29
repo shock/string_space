@@ -2,8 +2,7 @@
   "name": "string-space-client",
   "version": "0.6.5",
   "description": "TypeScript TCP client for the string-space server",
-  "main": "string-space-client.ts",
-  "types": "string-space-client.ts",
-  "author": "Bill Doughty",
+  "main": "typescript/string-space-client.ts",
+  "types": "typescript/string-space-client.ts",
   "license": "MIT"
 }
