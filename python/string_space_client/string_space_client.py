@@ -200,11 +200,13 @@ class StringSpaceClient:
 
     def parse_text(self, text: str) -> list[str]:
         # split the text into words by regex /s+/
-        words = re.split(r'[^\w_\-s]+', text)
+        words = re.split(r'[^\w_\-\']+', text)
         # get unique words
         words = list(set(words))
         # filter out words that are too short or too long
         words = [word for word in words if len(word) >= 3]
+        # filter out words beginning with "'"
+        words = [word for word in words if not word.startswith("'")]
         return words
 
     def add_words_from_text(self, text: str):
