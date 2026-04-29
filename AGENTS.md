@@ -132,6 +132,26 @@ cargo run -- restart <data-file>  # Restart server (daemon mode only)
 - **Daemon Mode**: Proper double-fork implementation with signal handling
 - **Database Format**: See [DATA_FORMAT.md](DATA_FORMAT.md) for details on data file structure
 
+## Version Management
+
+This repo contains multiple packages that share a single version:
+
+| File | Package |
+|------|---------|
+| `Cargo.toml` | Rust server |
+| `pyproject.toml` | Root Python workspace |
+| `python/string_space_client/pyproject.toml` | Python TCP client |
+| `python/string_space_completer/pyproject.toml` | Python prompt-toolkit completer |
+| `typescript/package.json` | TypeScript TCP client |
+
+To bump the version across all packages:
+
+```bash
+scripts/bump-version.sh <new-version>
+```
+
+Do **not** edit version numbers manually in individual files. Always use the script.
+
 ## TODO Tracking
 
 When the user mentions "todo", "to-do", "TODO", or similar terms, read **TODO.md** to check the current task list. This file tracks planned improvements and features for String Space.
