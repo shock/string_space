@@ -131,3 +131,7 @@ cargo run -- restart <data-file>  # Restart server (daemon mode only)
 - **Memory Alignment**: Uses 4KB alignment for optimal performance
 - **Daemon Mode**: Proper double-fork implementation with signal handling
 - **Database Format**: See [DATA_FORMAT.md](DATA_FORMAT.md) for details on data file structure
+
+## TODO Tracking
+
+When the user mentions "todo", "to-do", "TODO", or similar terms, read **TODO.md** to check the current task list. This file tracks planned improvements and features for String Space.
