@@ -142,7 +142,7 @@ This repo contains multiple packages that share a single version:
 | `pyproject.toml` | Root Python workspace |
 | `python/string_space_client/pyproject.toml` | Python TCP client |
 | `python/string_space_completer/pyproject.toml` | Python prompt-toolkit completer |
-| `typescript/package.json` | TypeScript TCP client |
+| `package.json` | TypeScript TCP client |
 
 To bump the version across all packages:
 
