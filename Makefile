@@ -48,8 +48,15 @@ benchmark: release
 server: release
 	RUST_BACKTRACE=full $(RELEASE_DIR)/$(EXECUTABLE) start test/word_list.txt
 
+# TypeScript integration tests: builds server, starts daemon, runs all ts_*.ts scripts, stops server
+ts-test: cargo-build
+	tests/run_ts_tests.sh
+
+cargo-build:
+	$(CARGO) build
+
 client:
 	python client.py
 
 # Phony targets
-.PHONY: all debug release clean test client auto-server
+.PHONY: all debug release clean test ts-test client auto-server cargo-build

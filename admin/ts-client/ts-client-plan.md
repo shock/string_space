@@ -399,39 +399,206 @@ async isAvailable(): Promise<boolean> {
 
 ## Testing Strategy
 
-### Manual Testing
+Follows the same pattern as the Python client tests: standalone TypeScript scripts executed by `bun run`, run against a live string-space server as part of `make test`.
 
-1. Start the string-space server: `cargo run -- start`
-2. Run a test script that imports the client:
+### Prerequisites
 
-```typescript
-import { StringSpaceClient } from './typescript/string-space-client';
+- `bun` installed and on `$PATH`
+- Rust server built (`cargo build`)
+- Test data file: `test/word_list.txt` (existing, ~10k words)
 
-const client = new StringSpaceClient('127.0.0.1', 7878);
+### Test Files
 
-// Health check
-console.log('Available:', await client.isAvailable());
+All TypeScript test scripts live alongside the Python test scripts:
 
-// Insert words
-await client.insert(['hello', 'world', 'helicopter', 'helpful', 'hemisphere']);
-
-// Search
-console.log('Best completions for "hel":', await client.bestCompletions('hel', 5));
-console.log('Prefix "he":', await client.prefixSearch('he'));
-
-// Word learning from text
-await client.addWordsFromText('The quick brown fox jumps over the lazy dog');
-console.log('Best completions for "qui":', await client.bestCompletions('qui', 5));
+```
+tests/
+├── ts_client.ts              # Smoke test: every API method
+tests/
+├── ts_best_completions.ts    # Comprehensive best-completions tests
+tests/
+├── ts_add_words.ts           # addWordsFromText extraction + batch insert
+tests/
+├── ts_protocol.ts            # Raw protocol validation (wire format, encoding, errors)
 ```
 
-### Edge Cases to Test
+Each script:
+- Takes a port number as its first CLI argument (e.g., `bun run tests/ts_client.ts 9898`)
+- Creates a `StringSpaceClient` connecting to `127.0.0.1:<port>`
+- Runs assertions with descriptive output
+- Exits 0 on success, non-zero on failure (uncaught exception or explicit `process.exit(1)`)
+- Uses `console.log` for progress output, prefixed with section headers
 
-- Server not running → `isAvailable()` returns `false`, search throws with retry exhaustion
-- Empty query → server rejects (min 3 chars)
-- Query with special characters → server rejects control chars
-- Large insert batch → verify all words added
-- Concurrent requests → verify serialized (no interleaving)
-- Split EOT across chunks → verify response assembly
+### Test Scripts
+
+#### `tests/ts_client.ts` — Smoke Test
+
+Mirrors `tests/client.py`. Exercises every public API method once against a server loaded with `test/word_list.txt`.
+
+| Test | Method | Asserts |
+|------|--------|----------|
+| Prefix search | `prefixSearch('hel')` | Returns non-empty array |
+| Substring search | `substringSearch('lo')` | Returns non-empty array |
+| Similar search | `similarSearch('hello', 0.6)` | Returns non-empty array |
+| Fuzzy-subsequence search | `fuzzySubsequenceSearch('hl')` | Returns non-empty array |
+| Best completions | `bestCompletions('hel', 5)` | Returns ≤5 results |
+| Insert | `insert(['testword1', 'testword2'])` | Returns string containing "OK" |
+| Insert dedup | `insert(['testword1'])` again | Returns "Inserted 0 of 1" |
+| Add words from text | `addWordsFromText(...)` | Returns non-empty string |
+| Data file | `dataFile()` | Returns non-empty string |
+| Availability | `isAvailable()` | Returns `true` |
+
+```typescript
+import { StringSpaceClient } from '../typescript/string-space-client';
+
+const port = parseInt(process.argv[2]);
+if (!port) { console.error('Usage: bun run tests/ts_client.ts <port>'); process.exit(1); }
+
+const client = new StringSpaceClient('127.0.0.1', port);
+
+function assert(condition: boolean, message: string) {
+    if (!condition) { console.error(`FAIL: ${message}`); process.exit(1); }
+    console.log(`  ✓ ${message}`);
+}
+
+// Prefix search
+let results = await client.prefixSearch('hel');
+assert(results.length > 0, `Prefix 'hel': ${results.length} results`);
+
+// Best completions with limit
+results = await client.bestCompletions('hel', 5);
+assert(results.length <= 5, `Best completions 'hel' limit 5: ${results.length} results`);
+assert(results.length > 0, `Best completions 'hel': has results`);
+
+// ... (substring, similar, fuzzy-subsequence follow same pattern)
+
+// Insert
+const insertResult = await client.insert(['testword1', 'testword2']);
+assert(insertResult.includes('OK'), `Insert: ${insertResult}`);
+
+// Insert dedup
+const dedupResult = await client.insert(['testword1']);
+assert(dedupResult.includes('0 of 1'), `Insert dedup: ${dedupResult}`);
+
+// Add words from text
+const addResult = await client.addWordsFromText("The quick brown fox's jump");
+assert(addResult.length > 0, `Add words from text: inserted`);
+
+// Data file
+const dataFile = await client.dataFile();
+assert(dataFile.length > 0, `Data file: ${dataFile}`);
+
+// Availability
+const available = await client.isAvailable();
+assert(available === true, 'isAvailable: true');
+
+console.log('\n=== All smoke tests passed ===');
+```
+
+#### `tests/ts_best_completions.ts` — Comprehensive Best-Completions
+
+Mirrors `tests/test_best_completions_integration.py`.
+
+| Test Suite | What it covers |
+|------------|---------------|
+| Basic queries | Simple prefix, query with limit, short queries (1–2 chars) |
+| Query lengths | 1-char through 7-char queries, verify limit respected |
+| Edge cases | Non-existent query, max-length query (50 chars), empty query, special characters |
+| Response format | All results are strings, no RS/EOT bytes in content |
+| Performance | Each query completes in <1000ms |
+| Concurrent clients | 5 concurrent `bestCompletions` calls via `Promise.all` on separate client instances, all succeed |
+| Consistency | 3 identical requests return the same result set |
+
+#### `tests/ts_add_words.ts` — Word Extraction + Batch Insert
+
+Tests the `addWordsFromText` pipeline end-to-end.
+
+| Test | Input | Asserts |
+|------|-------|----------|
+| Basic extraction | `'hello world foo bar baz'` | Words inserted, searchable by prefix |
+| Apostrophe handling | `'don\'t won\'t can\'t'` | Full words preserved (not split) |
+| Min length filter | `'a ab abc abcd'` | Only `abc`, `abcd` inserted |
+| Max length filter | 51-char string | Rejected (0 inserted) |
+| Dedup | `'hello hello hello'` | Only 1 instance inserted |
+| Leading apostrophe | `'\'s \'t hello'` | `\'s` and `\'t` skipped, `hello` inserted |
+| Large batch | 100 words | All inserted successfully |
+
+#### `tests/ts_protocol.ts` — Raw Protocol Validation
+
+Mirrors `tests/test_protocol_validation.py`. Tests the wire format directly using Node `net` module, independent of the client class.
+
+| Test | What it validates |
+|------|-----------------|
+| Raw request format | RS-separated elements, EOT terminator produce valid response |
+| Raw response format | Response ends with EOT, no RS bytes in content |
+| Error response | Unknown command → response starts with `ERROR -` |
+| Malformed request | Missing separators → server handles gracefully |
+| UTF-8 encoding | Unicode query (e.g., `café`) handled without crash |
+| EOT split across chunks | Server response >4096 bytes, verify client reassembles correctly |
+
+### Integration with `make test` and `make ts-test`
+
+**`make ts-test`** — dedicated target for TypeScript integration tests only. Runs `tests/run_ts_tests.sh`, which builds the server, starts a daemon on port 9898, runs all `ts_*.ts` scripts, then stops the server. Use during TS client development for fast iteration.
+
+**`make test`** — full suite (existing). TypeScript test runs are appended after the Python tests, reusing the same daemon on port 9898. No new server start/stop cycles.
+
+#### `tests/run_ts_tests.sh`
+
+```bash
+#!/bin/bash
+set -e
+
+cargo build
+EXECUTABLE=target/debug/string_space
+PORT=9898
+
+# Clean up any existing server
+RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop 2>/dev/null || true
+
+# Start daemon
+RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE start test/word_list.txt -p $PORT -d
+echo "Server started on port $PORT"
+
+# Trap ensures cleanup on exit
+trap 'RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop 2>/dev/null' EXIT
+
+# Run all TypeScript test scripts
+for script in tests/ts_*.ts; do
+    echo "\n=== Running $script ==="
+    bun run "$script" $PORT
+    echo "✓ $script passed"
+done
+
+echo "\n=== All TypeScript tests passed ==="
+```
+
+#### Addition to `tests/run_tests.sh` (full suite)
+
+Appended after the Python test runs, inside the existing daemon lifecycle on port 9898:
+
+```bash
+# --- TypeScript tests (new) ---
+for script in tests/ts_*.ts; do
+    echo "\n=== Running $script ==="
+    bun run "$script" 9898
+    echo "✓ $script passed"
+done
+```
+
+### Edge Cases Covered Across All Scripts
+
+| Edge case | Covered by |
+|-----------|-----------|
+| Server not running | `isAvailable()` returns `false`; search throws after retry exhaustion |
+| Empty query | `ts_best_completions.ts` — server returns error |
+| Query too long (>50 chars) | `ts_best_completions.ts` — server truncates or rejects |
+| Special characters in query | `ts_best_completions.ts` — graceful handling |
+| Unicode / emoji | `ts_protocol.ts` — UTF-8 encoding |
+| Large insert batch | `ts_add_words.ts` — 100 words |
+| Duplicate inserts | `ts_client.ts` — dedup response check |
+| Concurrent requests | `ts_best_completions.ts` — `Promise.all` on separate clients |
+| EOT split across TCP chunks | `ts_protocol.ts` — large response reassembly |
+| Word extraction edge cases | `ts_add_words.ts` — apostrophes, min/max length, dedup, leading apostrophe |
 
 ---
 
