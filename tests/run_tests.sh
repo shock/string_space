@@ -147,6 +147,19 @@ else
     echo "Protocol validation test ran successfully"
 fi
 
+# --- TypeScript tests (new) ---
+for script in tests/ts_*.ts; do
+    echo ""
+    echo "=== Running $script ==="
+    bun run "$script" 9898
+    if [ $? -ne 0 ]; then
+        echo "$script failed"
+        RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
+        exit 1
+    fi
+    echo "✓ $script passed"
+done
+
 # Stop the server after all tests
 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
