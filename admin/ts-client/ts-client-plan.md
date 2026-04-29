@@ -2,7 +2,7 @@
 
 **Created:** 2026-04-29
 **Status:** Planning — implementation not yet started
-**Parent plan:** `admin/string-space-acmpl/master-plan.md`
+**Parent plan:** `admin/string-space-acmpl/master-plan.md` *(not yet created)*
 
 ---
 
@@ -46,11 +46,11 @@ This plan creates the TypeScript equivalent of the Python client.
 
 | Constant | Value | Source |
 |----------|-------|--------|
-| EOT byte | `0x04` | `src/modules/protocol.rs:36` |
-| RS byte | `0x1E` | `src/modules/protocol.rs:37` |
-| Connection timeout | 3 seconds | `src/modules/protocol.rs:39` |
-| Min word length | 3 chars | `src/modules/string_space/mod.rs:65` |
-| Max word length | 50 chars | `src/modules/string_space/mod.rs:66` |
+| EOT byte | `0x04` | `src/modules/protocol.rs:31` |
+| RS byte | `0x1E` | `src/modules/protocol.rs:32` |
+| Connection timeout | 3 seconds | `src/modules/protocol.rs:34` |
+| Min word length | 3 chars | `src/modules/string_space/mod.rs:38` |
+| Max word length | 50 chars | `src/modules/string_space/mod.rs:39` |
 
 ### Commands
 
@@ -62,10 +62,9 @@ This plan creates the TypeScript equivalent of the Python client.
 | `substring` | `<substring>` | newline-separated matches |
 | `similar` | `<word><RS><threshold>` | newline-separated matches |
 | `fuzzy-subsequence` | `<query>` | newline-separated matches |
-| `remove` | `<words...>` | — |
 | `data-file` | (none) | file path string |
-| `len` | (none) | count |
-| `empty` | (none) | `true`/`false` |
+
+> **Not available via TCP:** The `StringSpace` Rust struct also exposes `len`, `empty`, `clear_space`, `get_all_strings`, `capacity`, and `sort` as methods, but these have **no protocol handlers** — they are not reachable over TCP. The TypeScript client does not expose them. If needed in the future, protocol handlers must be added to `src/modules/protocol.rs` first.
 
 ### Server Behavior
 
@@ -164,7 +163,6 @@ def parse_text(self, text: str) -> list[str]:
     words = re.split(r'[^\w_\-\']+', text)
     words = list(set(words))
     words = [word for word in words if len(word) >= 3]
-    words = [word for word in words if not word.startswith("'")]
     return words
 ```
 
@@ -203,8 +201,6 @@ export class StringSpaceClient {
 
     // Utility
     async dataFile(): Promise<string>;
-    async len(): Promise<number>;
-    async empty(): Promise<boolean>;
 }
 ```
 
@@ -230,12 +226,14 @@ private async request(elements: string[]): Promise<string> {
         socket.setTimeout(3000);
 
         let response = Buffer.alloc(0);
+        let settled = false;
 
         socket.on('data', (chunk: Buffer) => {
             response = Buffer.concat([response, chunk]);
             if (chunk.includes(EOT)) {
+                settled = true;
                 socket.destroy();
-                const text = response.toString('utf-8').replace(/\x04$/, '');
+                const text = response.toString('utf-8').replace(/\x04+$/, '');
                 if (text.startsWith('ERROR')) {
                     reject(new Error(text));
                 } else {
@@ -244,8 +242,9 @@ private async request(elements: string[]): Promise<string> {
             }
         });
 
-        socket.on('timeout', () => { socket.destroy(); reject(new Error('Connection timeout')); });
-        socket.on('error', (err) => reject(err));
+        socket.on('timeout', () => { settled = true; socket.destroy(); reject(new Error('Connection timeout')); });
+        socket.on('error', (err) => { if (!settled) { settled = true; reject(err); } });
+        socket.on('close', () => { if (!settled) { settled = true; reject(new Error('Connection closed by server')); } });
 
         socket.write(serialized);
     });
@@ -284,10 +283,24 @@ private async requestWithRetry(elements: string[], maxRetries = 2): Promise<stri
             return await this.request(elements);
         } catch (err) {
             if (attempt === maxRetries) throw err;
+            // Only retry on connection-level errors (ECONNREFUSED, timeout, etc.)
+            if (!this.isConnectionError(err)) throw err;
             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt))); // 1s, 2s
         }
     }
     throw new Error('Unreachable');
+}
+
+private isConnectionError(err: unknown): boolean {
+    if (err instanceof Error) {
+        const msg = err.message;
+        return msg.includes('ECONNREFUSED') ||
+               msg.includes('ECONNRESET') ||
+               msg.includes('ETIMEDOUT') ||
+               msg.includes('Connection timeout') ||
+               msg.includes('EPIPE');
+    }
+    return false;
 }
 ```
 
@@ -295,6 +308,7 @@ private async requestWithRetry(elements: string[], maxRetries = 2): Promise<stri
 
 ```typescript
 async bestCompletions(query: string, limit: number = 10): Promise<string[]> {
+    // Server default limit is 15 when omitted; client always sends explicitly.
     const response = await this.serializedRequest(['best-completions', query, String(limit)]);
     return response.split('\n').filter(line => line.length > 0);
 }
@@ -306,6 +320,16 @@ async prefixSearch(prefix: string): Promise<string[]> {
 
 async similarSearch(word: string, threshold: number): Promise<string[]> {
     const response = await this.serializedRequest(['similar', word, String(threshold)]);
+    return response.split('\n').filter(line => line.length > 0);
+}
+
+async substringSearch(substring: string): Promise<string[]> {
+    const response = await this.serializedRequest(['substring', substring]);
+    return response.split('\n').filter(line => line.length > 0);
+}
+
+async fuzzySubsequenceSearch(query: string): Promise<string[]> {
+    const response = await this.serializedRequest(['fuzzy-subsequence', query]);
     return response.split('\n').filter(line => line.length > 0);
 }
 ```
@@ -321,12 +345,21 @@ async insert(words: string[]): Promise<string> {
 
 async addWordsFromText(text: string): Promise<string> {
     const words = text
-        .split(/[^\w_-]+/)
+        .split(/[^\w_\-']+/) // Matches Python: keeps apostrophes (e.g. "don't")
         .filter(w => w.length >= 3)
-        .filter(w => !w.startsWith("'"))
+        .filter(w => w.length <= 50) // Server rejects words > MAX_CHARS
+        .filter(w => !w.startsWith("'")) // Skip bare apostrophe fragments (e.g. "'s", "'t")
         .filter((w, i, arr) => arr.indexOf(w) === i); // unique
     if (words.length === 0) return '';
     return this.insert(words);
+}
+```
+
+### Data File
+
+```typescript
+async dataFile(): Promise<string> {
+    return this.serializedRequest(['data-file']);
 }
 ```
 
@@ -424,3 +457,4 @@ Once the client is finalized and proven:
 6. **No concurrency**: Server handles one connection at a time
 7. **String length limits**: MIN_CHARS=3, MAX_CHARS=50
 8. **Case sensitivity**: `best_completions` does case-insensitive prefix matching, bubbles case-sensitive matches above
+9. **Insert comma handling**: The server also replaces commas with spaces during insert (in addition to newlines). Words containing commas will be split.
