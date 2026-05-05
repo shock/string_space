@@ -52,6 +52,10 @@ server: release
 ts-test: cargo-build
 	tests/run_ts_tests.sh
 
+# Lua integration tests: builds server, starts daemon, runs lua test script, stops server
+lua-test: cargo-build
+	tests/run_lua_tests.sh
+
 cargo-build:
 	$(CARGO) build
 
@@ -59,4 +63,4 @@ client:
 	python client.py
 
 # Phony targets
-.PHONY: all debug release clean test ts-test client auto-server cargo-build
+.PHONY: all debug release clean test ts-test lua-test client auto-server cargo-build

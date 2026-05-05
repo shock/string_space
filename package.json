@@ -1,6 +1,6 @@
 {
   "name": "string-space-client",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "TypeScript TCP client for the string-space server",
   "main": "typescript/string-space-client.ts",
   "types": "typescript/string-space-client.ts",

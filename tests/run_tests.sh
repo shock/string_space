@@ -160,6 +160,17 @@ for script in tests/ts_*.ts; do
     echo "✓ $script passed"
 done
 
+# --- Lua tests (new) ---
+echo ""
+echo "=== Running lua/test_client.lua ==="
+nvim -l lua/test_client.lua 9898
+if [ $? -ne 0 ]; then
+    echo "lua/test_client.lua failed"
+    RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
+    exit 1
+fi
+echo "✓ lua/test_client.lua passed"
+
 # Stop the server after all tests
 RUST_BACKTRACE=full SS_TEST=true $EXECUTABLE stop
 if [ $? -ne 0 ]; then
