@@ -221,7 +221,9 @@ export class StringSpaceClient {
             };
 
             socket.on('data', (chunk: Buffer) => {
-                response = Buffer.concat([response, chunk]);
+                // `as unknown as` shim: keeps this compiling under older @types/node
+                // (e.g. 22.0.0) where Buffer no longer satisfies Uint8Array<ArrayBufferLike>.
+                response = Buffer.concat([response, chunk] as unknown as Uint8Array[]);
                 // Check if the EOT byte has arrived (may be split across chunks)
                 if (chunk.includes(EOT)) {
                     settle(() => {
@@ -258,7 +260,7 @@ export class StringSpaceClient {
                 });
             });
 
-            socket.write(serialized);
+            socket.write(serialized as unknown as Uint8Array);
         });
     }
 

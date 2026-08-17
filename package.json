@@ -1,8 +1,11 @@
 {
   "name": "string-space-client",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "TypeScript TCP client for the string-space server",
   "main": "typescript/string-space-client.ts",
   "types": "typescript/string-space-client.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  }
 }

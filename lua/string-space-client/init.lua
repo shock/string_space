@@ -1,5 +1,5 @@
 ---
---- String Space Lua Client v0.6.7
+--- String Space Lua Client v0.6.8
 --- 2026-05-05
 ---
 --- TCP client for the string-space server — an in-memory word database
